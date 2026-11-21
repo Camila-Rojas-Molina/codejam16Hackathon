@@ -6,7 +6,7 @@ export default function DogsPage() {
     <>
       <PageHeader title="Dog Park Quests" description="Match a local and a tourist to find a dog park together." />
       <Card>
-        <p className="text-muted">Coming soon.</p>
+        <p className="text-navy">Coming soon.</p>
       </Card>
     </>
   )

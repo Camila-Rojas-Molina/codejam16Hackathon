@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router'
 import { cn } from '../../lib/cn'
+import Logo from '../ui/Logo'
 
 const links = [
   { to: '/', label: 'Home' },
@@ -12,17 +13,17 @@ const links = [
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
-    'rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-    isActive ? 'bg-brand-50 text-brand-700' : 'text-muted hover:text-ink',
+    'rounded-full px-3 py-2 font-type text-xs tracking-wider uppercase transition-colors',
+    isActive ? 'bg-red text-white' : 'text-navy hover:bg-bubble-light',
   )
 
 export default function Navigation() {
   return (
     <>
       {/* Desktop: top bar */}
-      <header className="sticky top-0 z-10 hidden border-b border-slate-200 bg-surface/90 backdrop-blur md:block">
+      <header className="sticky top-0 z-10 hidden border-b-[3px] border-navy bg-paper md:block">
         <nav className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
-          <span className="text-lg font-bold text-brand-700">Travel Quest</span>
+          <Logo size="sm" />
           <ul className="flex gap-1">
             {links.map((link) => (
               <li key={link.to}>
@@ -36,7 +37,7 @@ export default function Navigation() {
       </header>
 
       {/* Mobile: bottom bar */}
-      <nav className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-surface/95 backdrop-blur md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-10 border-t-[3px] border-navy bg-paper md:hidden">
         <ul className="mx-auto flex max-w-md justify-around px-2 py-2">
           {links.map((link) => (
             <li key={link.to}>

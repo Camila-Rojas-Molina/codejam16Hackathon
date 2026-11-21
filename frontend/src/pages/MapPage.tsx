@@ -6,7 +6,7 @@ export default function MapPage() {
     <>
       <PageHeader title="Map" description="Quest locations and accessible places near you." />
       <Card>
-        <p className="text-muted">Coming soon.</p>
+        <p className="text-navy">Coming soon.</p>
       </Card>
     </>
   )

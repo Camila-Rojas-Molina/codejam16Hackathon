@@ -6,7 +6,7 @@ export default function TeamPage() {
     <>
       <PageHeader title="Team" description="Your team, members and score." />
       <Card>
-        <p className="text-muted">Coming soon.</p>
+        <p className="text-navy">Coming soon.</p>
       </Card>
     </>
   )
