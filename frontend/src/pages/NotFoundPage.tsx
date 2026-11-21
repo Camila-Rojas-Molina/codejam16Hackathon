@@ -7,7 +7,7 @@ export default function NotFoundPage() {
     <>
       <PageHeader title="Page not found" />
       <Card>
-        <Link to="/" className="font-medium text-brand-700 hover:underline">
+        <Link to="/" className="font-type uppercase text-navy underline underline-offset-4">
           Back to home
         </Link>
       </Card>

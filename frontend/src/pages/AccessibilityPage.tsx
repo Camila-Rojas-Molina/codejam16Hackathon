@@ -6,7 +6,7 @@ export default function AccessibilityPage() {
     <>
       <PageHeader title="Accessible Places" description="Recommendations based on your accessibility needs." />
       <Card>
-        <p className="text-muted">Coming soon.</p>
+        <p className="text-navy">Coming soon.</p>
       </Card>
     </>
   )

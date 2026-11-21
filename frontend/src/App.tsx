@@ -6,12 +6,15 @@ import HomePage from './pages/HomePage'
 import MapPage from './pages/MapPage'
 import NotFoundPage from './pages/NotFoundPage'
 import QuestsPage from './pages/QuestsPage'
+import StyleguidePage from './pages/StyleguidePage'
 import TeamPage from './pages/TeamPage'
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* TEMPORARY: remove with StyleguidePage before the demo. */}
+        <Route path="styleguide" element={<StyleguidePage />} />
         <Route element={<AppShell />}>
           <Route index element={<HomePage />} />
           <Route path="quests" element={<QuestsPage />} />

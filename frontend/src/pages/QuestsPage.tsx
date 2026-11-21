@@ -6,7 +6,7 @@ export default function QuestsPage() {
     <>
       <PageHeader title="Quests" description="Find the location in the photo before time runs out." />
       <Card>
-        <p className="text-muted">Coming soon.</p>
+        <p className="text-navy">Coming soon.</p>
       </Card>
     </>
   )

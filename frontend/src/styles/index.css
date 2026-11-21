@@ -1,18 +1,87 @@
 @import 'tailwindcss';
 
-/* Design tokens. Change colors here, not in components. */
+/*
+ * Travel Quest design tokens (PRD section 7).
+ * Hand-drawn scrapbook / zine: flat sky everywhere, red pill buttons, stamp + typewriter type.
+ * Change colours here, not in components.
+ *
+ * Contrast notes (WCAG):
+ *   navy on sky 5.1:1 -> default text colour directly on the background
+ *   navy on paper 14.7:1 · white on red 4.7:1 · ink on sun 13.9:1 · navy on bubble 9.4:1
+ *   white on sky 3.2:1 -> large text only
+ *   red on sky 1.5:1 -> ONLY for the big logo/display text, never body or labels
+ *   red on paper 4.3:1 -> large text only
+ */
 @theme {
-  --color-brand-50: #f0fdf4;
-  --color-brand-500: #22c55e;
-  --color-brand-600: #16a34a;
-  --color-brand-700: #15803d;
+  /* Palette: these replace Tailwind's default colours entirely. */
+  --color-*: initial;
+  --color-sky: #6994c6;
+  --color-red: #e80c0c;
+  --color-red-rim: #ff2d2b;
+  --color-navy: #13175a;
+  --color-paper: #fff2e6;
+  --color-bubble: #7bcffb;
+  --color-bubble-light: #bdeaff;
+  --color-sun: #ffcc00;
+  --color-ink: #000000;
+  --color-white: #ffffff;
+  --color-transparent: transparent;
+  --color-current: currentColor;
 
-  --color-ink: #0f172a;
-  --color-muted: #64748b;
-  --color-surface: #ffffff;
-  --color-canvas: #f8fafc;
+  /* Type: stamp display (logo, headings), typewriter caps (buttons, labels, timer), sans body */
+  --font-display: 'Rubik Dirt', 'Impact', ui-sans-serif, system-ui, sans-serif;
+  --font-type: 'Special Elite', 'Courier New', ui-monospace, monospace;
+  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
 
-  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  /* Motion: bouncy and sticker-like for game moments, slow for Phone Away */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --animate-pop: pop 380ms var(--ease-spring) both;
+  --animate-breathe: breathe 6s ease-in-out infinite;
+  --animate-tick: tick 1s ease-in-out infinite;
+
+  @keyframes pop {
+    0% {
+      transform: scale(0.6) rotate(-6deg);
+      opacity: 0;
+    }
+    100% {
+      transform: scale(1) rotate(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes breathe {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 0.7;
+    }
+    50% {
+      transform: scale(1.08);
+      opacity: 1;
+    }
+  }
+
+  @keyframes tick {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.04);
+    }
+  }
+}
+
+/* Dashed navy divider: <hr className="trail-divider" /> */
+@utility trail-divider {
+  border: 0;
+  height: 3px;
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--color-navy) 0 12px,
+    transparent 12px 20px
+  );
 }
 
 @layer base {
@@ -22,7 +91,32 @@
     height: 100%;
   }
 
+  /* Flat sky background: no grain, no gradient. Navy text (5.1:1) by default. */
   body {
-    @apply bg-canvas font-sans text-ink antialiased;
+    @apply bg-sky font-sans text-navy antialiased;
+  }
+
+  /* Rubik Dirt ships one weight; never fake-bold it. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display font-normal tracking-wide uppercase;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--color-navy);
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

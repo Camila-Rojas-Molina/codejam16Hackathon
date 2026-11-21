@@ -6,7 +6,7 @@ export default function HomePage() {
     <>
       <PageHeader title="Travel Quest" description="Find hidden places with locals and tourists." />
       <Card>
-        <p className="text-muted">Coming soon.</p>
+        <p className="text-navy">Coming soon.</p>
       </Card>
     </>
   )
