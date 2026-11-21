@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router'
 import Screen from '../components/layout/Screen'
 import { SpeechBubble, Star } from '../components/illustrations/Stickers'
@@ -6,6 +6,10 @@ import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import { roleLabel } from '../features/onboarding/options'
+import { nextOnboardingStep } from '../features/profile/flow'
+import { compatibility, toMatchProfile } from '../features/profile/matching'
+import { activeTrip } from '../features/profile/model'
+import { INTEREST_OPTIONS, labelsFor } from '../features/profile/options'
 import { findPartner } from '../lib/api'
 import type { User } from '../lib/types'
 import { useStore } from '../store/useStore'
@@ -28,26 +32,38 @@ function AvatarDisc({ emoji, className = '' }: { emoji: string; className?: stri
 }
 
 export default function MatchPage() {
-  const { user, setPartner } = useStore()
+  const { user, account, profile, setPartner } = useStore()
   const navigate = useNavigate()
   const [phase, setPhase] = useState<Phase>({ kind: 'searching' })
   const [attempt, setAttempt] = useState(0)
 
+  // What we match on: the active mode's effective preferences (trip details override the defaults).
+  const me = toMatchProfile(profile)
+  const search = useEffectEvent((r: User['role']) => Promise.all([findPartner(r, me), wait(SEARCH_MS)]))
+  const userId = user?.id
+  const role = user?.role
+  const next = nextOnboardingStep(account, profile)
+
   useEffect(() => {
-    if (!user) return
+    if (!userId || !role || next) return
     let cancelled = false
     // Always show the search for ~2.5 s, even if the API answers sooner.
-    Promise.all([findPartner(user.role), wait(SEARCH_MS)])
+    search(role)
       .then(([partner]) => !cancelled && setPhase({ kind: 'found', partner }))
       .catch(() => !cancelled && setPhase({ kind: 'error' }))
     return () => {
       cancelled = true
     }
-  }, [user, attempt])
+  }, [userId, role, next, attempt])
 
+  if (next) return <Navigate to={next} replace />
   if (!user) return <Navigate to="/onboarding" replace />
 
-  const lookingFor = user.role === 'tourist' ? 'a local who knows the city' : 'a tourist to show around'
+  const trip = activeTrip(profile)
+  const lookingFor =
+    user.role === 'tourist'
+      ? `a local who knows ${trip?.destination || 'the city'}`
+      : `a visitor to show around ${profile?.local?.homeCity || 'your city'}`
 
   if (phase.kind === 'searching') {
     return (
@@ -94,6 +110,8 @@ export default function MatchPage() {
   }
 
   const { partner } = phase
+  const match = compatibility(me ?? {}, { interests: partner.interests, languages: partner.languages })
+  const common = labelsFor(INTEREST_OPTIONS, match.sharedInterests)
 
   return (
     <Screen className="justify-between gap-8">
@@ -129,6 +147,15 @@ export default function MatchPage() {
             </Badge>
           </div>
         </div>
+        {(common.length > 0 || match.sharedLanguages.length > 0) && (
+          <p className="mt-4 border-t-[3px] border-dashed border-navy pt-3">
+            <span className="font-type text-xs tracking-wider uppercase">In common · </span>
+            {[common.length > 0 && `you both love ${common.join(', ')}`, match.sharedLanguages.length > 0 && `you both speak ${match.sharedLanguages.join(', ')}`]
+              .filter(Boolean)
+              .join('; ')}
+            .
+          </p>
+        )}
         {partner.funFact && (
           <p className="mt-4 border-t-[3px] border-dashed border-navy pt-3">
             <span className="font-type text-xs tracking-wider uppercase">Fun fact · </span>
