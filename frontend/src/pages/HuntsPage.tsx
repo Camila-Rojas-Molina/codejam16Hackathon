@@ -1,6 +1,7 @@
 // PLACEHOLDER until build step 4 (hunt list). Exists so Welcome/Match have somewhere to land.
 import { Navigate, useNavigate } from 'react-router'
 import Screen from '../components/layout/Screen'
+import Avatar from '../components/ui/Avatar'
 import Badge from '../components/ui/Badge'
 import BottomNav from '../components/ui/BottomNav'
 import Button from '../components/ui/Button'
@@ -28,8 +29,8 @@ export default function HuntsPage() {
       <Card tone="bubble-light" tilt="left">
         <p className="font-type text-xs tracking-wider uppercase">Your team</p>
         <h2 className="mt-1 text-2xl">{team.name}</h2>
-        <p className="mt-2 text-3xl" aria-label={`${team.members[0].name} and ${team.members[1].name}`}>
-          {team.members[0].avatar} + {team.members[1].avatar}
+        <p className="mt-2 flex items-center gap-2 text-3xl" aria-label={`${team.members[0].name} and ${team.members[1].name}`}>
+          <Avatar avatar={team.members[0].avatar} size="md" /> + <Avatar avatar={team.members[1].avatar} size="md" />
         </p>
         <p className="mt-1">
           {team.members[0].name} & {team.members[1].name}

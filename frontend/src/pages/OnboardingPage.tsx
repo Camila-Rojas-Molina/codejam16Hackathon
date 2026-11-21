@@ -39,7 +39,7 @@ export default function OnboardingPage() {
     try {
       if (account) {
         await updateAccount({ name: trimmed, avatar })
-        navigate(fromProfile ? '/profile' : (nextOnboardingStep(account, profile) ?? '/hunts'))
+        navigate(fromProfile ? '/profile' : (nextOnboardingStep(account, profile) ?? '/map'))
       } else {
         await createAccount({ name: trimmed, avatar })
         navigate('/onboarding/questions')

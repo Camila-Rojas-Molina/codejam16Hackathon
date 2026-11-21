@@ -7,7 +7,8 @@ import type {
   TouristTrip,
   UniversalProfile,
 } from '../features/profile/types'
-import type { ScoreBreakdown, User } from '../lib/types'
+import type { Person, Thread } from '../features/chat/types'
+import type { HuntResult, ScoreBreakdown, User } from '../lib/types'
 import type { AppState } from './state'
 
 export type StoreValue = AppState & {
@@ -32,6 +33,24 @@ export type StoreValue = AppState & {
   clearLocal: () => Promise<ProfileRecord>
   /** Permanently deletes the account and all its answers, then signs out. */
   deleteAccount: () => Promise<void>
+
+  // Cities discovered (universal profile)
+  addCity: (name: string) => Promise<ProfileRecord>
+  removeCity: (cityId: string) => Promise<ProfileRecord>
+
+  // Points, challenges & shop
+  /** Completed hunts across every exploring context (current and parked). */
+  huntResults: HuntResult[]
+  claimChallenge: (challengeId: string) => Promise<ProfileRecord>
+  purchase: (itemId: string) => Promise<ProfileRecord>
+  setEquipped: (itemId: string, on: boolean) => Promise<ProfileRecord>
+
+  // People & messages
+  setLiked: (personId: string, liked: boolean) => Promise<ProfileRecord>
+  /** Message threads by person id (loaded from api.ts). */
+  threads: Record<string, Thread>
+  sendMessage: (person: Person, text: string) => Promise<void>
+  markRead: (personId: string) => Promise<void>
 }
 
 export const StoreContext = createContext<StoreValue | null>(null)

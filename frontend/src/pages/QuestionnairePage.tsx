@@ -70,7 +70,7 @@ export default function QuestionnairePage() {
     setError(null)
     setIndex(Math.min(Math.max(0, i), reviewIndex))
   }
-  const exit = () => navigate('/profile')
+  const exit = () => navigate('/profile?tab=answers')
 
   function back() {
     if (returnToReview && item.kind === 'question') {
@@ -103,7 +103,7 @@ export default function QuestionnairePage() {
     setBusy(true)
     try {
       await saveUniversal(draft)
-      if (editing) return navigate('/profile', { state: { saved: 'Profile updated.' } })
+      if (editing) return navigate('/profile?tab=answers', { state: { saved: 'Profile updated.' } })
       removeKey(draftKey(account!.id))
       navigate('/mode', { state: { welcome: true } })
     } catch (e) {

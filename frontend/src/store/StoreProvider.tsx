@@ -1,12 +1,16 @@
-import { useEffect, useMemo, useReducer, type ReactNode } from 'react'
-import * as api from '../lib/api'
+import { useEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
+import type { Thread } from '../features/chat/types'
 import type { ProfileRecord } from '../features/profile/types'
+import { todayKey } from '../features/quests/challenges'
+import * as api from '../lib/api'
 import { StoreContext, type StoreValue } from './context'
 import { currentUser, loadState, reducer, saveState } from './state'
 
 export default function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, loadState)
   const accountId = state.account?.id ?? null
+  // Message threads live in api.ts (not in the persisted app state); this is the in-memory copy.
+  const [threads, setThreads] = useState<{ owner: string | null; byPerson: Record<string, Thread> }>({ owner: null, byPerson: {} })
 
   useEffect(() => {
     saveState(state)
@@ -27,6 +31,10 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
       .catch(() => {
         // Offline or storage blocked: keep using the cached copy.
       })
+    api
+      .getThreads(accountId)
+      .then((byPerson) => !cancelled && setThreads({ owner: accountId, byPerson }))
+      .catch(() => {})
     return () => {
       cancelled = true
     }
@@ -41,6 +49,10 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'setProfile', profile })
       return profile
     }
+    const huntResults = [...Object.values(state.results), ...Object.values(state.parked).flatMap((s) => Object.values(s.results))]
+    const myThreads = threads.owner === accountId ? threads.byPerson : {}
+    const setThread = (thread: Thread) =>
+      setThreads((t) => ({ owner: accountId, byPerson: { ...(t.owner === accountId ? t.byPerson : {}), [thread.person.id]: thread } }))
 
     return {
       ...state,
@@ -72,8 +84,26 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
         await api.deleteAccount(requireId())
         dispatch({ type: 'reset' })
       },
+
+      addCity: async (name) => commit(await api.addDiscoveredCity(requireId(), name)),
+      removeCity: async (cityId) => commit(await api.removeDiscoveredCity(requireId(), cityId)),
+
+      huntResults,
+      claimChallenge: async (challengeId) =>
+        commit(await api.claimChallengeReward(requireId(), challengeId, { huntResults, today: todayKey() })),
+      purchase: async (itemId) => commit(await api.purchaseItem(requireId(), itemId)),
+      setEquipped: async (itemId, on) => commit(await api.setEquipped(requireId(), itemId, on)),
+
+      setLiked: async (personId, liked) => commit(await api.setLiked(requireId(), personId, liked)),
+      threads: myThreads,
+      sendMessage: async (person, text) => setThread(await api.sendMessage(requireId(), person, text)),
+      markRead: async (personId) => {
+        if ((myThreads[personId]?.messages ?? []).every((m) => m.read)) return
+        const thread = await api.markThreadRead(requireId(), personId)
+        if (thread) setThread(thread)
+      },
     }
-  }, [state, accountId])
+  }, [state, accountId, threads])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

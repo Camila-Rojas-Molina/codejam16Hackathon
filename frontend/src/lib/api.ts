@@ -1,24 +1,32 @@
-// The only data-access module. Returns mock data now; swap the bodies for Supabase /
-// Google Places later without changing the signatures. Screens must not import mockData.
-import { compatibility, type MatchDogs, type MatchProfile } from '../features/profile/matching'
-import { tidyDogs } from '../features/profile/model'
+// The only data-access module screens use. Hunts, partners and the leaderboard are still mock data
+// (backend.ts has the Supabase versions ready to swap in). Accounts and profiles save to Supabase
+// when it's configured, and to this device otherwise. Screens must not import mockData.
+import { MESSAGE_MAX_LENGTH, type Message, type Person, type Thread } from '../features/chat/types'
+import { addCity, pointsBalance, tidyDogs } from '../features/profile/model'
+import { compatibility, type Compatibility, type MatchDogs, type MatchProfile } from '../features/profile/matching'
 import type {
   Account,
+  DiscoveredCity,
   ExploreMode,
+  PointsEntry,
   LocalContext,
   ProfileRecord,
   TouristTrip,
   UniversalProfile,
 } from '../features/profile/types'
+import { challenge, challengeState, rewardRef, type ChallengeContext } from '../features/quests/challenges'
+import { shopItem } from '../features/rewards/shop'
 import { scoreHunt } from '../features/scoring/score'
 import { distanceMeters } from './geo'
 import { HUNTS, TEAMS, USERS } from './mockData'
 import * as db from './profileDb'
+import { profileRepo } from './profileRepo'
 import type { Hunt, LatLng, Role, ScoreBreakdown, Team, User } from './types'
 
 // Small fake latency so loading states get exercised.
 const delay = (ms = 250) => new Promise((resolve) => setTimeout(resolve, ms))
 const clone = <T>(value: T): T => structuredClone(value)
+const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 
 /**
  * Hunts near a location. Today: the curated McGill list, nearest first when a location is given.
@@ -49,7 +57,9 @@ export async function findPartner(role: Role, me?: MatchProfile | null): Promise
   await delay()
   const wanted: Role = role === 'tourist' ? 'local' : 'tourist'
   const pool = USERS.filter((u) => u.role === wanted)
-  if (!me) return clone(pool[Math.floor(Math.random() * pool.length)])
+  // Every partner here is a sample profile until the backend's find_partner is wired in.
+  const sample = (u: User): User => ({ ...clone(u), demo: true })
+  if (!me) return sample(pool[Math.floor(Math.random() * pool.length)])
   const scored = pool
     .map((u) => ({ u, match: compatibility(me, { interests: u.interests, languages: u.languages, dogs: matchDogs(u) }) }))
     // Hard filter: "prefers no dogs" is never paired with a dog owner.
@@ -59,58 +69,59 @@ export async function findPartner(role: Role, me?: MatchProfile | null): Promise
   if (scored.length === 0) throw new Error('No compatible partner right now.')
   // A little variety: pick randomly among everyone within 0.1 of the best score.
   const best = scored.filter((s) => s.score >= scored[0].score - 0.1)
-  return clone(best[Math.floor(Math.random() * best.length)].u)
+  return sample(best[Math.floor(Math.random() * best.length)].u)
 }
 
 // ---- Accounts & profiles ----------------------------------------------------------------------
-// One account per person. Universal answers, tourist trips and local context all hang off the
-// account id, so switching modes never creates or duplicates anything.
-
-const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-
-function requireAccount(accountId: string) {
-  if (!db.getAccount(accountId)) throw new Error('Account not found. Please create your profile again.')
-}
+// One account per person. Universal answers, tourist trips, local context, rewards and likes all
+// hang off the account id, so switching modes never creates or duplicates anything.
+// Storage: Supabase when configured, this device otherwise (see profileRepo.ts).
 
 /** Read-modify-write one profile record. */
-function updateRecord(accountId: string, change: (record: ProfileRecord) => ProfileRecord): ProfileRecord {
-  requireAccount(accountId)
-  const next = { ...change(db.getRecord(accountId)), accountId, updatedAt: Date.now() }
-  db.putRecord(next)
+async function updateRecord(accountId: string, change: (record: ProfileRecord) => ProfileRecord): Promise<ProfileRecord> {
+  const repo = profileRepo()
+  if (!(await repo.getAccount(accountId))) throw new Error('Account not found. Please create your profile again.')
+  const next = { ...change(await repo.getRecord(accountId)), accountId, updatedAt: Date.now() }
+  await repo.saveRecord(next)
   return clone(next)
 }
+
+/** "supabase" or "device": where profiles are saved right now (shown in Settings). */
+export const profileStorage = () => profileRepo().kind
 
 export async function createAccount(input: { name: string; avatar: string }): Promise<{ account: Account; profile: ProfileRecord }> {
   await delay(200)
   const name = input.name.trim()
   if (!name) throw new Error('A name is required.')
-  const account: Account = { id: newId('acct'), name, avatar: input.avatar, createdAt: Date.now() }
-  db.putAccount(account)
-  const profile = db.getRecord(account.id)
-  db.putRecord(profile)
+  const repo = profileRepo()
+  const account = await repo.createAccount({ name, avatar: input.avatar })
+  const profile = await repo.getRecord(account.id)
+  await repo.saveRecord(profile)
   return { account: clone(account), profile: clone(profile) }
 }
 
 export async function updateAccount(accountId: string, input: { name: string; avatar: string }): Promise<Account> {
   await delay(150)
-  const existing = db.getAccount(accountId)
+  const repo = profileRepo()
+  const existing = await repo.getAccount(accountId)
   if (!existing) throw new Error('Account not found.')
   const name = input.name.trim()
   if (!name) throw new Error('A name is required.')
   const account = { ...existing, name, avatar: input.avatar }
-  db.putAccount(account)
+  await repo.saveAccount(account)
   return clone(account)
 }
 
-/** Returns null when the account no longer exists (e.g. deleted on this device). */
+/** Returns null when the account no longer exists (e.g. deleted). */
 export async function getProfile(accountId: string): Promise<{ account: Account; profile: ProfileRecord } | null> {
   await delay(100)
-  const account = db.getAccount(accountId)
+  const repo = profileRepo()
+  const account = await repo.getAccount(accountId)
   if (!account) return null
-  return { account: clone(account), profile: clone(db.getRecord(accountId)) }
+  return { account: clone(account), profile: clone(await repo.getRecord(accountId)) }
 }
 
-/** Saves the universal profile only. Trips and local context are untouched. */
+/** Saves the universal profile only. Trips, local context and rewards are untouched. */
 export async function saveUniversalProfile(accountId: string, universal: UniversalProfile): Promise<ProfileRecord> {
   await delay(250)
   return updateRecord(accountId, (r) => ({
@@ -119,6 +130,28 @@ export async function saveUniversalProfile(accountId: string, universal: Univers
     universal: clone(tidyDogs(universal)),
     universalCompletedAt: r.universalCompletedAt ?? Date.now(),
   }))
+}
+
+/** Adds a discovered city to the universal profile (ignored if it's already there). */
+export async function addDiscoveredCity(
+  accountId: string,
+  name: string,
+  source: DiscoveredCity['source'] = 'manual',
+  refId?: string,
+): Promise<ProfileRecord> {
+  await delay(120)
+  return updateRecord(accountId, (r) => {
+    if (!r.universal) throw new Error('Finish your profile first.')
+    return { ...r, universal: { ...r.universal, citiesDiscovered: addCity(r.universal.citiesDiscovered, name, source, refId) } }
+  })
+}
+
+export async function removeDiscoveredCity(accountId: string, cityId: string): Promise<ProfileRecord> {
+  await delay(120)
+  return updateRecord(accountId, (r) => {
+    if (!r.universal) return r
+    return { ...r, universal: { ...r.universal, citiesDiscovered: r.universal.citiesDiscovered.filter((c) => c.id !== cityId) } }
+  })
 }
 
 export async function setActiveMode(accountId: string, mode: ExploreMode): Promise<ProfileRecord> {
@@ -178,10 +211,142 @@ export async function clearLocalContext(accountId: string): Promise<ProfileRecor
   return updateRecord(accountId, (r) => ({ ...r, local: null, activeMode: r.activeMode === 'local' ? null : r.activeMode }))
 }
 
-/** Permanently removes the account and every answer attached to it. */
+/** Permanently removes the account and every answer, point and message attached to it. */
 export async function deleteAccount(accountId: string): Promise<void> {
   await delay(150)
+  await profileRepo().deleteAccount(accountId)
   db.deleteAccountData(accountId)
+}
+
+// ---- Points, challenges & shop ----------------------------------------------------------------
+// The balance is the sum of the ledger. Rewards are re-checked here before paying out, and each
+// reward/purchase has a unique refId so nothing pays (or charges) twice.
+// TODO(backend): move these checks into SQL functions so the server, not the browser, awards points.
+
+/** Pays a challenge reward if the challenge is complete and hasn't been claimed this period. */
+export async function claimChallengeReward(accountId: string, challengeId: string, ctx: Omit<ChallengeContext, 'profile'>): Promise<ProfileRecord> {
+  await delay(200)
+  return updateRecord(accountId, (r) => {
+    const c = challenge(challengeId)
+    if (!c) throw new Error('Unknown challenge.')
+    const state = challengeState(c, { ...ctx, profile: r })
+    if (state.status === 'claimed') return r
+    if (state.status !== 'ready') throw new Error('That challenge isn’t finished yet.')
+    const entry: PointsEntry = { id: newId('pts'), amount: c.reward, reason: 'challenge', refId: rewardRef(c, ctx.today), label: c.title, at: Date.now() }
+    return { ...r, rewards: { ...r.rewards, ledger: [...r.rewards.ledger, entry] } }
+  })
+}
+
+export async function purchaseItem(accountId: string, itemId: string): Promise<ProfileRecord> {
+  await delay(200)
+  return updateRecord(accountId, (r) => {
+    const item = shopItem(itemId)
+    if (!item) throw new Error('That item isn’t in the shop.')
+    if (r.rewards.owned.includes(item.id)) return r
+    const balance = pointsBalance(r.rewards)
+    if (balance < item.price) throw new Error(`You need ${item.price - balance} more points for that.`)
+    const entry: PointsEntry = { id: newId('pts'), amount: -item.price, reason: 'purchase', refId: `item:${item.id}`, label: item.name, at: Date.now() }
+    return { ...r, rewards: { ...r.rewards, ledger: [...r.rewards.ledger, entry], owned: [...r.rewards.owned, item.id] } }
+  })
+}
+
+/** Puts an owned item on Migo (replacing whatever is in that slot), or takes it off. */
+export async function setEquipped(accountId: string, itemId: string, on: boolean): Promise<ProfileRecord> {
+  await delay(100)
+  return updateRecord(accountId, (r) => {
+    const item = shopItem(itemId)
+    if (!item || !r.rewards.owned.includes(item.id)) throw new Error('You don’t own that yet.')
+    const equipped = { ...r.rewards.equipped }
+    if (on) equipped[item.slot] = item.id
+    else if (equipped[item.slot] === item.id) delete equipped[item.slot]
+    return { ...r, rewards: { ...r.rewards, equipped } }
+  })
+}
+
+// ---- People & messages ------------------------------------------------------------------------
+// TODO(backend): live discovery and message delivery. Until then, discovery shows the sample
+// profiles from the match pool (flagged `demo`), and messages you send are kept on this device.
+
+/** People to discover, most compatible first, in the opposite mode to yours. */
+export async function getPeopleToDiscover(me: MatchProfile | null): Promise<{ person: Person; match: Compatibility }[]> {
+  await delay(200)
+  const wanted: Role | null = me ? (me.mode === 'tourist' ? 'local' : 'tourist') : null
+  return USERS.filter((u) => !wanted || u.role === wanted)
+    .map((u) => {
+      const person: Person = { id: u.id, name: u.name, avatar: u.avatar, mode: u.role, interests: u.interests ?? [], languages: u.languages ?? [], funFact: u.funFact, demo: true }
+      return { person, match: compatibility(me ?? {}, { interests: person.interests, languages: person.languages, dogs: matchDogs(u) }) }
+    })
+    // Same hard filter as matching: "prefers no dogs" never sees dog owners (and vice versa).
+    .filter(({ match }) => !match.blocked)
+    .sort((a, b) => (b.match.total ?? 0) - (a.match.total ?? 0))
+}
+
+/** Shows (or withdraws) interest in someone's profile. */
+export async function setLiked(accountId: string, personId: string, liked: boolean): Promise<ProfileRecord> {
+  await delay(120)
+  return updateRecord(accountId, (r) => {
+    const likes = r.likes.filter((id) => id !== personId)
+    return { ...r, likes: liked ? [...likes, personId] : likes }
+  })
+}
+
+function normMessage(v: unknown): Message | null {
+  if (typeof v !== 'object' || v === null) return null
+  const m = v as Partial<Message>
+  if (typeof m.id !== 'string' || typeof m.text !== 'string' || typeof m.at !== 'number') return null
+  return { id: m.id, from: m.from === 'them' ? 'them' : 'me', text: m.text, at: m.at, read: m.read !== false }
+}
+
+function normThread(v: unknown): Thread | null {
+  if (typeof v !== 'object' || v === null) return null
+  const t = v as Partial<Thread>
+  const p = t.person as Partial<Person> | undefined
+  if (!p || typeof p.id !== 'string' || typeof p.name !== 'string') return null
+  return {
+    person: {
+      id: p.id,
+      name: p.name,
+      avatar: typeof p.avatar === 'string' ? p.avatar : '🙂',
+      mode: p.mode === 'local' ? 'local' : 'tourist',
+      interests: Array.isArray(p.interests) ? p.interests : [],
+      languages: Array.isArray(p.languages) ? p.languages : [],
+      funFact: p.funFact,
+      demo: p.demo,
+    },
+    messages: (Array.isArray(t.messages) ? t.messages : []).map(normMessage).filter((m): m is Message => m !== null),
+  }
+}
+
+/** Message threads by person id. */
+export async function getThreads(accountId: string): Promise<Record<string, Thread>> {
+  await delay(80)
+  const out: Record<string, Thread> = {}
+  for (const v of Object.values(db.getThreads(accountId))) {
+    const t = normThread(v)
+    if (t) out[t.person.id] = t
+  }
+  return out
+}
+
+export async function sendMessage(accountId: string, person: Person, text: string): Promise<Thread> {
+  await delay(120)
+  const clean = text.trim().slice(0, MESSAGE_MAX_LENGTH)
+  if (!clean) throw new Error('Write something first.')
+  const existing = (await getThreads(accountId))[person.id]
+  const thread: Thread = {
+    person: clone(person),
+    messages: [...(existing?.messages ?? []), { id: newId('msg'), from: 'me', text: clean, at: Date.now(), read: true }],
+  }
+  db.putThread(accountId, person.id, thread)
+  return thread
+}
+
+export async function markThreadRead(accountId: string, personId: string): Promise<Thread | null> {
+  const thread = (await getThreads(accountId))[personId]
+  if (!thread) return null
+  const next = { ...thread, messages: thread.messages.map((m) => ({ ...m, read: true })) }
+  db.putThread(accountId, personId, next)
+  return next
 }
 
 export type SelfieSubmission = {

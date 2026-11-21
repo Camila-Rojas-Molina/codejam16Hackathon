@@ -9,15 +9,18 @@ backend/
 ├── supabase/migrations/
 │   ├── 001_schema.sql   tables, scoring, matching, GPS check, security
 │   ├── 002_seed.sql     McGill hunts, partner pool, leaderboard teams
-│   └── 003_storage.sql  'selfies' storage bucket
-└── tests/smoke_test.sql checks the whole flow, then rolls back
+│   ├── 003_storage.sql  'selfies' storage bucket
+│   └── 004_migo_profiles.sql  one account, two modes: questionnaire, trips, local profile
+└── tests/
+    ├── smoke_test.sql          checks the hunt flow, then rolls back
+    └── migo_profiles_test.sql  checks accounts/profiles and mode switching, then rolls back
 ```
 
 ## Setup (about 10 minutes)
 
 1. Create a free project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor**, then paste and run `001_schema.sql`, `002_seed.sql` and `003_storage.sql`, in that order.
-3. Optional: paste and run `tests/smoke_test.sql`. It should say `All backend checks passed`.
+2. Open **SQL Editor**, then paste and run `001_schema.sql`, `002_seed.sql`, `003_storage.sql` and `004_migo_profiles.sql`, in that order.
+3. Optional: paste and run `tests/smoke_test.sql` and `tests/migo_profiles_test.sql`. They should say `All backend checks passed` and `All MIGO profile checks passed`.
 4. Go to **Project Settings → API** and copy the Project URL and the `anon` public key into `frontend/.env.local`:
    ```
    VITE_SUPABASE_URL=https://xxxx.supabase.co
@@ -25,13 +28,14 @@ backend/
    ```
    Never commit `.env.local`. Add the same two variables in Vercel for the deployed app.
 
-All three files can be run again safely after changes. Running `002_seed.sql` again also puts the demo partners back in the match queue.
+All migration files can be run again safely after changes. Running `002_seed.sql` again also puts the demo partners back in the match queue.
 
 ## Data model
 
 | Table | What it holds |
 |---|---|
-| `profiles` | Players: name, avatar, role (tourist/local), fun fact, `has_dog`, `accessibility_needs` |
+| `profiles` | Players: name, avatar, `role` = the **current** mode (tourist/local, null until picked), fun fact, `has_dog`, `accessibility_needs` |
+| `migo_profiles` | One JSON record per player: universal profile (incl. home city and cities discovered), tourist trips, local context, points, items and likes. `home_city` is pulled out for searching. |
 | `hunts` | Places to find: photo, coordinates, time limit, points, trivia, `kind` (landmark, dog-park…), `accessible_for` |
 | `teams` / `team_members` | One tourist and one local per team |
 | `submissions` | One per team per hunt: where they were, time left, selfie path and the points breakdown |
@@ -48,6 +52,16 @@ Call these from `frontend/src/lib/backend.ts`. Each one is a Postgres function.
 | `get_hunts(profile_id, lat, lng)` | Hunts for this player: dog park hunts only for dog owners, places that suit their accessibility needs first, then nearest. |
 | `submit_selfie(team_id, hunt_id, seconds_left, lat, lng, selfie_path, demo)` | Checks the team is within 75 m of the spot (skipped when `demo` is true), then scores it. A team can score each hunt once. |
 
+**MIGO accounts and profiles** (`004_migo_profiles.sql`). The app uses these automatically when the two Supabase variables are set (`frontend/src/lib/profileRepo.ts`); without them it saves on the device.
+
+| Function | Does |
+|---|---|
+| `migo_create_account(name, avatar)` | Registration. No role: Tourist/Local is a mode, picked later. |
+| `migo_get_profile(profile_id)` | The account and its saved record (`null` record before the first save, `null` if the account is gone). |
+| `migo_update_account(profile_id, name, avatar)` | Name and avatar. |
+| `migo_save_record(profile_id, record)` | Saves the whole record and keeps `profiles.role` (= active mode) and `has_dog` in sync, so `find_partner` keeps working. |
+| `migo_delete_account(profile_id)` | Deletes the player and everything attached. |
+
 **Scoring** (same as `frontend/src/features/scoring/score.ts`, plus the first finder bonus):
 
 ```
@@ -59,6 +73,7 @@ base + speed bonus (base × time left / time limit × 0.5) + 50 for meeting some
 
 - The browser can read `hunts`, `teams` and `leaderboard`, and can call the four functions above. It cannot write to any table directly, so points are always calculated on the server.
 - There's no login yet. A player is identified by the profile id stored in their browser, so someone with technical skills could act as another player. That's fine for a hackathon demo, but add Supabase Auth before real use.
+- `migo_save_record` accepts the whole record from the browser, including the points ledger and owned items. Before real use, move claiming rewards and buying items into their own functions that check them on the server (the rules are in `frontend/src/lib/api.ts` under "Points, challenges & shop").
 
 ## For the team
 

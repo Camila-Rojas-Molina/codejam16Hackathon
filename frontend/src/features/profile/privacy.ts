@@ -1,10 +1,10 @@
 // What other people can see. Anything not returned by publicProfile() stays private: it may be
 // used for matching, but it is never shown to another person.
 //
-// Public: name, avatar, vibe, planning and decision style, interests, ideal adventure, topics, pace,
-//         must-see spots, group size, languages, dog stance (has a dog / loves dogs / neutral) and
-//         dog details (name, size, vibe, good with dogs, photo), and the city-level context of the
-//         active mode.
+// Public: name, avatar, home city, cities discovered, vibe, planning and decision style, interests,
+//         ideal adventure, topics, pace, must-see spots, group size, languages, dog stance (has a
+//         dog / loves dogs / neutral) and dog details (name, size, vibe, good with dogs, photo), and
+//         the city-level context of the active mode.
 // Private: comfort meeting new people, buddy qualities, budget and spending range, food and dietary
 //          needs, transport, neighbourhood, hidden gems, trip party, "prefers no dogs" (a matching
 //          filter only, never shown), and accessibility (unless the person turns on sharing with
@@ -36,6 +36,8 @@ import type {
 export type PublicProfile = {
   name: string
   avatar: string
+  homeCity: string
+  citiesDiscovered: string[]
   mode: ExploreMode | null
   energy: SocialEnergy | null
   planning: PlanningStyle | null
@@ -74,6 +76,8 @@ export function publicProfile(account: Account, record: ProfileRecord): PublicPr
   const view: PublicProfile = {
     name: account.name,
     avatar: account.avatar,
+    homeCity: u?.homeCity.trim() ?? '',
+    citiesDiscovered: u?.citiesDiscovered.map((c) => c.name) ?? [],
     mode: record.activeMode,
     energy: u?.personality.energy ?? null,
     planning: u?.personality.planning ?? null,

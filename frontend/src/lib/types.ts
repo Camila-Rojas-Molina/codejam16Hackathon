@@ -13,6 +13,8 @@ export type User = {
   /** Public profile bits used to rank partners. Values are Interest ids from features/profile. */
   interests?: Interest[]
   languages?: string[]
+  /** A sample profile from the demo partner pool (not a real person yet). */
+  demo?: boolean
   /** Public dog answer. `dog` only when stance is 'has-dog'. */
   dogs?: { stance: DogStance; dog?: DogDetails }
 }

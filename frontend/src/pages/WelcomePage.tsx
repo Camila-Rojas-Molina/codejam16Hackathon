@@ -4,7 +4,7 @@ import { Squiggle, Star } from '../components/illustrations/Stickers'
 import { buttonClasses } from '../components/ui/buttonStyles'
 import Card from '../components/ui/Card'
 import Logo from '../components/ui/Logo'
-import { nextOnboardingStep } from '../features/profile/flow'
+import { hasUniversalProfile } from '../features/profile/flow'
 import { TAGLINE } from '../lib/config'
 import { useStore } from '../store/useStore'
 
@@ -17,8 +17,8 @@ const steps = [
 export default function WelcomePage() {
   const { account, profile } = useStore()
 
-  // Returning player: pick up where they left off (never repeat onboarding).
-  if (account) return <Navigate to={nextOnboardingStep(account, profile) ?? '/hunts'} replace />
+  // Returning player: straight into the app (never repeat onboarding).
+  if (account) return <Navigate to={hasUniversalProfile(profile) ? '/map' : '/onboarding/questions'} replace />
 
   return (
     <Screen className="justify-between gap-8">

@@ -45,7 +45,7 @@ export function tripItems(trip: TouristTrip): SummaryItem[] {
 export function localItems(local: LocalContext): SummaryItem[] {
   const gems = local.hiddenGems.trim()
   return [
-    { id: 'home', label: 'Home city', value: local.homeCity || 'Not answered', visibility: 'public' },
+    { id: 'home', label: 'Hosting city', value: local.homeCity || 'Not answered', visibility: 'public' },
     { id: 'home', label: 'Neighbourhood', value: local.neighbourhood || 'Not shared', visibility: 'private' },
     { id: 'turf', label: 'Know really well', value: list(local.knownAreas, 'Skipped'), visibility: 'public' },
     { id: 'turf', label: 'Love recommending', value: list(labelsFor(ATTRACTION_OPTIONS, local.recommendations), 'Skipped'), visibility: 'public' },

@@ -27,14 +27,14 @@ import { useStore } from '../store/useStore'
 const STEPS: SetupStep<LocalContext>[] = [
   {
     id: 'home',
-    title: 'Where’s home?',
-    subtitle: 'The city you’d show a visitor around. We never guess it from your location.',
+    title: 'Where will you host?',
+    subtitle: 'The city you’d show a visitor around. Usually your home city, so we’ve filled that in. We never guess it from your location.',
     isValid: (l) => l.homeCity.trim().length > 0,
-    blockedReason: 'Add your home city.',
+    blockedReason: 'Add the city you’ll host in.',
     render: (l, update) => (
       <>
         <TextField
-          label="Home city"
+          label="Hosting city"
           value={l.homeCity}
           onChange={(homeCity) => update((x) => ({ ...x, homeCity }))}
           maxLength={CITY_MAX_LENGTH}
@@ -174,7 +174,7 @@ export default function LocalSetupPage() {
 
   const existing = profile.local
   const activate = nav?.activate ?? !existing
-  const returnTo = nav?.returnTo ?? (activate ? '/hunts' : '/profile')
+  const returnTo = nav?.returnTo ?? (activate ? '/map' : '/profile')
 
   return (
     <SetupFlow<LocalContext>

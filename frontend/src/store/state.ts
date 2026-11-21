@@ -1,4 +1,4 @@
-import { activeTrip } from '../features/profile/model'
+import { activeTrip, normalizeRecord } from '../features/profile/model'
 import type { Account, ProfileRecord } from '../features/profile/types'
 import { readJSON, writeJSON } from '../lib/storage'
 import type { HuntResult, ScoreBreakdown, Team, User } from '../lib/types'
@@ -163,7 +163,11 @@ export function reducer(state: AppState, action: Action): AppState {
 export function loadState(): AppState {
   const saved = readJSON<Partial<AppState>>(STORAGE_KEY)
   if (!saved || typeof saved !== 'object') return initialState
-  return { ...initialState, ...saved, results: saved.results ?? {}, parked: saved.parked ?? {} }
+  // The cached profile may come from an older version of the app: fill any missing fields so the
+  // first render works before the fresh copy arrives from api.ts.
+  const account = saved.account && typeof saved.account.id === 'string' ? saved.account : null
+  const profile = account && saved.profile ? normalizeRecord(saved.profile, account.id) : null
+  return { ...initialState, ...saved, account, profile, results: saved.results ?? {}, parked: saved.parked ?? {} }
 }
 
 const withoutSelfies = (results: Record<string, HuntResult>) =>

@@ -1,37 +1,44 @@
-import { avatarFor } from '../../lib/avatars'
+// A person's avatar: character art (lib/avatars.ts), or the emoji used by demo partners.
+// Anything else (an unknown id) shows the default avatar, so nothing breaks.
+import { AVATAR_LIST, avatarFor } from '../../lib/avatars'
 import { cn } from '../../lib/cn'
 
-type AvatarSize = 'sm' | 'md' | 'lg'
+type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
+
+const sizes: Record<AvatarSize, { box: string; emoji: string }> = {
+  xs: { box: 'size-8 border-2', emoji: 'text-base' },
+  sm: { box: 'size-11 border-[3px]', emoji: 'text-xl' },
+  md: { box: 'size-14 border-[3px]', emoji: 'text-3xl' },
+  lg: { box: 'size-20 border-4', emoji: 'text-4xl' },
+  xl: { box: 'size-28 border-4', emoji: 'text-6xl' },
+}
 
 type AvatarProps = {
-  id: string | null | undefined
+  avatar: string
+  /** Who it is. Omit when the name is right next to it (the image is then decorative). */
+  name?: string
   size?: AvatarSize
-  /** Paper circle with a navy outline around the image. */
-  framed?: boolean
-  /** Hide from screen readers when the name is shown right next to it. */
-  decorative?: boolean
   className?: string
 }
 
-const sizes: Record<AvatarSize, string> = { sm: 'size-10', md: 'size-14', lg: 'size-20' }
-
-// Renders the image for an avatar id. Unknown ids fall back to the default avatar.
-export default function Avatar({ id, size = 'md', framed = false, decorative = false, className }: AvatarProps) {
-  const avatar = avatarFor(id)
-  const img = (
-    <img
-      src={avatar.src}
-      alt={decorative ? '' : avatar.alt}
-      aria-hidden={decorative || undefined}
-      className={cn('object-contain', framed ? 'size-[85%]' : cn(sizes[size], className))}
-    />
-  )
-  if (!framed) return img
+export default function Avatar({ avatar, name, size = 'md', className }: AvatarProps) {
+  const known = AVATAR_LIST.find((a) => a.id === avatar)
+  // Emoji avatars are short pictographs; plain-text unknown ids fall back to the default art.
+  const isEmoji = !known && avatar.length <= 8 && /\p{Extended_Pictographic}/u.test(avatar)
+  const art = known ?? (isEmoji ? null : avatarFor(avatar))
+  const s = sizes[size]
   return (
     <span
-      className={cn('grid shrink-0 place-items-center rounded-full border-4 border-navy bg-paper', sizes[size], className)}
+      className={cn('grid shrink-0 place-items-center overflow-hidden rounded-full border-navy bg-paper', s.box, className)}
+      role={name ? 'img' : undefined}
+      aria-label={name ? `${name}’s avatar` : undefined}
+      aria-hidden={name ? undefined : true}
     >
-      {img}
+      {art ? (
+        <img src={art.src} alt="" draggable={false} className="size-[88%] object-contain" />
+      ) : (
+        <span className={cn('leading-none', s.emoji)}>{avatar}</span>
+      )}
     </span>
   )
 }
