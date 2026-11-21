@@ -5,9 +5,15 @@ export const APP_NAME = 'MIGO'
 
 export const TAGLINE = 'Find the place. Find your people.'
 
+// Values set on the host at runtime (served as /env.js by server.js) win over build-time ones.
+const runtimeEnv: Record<string, string | undefined> =
+  (typeof window !== 'undefined' && (window as { __ENV__?: Record<string, string> }).__ENV__) || {}
+const env = (key: 'VITE_GOOGLE_MAPS_API_KEY' | 'VITE_SUPABASE_URL' | 'VITE_SUPABASE_ANON_KEY'): string =>
+  runtimeEnv[key] || import.meta.env[key] || ''
+
 export const config = {
-  googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '',
+  googleMapsApiKey: env('VITE_GOOGLE_MAPS_API_KEY'),
   /** Supabase backend. Leave empty to run on mock data. */
-  supabaseUrl: (import.meta.env.VITE_SUPABASE_URL ?? '').replace(/\/$/, ''),
-  supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY ?? '',
+  supabaseUrl: env('VITE_SUPABASE_URL').replace(/\/$/, ''),
+  supabaseAnonKey: env('VITE_SUPABASE_ANON_KEY'),
 }
