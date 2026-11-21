@@ -93,7 +93,7 @@ begin
 
   update profiles
      set role    = case when mode in ('tourist', 'local') then mode end,
-         has_dog = coalesce(p_record #>> '{local,dogs}', '') = 'bring-my-dog'
+         has_dog = coalesce(p_record #>> '{universal,dogs,stance}', '') = 'has-dog'
    where id = p_profile_id;
 end;
 $$;

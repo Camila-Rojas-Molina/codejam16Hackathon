@@ -8,7 +8,6 @@ import {
   AVAILABILITY_OPTIONS,
   BUDGET_OPTIONS,
   COMPANION_OPTIONS,
-  DOG_OPTIONS,
   DURATION_OPTIONS,
   HOST_ACTIVITY_OPTIONS,
   INTEREST_OPTIONS,
@@ -56,7 +55,6 @@ export function localItems(local: LocalContext): SummaryItem[] {
     { id: 'languages', label: 'Getting around', value: list(labelsFor(TRANSPORT_OPTIONS, local.transport), 'Skipped'), visibility: 'private' },
     { id: 'time', label: 'Usually free', value: list(labelsFor(AVAILABILITY_OPTIONS, local.availability)), visibility: 'public' },
     { id: 'time', label: 'Typical outing', value: labelFor(DURATION_OPTIONS, local.duration) || 'Not answered', visibility: 'public' },
-    { id: 'dogs', label: 'Dog-friendly', value: labelFor(DOG_OPTIONS, local.dogs) || 'Skipped', visibility: 'public' },
   ].map((item, i) => ({ ...item, id: `${item.id}#${i}` }) as SummaryItem)
 }
 

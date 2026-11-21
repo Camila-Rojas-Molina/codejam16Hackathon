@@ -15,7 +15,6 @@ import {
   ATTRACTION_OPTIONS,
   AVAILABILITY_OPTIONS,
   CITY_MAX_LENGTH,
-  DOG_OPTIONS,
   DURATION_OPTIONS,
   GEMS_MAX_LENGTH,
   HOST_ACTIVITY_OPTIONS,
@@ -161,17 +160,6 @@ const STEPS: SetupStep<LocalContext>[] = [
           onChange={(duration) => update((x) => ({ ...x, duration }))}
         />
       </>
-    ),
-  },
-  {
-    id: 'dogs',
-    title: 'Up for dog-friendly adventures?',
-    subtitle: 'Some hunts end at a dog park, with bonus points for four-legged teammates.',
-    optional: true,
-    isAnswered: (l) => l.dogs !== null,
-    isValid: () => true,
-    render: (l, update) => (
-      <Choices legend="Dog-friendly activities" hideLegend options={DOG_OPTIONS} value={l.dogs} onChange={(dogs) => update((x) => ({ ...x, dogs }))} />
     ),
   },
 ]

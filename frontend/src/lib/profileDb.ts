@@ -4,6 +4,7 @@
 // Shape: { accounts: { [id]: Account }, profiles: { [accountId]: ProfileRecord } }.
 // Records are keyed by account id, so one person has exactly one profile whatever mode they use.
 import { normalizeRecord } from '../features/profile/model'
+import { resolveAvatar } from './avatars'
 import type { Account, ProfileRecord } from '../features/profile/types'
 import { readJSON, writeJSON } from './storage'
 
@@ -26,7 +27,9 @@ function load(): Db {
 }
 
 export function getAccount(id: string): Account | null {
-  return load().accounts[id] ?? null
+  const account = load().accounts[id]
+  // Accounts saved with an old emoji avatar get mapped to an image avatar.
+  return account ? { ...account, avatar: resolveAvatar(account.avatar) } : null
 }
 
 export function putAccount(account: Account) {

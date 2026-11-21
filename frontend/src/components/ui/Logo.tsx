@@ -15,7 +15,7 @@ type LogoProps = {
 // The PNGs are 500×500 with the artwork in the middle. These boxes are the artwork's pixel bounds,
 // so we can crop the padding with CSS and keep the original asset untouched.
 const ART: Record<LogoVariant, { src: string; box: [number, number, number, number] }> = {
-  wordmark: { src: '/assets/logo.png', box: [39, 183, 461, 317] },
+  wordmark: { src: '/assets/logo.png', box: [38, 181, 480, 322] },
   icon: { src: '/assets/icon.png', box: [132, 155, 368, 345] },
 }
 const CANVAS = 500

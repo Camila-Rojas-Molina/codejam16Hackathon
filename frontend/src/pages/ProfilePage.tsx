@@ -13,7 +13,6 @@ import { buttonClasses } from '../components/ui/buttonStyles'
 import Card from '../components/ui/Card'
 import { TextField } from '../components/ui/Fields'
 import { NAME_MAX_LENGTH, modeMeta } from '../features/onboarding/options'
-import { AVATAR_OPTIONS } from '../features/profile/avatars'
 import SummaryList from '../features/profile/components/SummaryList'
 import UniversalSummary from '../features/profile/components/UniversalSummary'
 import { localItems, stepIdOf } from '../features/profile/contextSummary'
@@ -32,6 +31,7 @@ import {
 } from '../features/profile/options'
 import { publicProfile } from '../features/profile/privacy'
 import { SHOP_ITEMS, SLOT_LABELS } from '../features/rewards/shop'
+import { AVATAR_LIST } from '../lib/avatars'
 import { cn } from '../lib/cn'
 import { useStore } from '../store/useStore'
 
@@ -207,6 +207,11 @@ function Overview() {
           <ChipList label="Chat topics" items={labelsFor(TOPIC_OPTIONS, view.topics)} />
           <ChipList label="Speaks" items={view.languages} />
           <ChipList label="Cities discovered" items={view.citiesDiscovered} />
+          {view.dogStance && (
+            <p>
+              {view.dog ? `🐕 Exploring with ${view.dog.name || 'their dog'}` : view.dogStance === 'loves-dogs' ? '🦴 Loves dogs' : '🐾 Fine with dogs'}
+            </p>
+          )}
           {view.idealAdventureNote && <p className="italic">“{view.idealAdventureNote}”</p>}
           {view.accessibilityNeeds && <ChipList label="Access needs (shared)" items={labelsFor(ACCESSIBILITY_OPTIONS, view.accessibilityNeeds)} />}
           <p className="border-t-[3px] border-dashed border-navy pt-2 text-sm">
@@ -378,14 +383,14 @@ function Style() {
             <fieldset>
               <legend className="mb-2 font-type text-sm tracking-wider uppercase">Avatar</legend>
               <div className="grid grid-cols-4 gap-3 sm:grid-cols-8 lg:grid-cols-4 xl:grid-cols-8">
-                {AVATAR_OPTIONS.map((a) => (
+                {AVATAR_LIST.map((a) => (
                   <label
                     key={a.id}
                     className="relative grid cursor-pointer place-items-center rounded-2xl border-[3px] border-transparent p-1 transition-transform active:scale-95 has-checked:border-navy has-checked:bg-sun has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-navy"
                   >
                     <input type="radio" name="avatar" value={a.id} checked={avatar === a.id} onChange={() => setAvatar(a.id)} className="sr-only" />
                     <img src={a.src} alt="" className="aspect-square w-full object-contain" />
-                    <span className="sr-only">{a.label}</span>
+                    <span className="sr-only">{a.alt}</span>
                   </label>
                 ))}
               </div>

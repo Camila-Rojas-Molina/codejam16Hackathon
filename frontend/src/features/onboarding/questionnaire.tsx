@@ -4,8 +4,9 @@ import type { ReactNode } from 'react'
 import Choices from '../../components/ui/Choices'
 import { TagInput, TextArea, TextField, Toggle } from '../../components/ui/Fields'
 import BudgetFields from '../profile/components/BudgetFields'
+import DogPhotoField from '../profile/components/DogPhotoField'
 import LanguageFields from '../profile/components/LanguageFields'
-import { citiesFromNames, rangeError } from '../profile/model'
+import { citiesFromNames, dogDetailsError, dogsOf, rangeError } from '../profile/model'
 import {
   ACCESSIBILITY_OPTIONS,
   ADVENTURE_OPTIONS,
@@ -14,6 +15,11 @@ import {
   CITY_MAX_LENGTH,
   DECISION_OPTIONS,
   DIETARY_OPTIONS,
+  DOG_NAME_MAX_LENGTH,
+  DOG_SIZE_OPTIONS,
+  DOG_SOCIAL_OPTIONS,
+  DOG_STANCE_OPTIONS,
+  DOG_VIBE_OPTIONS,
   ENERGY_OPTIONS,
   FOOD_STYLE_OPTIONS,
   GROUP_OPTIONS,
@@ -385,6 +391,70 @@ export const QUESTIONS: QuestionStep[] = [
     ),
   },
   {
+    id: 'dogs',
+    section: 'style',
+    title: 'Any four-legged amigos?',
+    subtitle: 'Some hunts are dog-friendly, and dog people love finding each other.',
+    optional: true,
+    isAnswered: (d) => dogsOf(d).stance !== null,
+    // Optional, but if you say you have a dog we need the basics (the photo stays optional).
+    isValid: (d) => dogDetailsError(dogsOf(d)) === null,
+    blockedReason: 'Tell us your dog’s name, size, vibe and how they get on with other dogs (or pick another answer).',
+    render: (d, update) => {
+      const dogs = dogsOf(d)
+      const setDogs = (patch: Partial<typeof dogs>) => update((x) => ({ ...x, dogs: { ...dogsOf(x), ...patch } }))
+      const setDog = (patch: Partial<typeof dogs.dog>) =>
+        update((x) => ({ ...x, dogs: { ...dogsOf(x), dog: { ...dogsOf(x).dog, ...patch } } }))
+      return (
+        <>
+          <Choices
+            legend="Dogs and me"
+            hideLegend
+            options={DOG_STANCE_OPTIONS}
+            value={dogs.stance}
+            onChange={(stance) => setDogs({ stance })}
+          />
+          {dogs.stance === 'has-dog' && (
+            <>
+              <TextField
+                label="Your dog’s name"
+                value={dogs.dog.name}
+                onChange={(name) => setDog({ name })}
+                maxLength={DOG_NAME_MAX_LENGTH}
+                placeholder="Biscuit"
+              />
+              <Choices
+                legend="Size"
+                layout="tile"
+                columns={3}
+                options={DOG_SIZE_OPTIONS}
+                value={dogs.dog.size}
+                onChange={(size) => setDog({ size })}
+              />
+              <Choices
+                legend="Vibe"
+                layout="tile"
+                columns={3}
+                options={DOG_VIBE_OPTIONS}
+                value={dogs.dog.vibe}
+                onChange={(vibe) => setDog({ vibe })}
+              />
+              <Choices
+                legend="Good with other dogs?"
+                layout="tile"
+                columns={3}
+                options={DOG_SOCIAL_OPTIONS}
+                value={dogs.dog.goodWithDogs}
+                onChange={(goodWithDogs) => setDog({ goodWithDogs })}
+              />
+              <DogPhotoField dogName={dogs.dog.name} value={dogs.dog.photo} onChange={(photo) => setDog({ photo })} />
+            </>
+          )}
+        </>
+      )
+    },
+  },
+  {
     id: 'languages',
     section: 'style',
     title: 'Which languages do you speak?',
@@ -528,6 +598,20 @@ export function summaryRows(u: UniversalProfile): SummaryRow[] {
     u.companion.idealAdventureNote.trim() ? `“${u.companion.idealAdventureNote.trim()}”` : '',
   ].filter(Boolean)
   const langs = u.languages.preferred.length > 0 ? `${list(u.languages.spoken)} (prefers ${list(u.languages.preferred)})` : list(u.languages.spoken)
+  const dogs = dogsOf(u)
+  const dogValue =
+    dogs.stance === 'has-dog'
+      ? [
+          `🐕 ${dogs.dog.name.trim() || 'My dog'}`,
+          [labelFor(DOG_SIZE_OPTIONS, dogs.dog.size), labelFor(DOG_VIBE_OPTIONS, dogs.dog.vibe)].filter(Boolean).join(', ').toLowerCase(),
+          dogs.dog.goodWithDogs && `good with dogs: ${labelFor(DOG_SOCIAL_OPTIONS, dogs.dog.goodWithDogs).toLowerCase()}`,
+          dogs.dog.photo && 'with photo',
+        ]
+          .filter(Boolean)
+          .join(' · ')
+      : dogs.stance
+        ? withEmoji(DOG_STANCE_OPTIONS, dogs.stance)
+        : 'Skipped'
 
   return [
     { stepId: 'home', section: 'you', label: 'Home city', value: u.homeCity.trim() || 'Not answered yet', visibility: 'public' },
@@ -545,6 +629,8 @@ export function summaryRows(u: UniversalProfile): SummaryRow[] {
     { stepId: 'food', section: 'style', label: 'Food', value: list(food, 'Skipped'), visibility: 'private' },
     { stepId: 'transport', section: 'style', label: 'Getting around', value: list(labelsFor(TRANSPORT_OPTIONS, u.exploration.transport)), visibility: 'private' },
     { stepId: 'group', section: 'style', label: 'Group size', value: withEmoji(GROUP_OPTIONS, u.exploration.groupSize), visibility: 'public' },
+    // "Prefers no dogs" is a private filter; every other answer is public (see privacy.ts).
+    { stepId: 'dogs', section: 'style', label: 'Four-legged amigos', value: dogValue, visibility: dogs.stance === 'no-dogs' ? 'private' : 'public' },
     { stepId: 'languages', section: 'style', label: 'Languages', value: langs, visibility: 'public' },
     { stepId: 'cities', section: 'style', label: 'Cities discovered', value: list(u.citiesDiscovered.map((c) => c.name), 'None yet'), visibility: 'public' },
     {

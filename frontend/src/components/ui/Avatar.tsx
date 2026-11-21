@@ -1,5 +1,6 @@
-// A person's avatar: character art from public/assets/avatars, or an emoji for older/demo profiles.
-import { avatarOption } from '../../features/profile/avatars'
+// A person's avatar: character art (lib/avatars.ts), or the emoji used by demo partners.
+// Anything else (an unknown id) shows the default avatar, so nothing breaks.
+import { AVATAR_LIST, avatarFor } from '../../lib/avatars'
 import { cn } from '../../lib/cn'
 
 type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
@@ -21,7 +22,10 @@ type AvatarProps = {
 }
 
 export default function Avatar({ avatar, name, size = 'md', className }: AvatarProps) {
-  const art = avatarOption(avatar)
+  const known = AVATAR_LIST.find((a) => a.id === avatar)
+  // Emoji avatars are short pictographs; plain-text unknown ids fall back to the default art.
+  const isEmoji = !known && avatar.length <= 8 && /\p{Extended_Pictographic}/u.test(avatar)
+  const art = known ?? (isEmoji ? null : avatarFor(avatar))
   const s = sizes[size]
   return (
     <span

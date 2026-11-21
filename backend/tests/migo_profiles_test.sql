@@ -19,17 +19,18 @@ begin
     'accountId', pid::text,
     'activeMode', 'tourist',
     'universal', jsonb_build_object('homeCity', ' Montréal ',
+                                    'dogs', jsonb_build_object('stance', 'has-dog'),
                                     'citiesDiscovered', jsonb_build_array(jsonb_build_object('id', 'c1', 'name', 'Lisbon'))),
     'tourist', jsonb_build_object('trips', jsonb_build_array(jsonb_build_object('id', 't1', 'destination', 'Paris')),
                                   'activeTripId', 't1'),
-    'local', jsonb_build_object('homeCity', 'Montréal', 'dogs', 'bring-my-dog'));
+    'local', jsonb_build_object('homeCity', 'Montréal'));
   perform migo_save_record(pid, rec);
 
   got := migo_get_profile(pid);
   assert got #>> '{record,universal,citiesDiscovered,0,name}' = 'Lisbon', 'cities discovered saved';
   assert (select home_city from migo_profiles where profile_id = pid) = 'Montréal', 'home city extracted';
   assert (select role from profiles where profiles.id = pid) = 'tourist', 'role mirrors active mode';
-  assert (select has_dog from profiles where profiles.id = pid), 'has_dog mirrors local dog preference';
+  assert (select has_dog from profiles where profiles.id = pid), 'has_dog mirrors the dog answer';
 
   -- Switch to Local mode: same account, both contexts kept.
   perform migo_save_record(pid, jsonb_set(rec, '{activeMode}', '"local"'));
