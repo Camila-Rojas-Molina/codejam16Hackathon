@@ -10,7 +10,10 @@ import type {
   Currency,
   DecisionStyle,
   Dietary,
-  DogPreference,
+  DogSize,
+  DogSociability,
+  DogStance,
+  DogVibe,
   FoodStyle,
   GroupSize,
   HostActivity,
@@ -245,11 +248,35 @@ export const DURATION_OPTIONS: Option<HostDuration>[] = [
   { value: 'full-day', emoji: '🌕', label: 'A full day' },
 ]
 
-export const DOG_OPTIONS: Option<DogPreference>[] = [
-  { value: 'bring-my-dog', emoji: '🐕', label: 'Yes! My dog’s coming', blurb: 'Dog park challenges, please.' },
-  { value: 'love-dogs', emoji: '🦴', label: 'No dog, but I love them', blurb: 'Happy to tag along to dog-friendly spots.' },
-  { value: 'no-dogs', emoji: '🙅', label: 'I’d rather skip', blurb: 'No dog activities for me.' },
+
+// ---- Four-legged amigos (universal questionnaire) ----
+
+export const DOG_STANCE_OPTIONS: Option<DogStance>[] = [
+  { value: 'has-dog', emoji: '🐕', label: 'Yes, I have a dog', blurb: 'They might even tag along.' },
+  { value: 'loves-dogs', emoji: '🦴', label: 'No dog, but I love them', blurb: 'Happy to hang out with someone’s pup.' },
+  { value: 'neutral', emoji: '🤷', label: 'Neutral', blurb: 'Dogs or no dogs, either’s fine.' },
+  { value: 'no-dogs', emoji: '🙅', label: 'I’d rather not', blurb: 'Private. We just won’t pair you with dog owners.' },
 ]
+
+export const DOG_SIZE_OPTIONS: Option<DogSize>[] = [
+  { value: 'small', emoji: '🐩', label: 'Small' },
+  { value: 'medium', emoji: '🐕', label: 'Medium' },
+  { value: 'large', emoji: '🦮', label: 'Large' },
+]
+
+export const DOG_VIBE_OPTIONS: Option<DogVibe>[] = [
+  { value: 'chill', emoji: '😌', label: 'Chill' },
+  { value: 'playful', emoji: '🎾', label: 'Playful' },
+  { value: 'learning', emoji: '📚', label: 'Still learning' },
+]
+
+export const DOG_SOCIAL_OPTIONS: Option<DogSociability>[] = [
+  { value: 'yes', emoji: '👍', label: 'Yes' },
+  { value: 'sometimes', emoji: '🤞', label: 'Sometimes' },
+  { value: 'no', emoji: '✋', label: 'Not really' },
+]
+
+export const DOG_NAME_MAX_LENGTH = 30
 
 export const CITY_MAX_LENGTH = 60
 export const AREA_MAX_LENGTH = 40

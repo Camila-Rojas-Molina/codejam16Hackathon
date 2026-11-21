@@ -15,6 +15,7 @@ export const HUNTS: Hunt[] = [
     timeLimitSec: 10 * 60,
     basePoints: 100,
     difficulty: 'easy',
+    dogFriendly: true,
     revealText:
       "These are the Roddick Gates, McGill's main entrance on Sherbrooke Street, built in 1925 in memory of Sir Thomas Roddick.",
   },
@@ -27,6 +28,7 @@ export const HUNTS: Hunt[] = [
     timeLimitSec: 10 * 60,
     basePoints: 150,
     difficulty: 'medium',
+    dogFriendly: true,
     revealText:
       'This fountain sculpture on lower campus has been nicknamed "The Three Bares" by generations of McGill students.',
   },
@@ -39,6 +41,7 @@ export const HUNTS: Hunt[] = [
     timeLimitSec: 15 * 60,
     basePoints: 200,
     difficulty: 'medium',
+    dogFriendly: true,
     revealText:
       'This giant portrait of Montreal-born poet and singer Leonard Cohen towers over Crescent Street, many storeys tall.',
   },
@@ -51,6 +54,7 @@ export const HUNTS: Hunt[] = [
     timeLimitSec: 25 * 60,
     basePoints: 300,
     difficulty: 'hard',
+    dogFriendly: true,
     revealText:
       'The Kondiaronk Belvedere on Mount Royal is named after the Wendat chief who helped bring about the Great Peace of Montreal in 1701.',
   },
@@ -63,6 +67,8 @@ export const HUNTS: Hunt[] = [
     timeLimitSec: 15 * 60,
     basePoints: 200,
     difficulty: 'medium',
+    // Busy festival esplanade: verify before the demo.
+    dogFriendly: false,
     revealText:
       "Place des Arts is the heart of the Quartier des spectacles, Montreal's festival district, and its fountains are a summer favourite.",
   },
@@ -75,12 +81,13 @@ export const HUNTS: Hunt[] = [
     timeLimitSec: 20 * 60,
     basePoints: 250,
     difficulty: 'hard',
+    dogFriendly: true,
     revealText:
       "The Cartier Monument at the foot of Mount Royal is home to the Sunday Tam-Tams, the city's famous open-air drum circle.",
   },
 ]
 
-// The pool partners are matched from: 3 tourists, 3 locals.
+// The pool partners are matched from: 4 tourists, 4 locals.
 export const USERS: User[] = [
   { id: 'u-ana', name: 'Ana', avatar: '🦜', role: 'tourist', funFact: 'Flew in from Lisbon and has never seen snow.', interests: ['food', 'architecture', 'photography'], languages: ['Portuguese', 'English', 'Spanish'] },
   { id: 'u-kenji', name: 'Kenji', avatar: '🐙', role: 'tourist', funFact: 'Collects a postcard from every city he visits.', interests: ['art', 'history', 'technology'], languages: ['Japanese', 'English'] },
@@ -88,6 +95,27 @@ export const USERS: User[] = [
   { id: 'u-marc', name: 'Marc', avatar: '🦫', role: 'local', funFact: 'Knows every bagel shop in Mile End by smell.', interests: ['food', 'traditions', 'music'], languages: ['French', 'English'] },
   { id: 'u-sophie', name: 'Sophie', avatar: '🐿️', role: 'local', funFact: 'Has climbed Mount Royal more than 200 times.', interests: ['nature', 'photography', 'sports'], languages: ['French', 'English', 'Spanish'] },
   { id: 'u-yasmine', name: 'Yasmine', avatar: '🦔', role: 'local', funFact: 'Plays drums at the Tam-Tams most Sundays.', interests: ['music', 'art', 'nightlife', 'history'], languages: ['Arabic', 'French', 'English'] },
+  // Dog owners (one per mode), so the dog filter, bonus and "Dog duo" badge can be demoed.
+  {
+    id: 'u-liam',
+    name: 'Liam',
+    avatar: '🐶',
+    role: 'tourist',
+    funFact: 'Road-tripped from Boston with his dog in the back seat.',
+    interests: ['nature', 'food', 'photography'],
+    languages: ['English'],
+    dogs: { stance: 'has-dog', dog: { name: 'Maple', size: 'large', vibe: 'playful', goodWithDogs: 'yes', photo: null } },
+  },
+  {
+    id: 'u-chloe',
+    name: 'Chloé',
+    avatar: '🐕',
+    role: 'local',
+    funFact: 'Knows every dog park between the Plateau and the Old Port.',
+    interests: ['nature', 'history', 'food'],
+    languages: ['French', 'English'],
+    dogs: { stance: 'has-dog', dog: { name: 'Poutine', size: 'small', vibe: 'chill', goodWithDogs: 'yes', photo: null } },
+  },
 ]
 
 const person = (id: string, name: string, avatar: string, role: User['role']): User => ({ id, name, avatar, role })

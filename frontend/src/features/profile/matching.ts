@@ -1,10 +1,12 @@
 // Structured, mode-aware input for compatibility scoring. Deliberately simple: each dimension is
 // a 0–1 score, dimensions with missing data are skipped, and the total is a weighted average.
 // A smarter matcher can replace compatibility() later without changing what we collect.
-import { activeTrip } from './model'
+import { activeTrip, dogsOf } from './model'
 import type {
   AccessibilityNeed,
   BudgetLevel,
+  DogSociability,
+  DogStance,
   ExploreMode,
   GroupSize,
   Interest,
@@ -26,7 +28,11 @@ export type MatchProfile = {
   languages: string[]
   accessibilityNeeds?: AccessibilityNeed[]
   city?: string
+  /** Dog stance, plus how an owner's dog gets on with other dogs. */
+  dogs?: MatchDogs
 }
+
+export type MatchDogs = { stance: DogStance | null; goodWithDogs?: DogSociability | null }
 
 /** The effective preferences for the active mode: trip details override the universal defaults. */
 export function toMatchProfile(record: ProfileRecord | null): MatchProfile | null {
@@ -42,6 +48,7 @@ export function toMatchProfile(record: ProfileRecord | null): MatchProfile | nul
     groupSize: u.exploration.groupSize,
     languages: u.languages.preferred.length > 0 ? u.languages.preferred : u.languages.spoken,
     accessibilityNeeds: u.accessibility.needs,
+    dogs: { stance: dogsOf(u).stance, goodWithDogs: dogsOf(u).dog.goodWithDogs },
   }
   if (record.activeMode === 'tourist') {
     const trip = activeTrip(record)
@@ -104,12 +111,36 @@ function groupScore(a?: GroupSize | null, b?: GroupSize | null) {
   return a === 'large-group' || b === 'large-group' ? 0.25 : 0.5
 }
 
+// ---- Dogs: a hard filter plus a bonus on top of the weighted dimensions above --------------------
+
+/** Extra weight (at full agreement) when it applies. The dimension WEIGHTS above are unchanged. */
+export const DOG_BONUS = { bothSocialDogs: 3, ownerAndLover: 1 } as const
+
+const owns = (d?: MatchDogs) => d?.stance === 'has-dog'
+
+/** Someone who prefers no dogs is never matched with a dog owner. */
+export function dogsBlocked(a?: MatchDogs, b?: MatchDogs) {
+  return (a?.stance === 'no-dogs' && owns(b)) || (b?.stance === 'no-dogs' && owns(a))
+}
+
+export function dogBonus(a?: MatchDogs, b?: MatchDogs): number {
+  if (owns(a) && owns(b) && a?.goodWithDogs === 'yes' && b?.goodWithDogs === 'yes') return DOG_BONUS.bothSocialDogs
+  if ((owns(a) && b?.stance === 'loves-dogs') || (owns(b) && a?.stance === 'loves-dogs')) return DOG_BONUS.ownerAndLover
+  return 0
+}
+
 export type Compatibility = {
-  /** 0–1, or null if there's nothing to compare yet. */
+  /** 0–1, or null if there's nothing to compare yet. 0 when `blocked`. */
   total: number | null
   dimensions: Partial<Record<Dimension, number>>
   sharedInterests: Interest[]
   sharedLanguages: string[]
+  /** Hard filter: never pair these two (no-dogs person + dog owner). */
+  blocked: boolean
+  /** Both people have a dog. */
+  dogDuo: boolean
+  /** Bonus weight that was added (0 if none). */
+  dogBonus: number
 }
 
 export function compatibility(a: Partial<MatchProfile>, b: Partial<MatchProfile>): Compatibility {
@@ -140,5 +171,20 @@ export function compatibility(a: Partial<MatchProfile>, b: Partial<MatchProfile>
     weight += WEIGHTS[dim]
   }
 
-  return { total: weight > 0 ? sum / weight : null, dimensions: dims, sharedInterests: shared, sharedLanguages: langs }
+  // Dog bonus: counted as a full-agreement term with its own weight, only when it applies, so
+  // nobody is penalised for not having a dog and the total stays within 0–1.
+  const blocked = dogsBlocked(a.dogs, b.dogs)
+  const bonus = blocked ? 0 : dogBonus(a.dogs, b.dogs)
+  sum += bonus
+  weight += bonus
+
+  return {
+    total: blocked ? 0 : weight > 0 ? sum / weight : null,
+    dimensions: dims,
+    sharedInterests: shared,
+    sharedLanguages: langs,
+    blocked,
+    dogDuo: owns(a.dogs) && owns(b.dogs),
+    dogBonus: bonus,
+  }
 }

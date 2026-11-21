@@ -101,6 +101,27 @@ export type GroupSize = 'one-on-one' | 'small-group' | 'large-group' | 'no-prefe
 /** Practical needs only. We never ask for a diagnosis. */
 export type AccessibilityNeed = 'step-free' | 'wheelchair' | 'accessible-transit' | 'quiet' | 'rest-stops'
 
+/** "Any four-legged amigos?" `no-dogs` is private: used only to filter matches, never shown. */
+export type DogStance = 'has-dog' | 'loves-dogs' | 'neutral' | 'no-dogs'
+export type DogSize = 'small' | 'medium' | 'large'
+export type DogVibe = 'chill' | 'playful' | 'learning'
+export type DogSociability = 'yes' | 'sometimes' | 'no'
+
+export type DogDetails = {
+  name: string
+  size: DogSize | null
+  vibe: DogVibe | null
+  goodWithDogs: DogSociability | null
+  /** Small downscaled JPEG data URL, or null. */
+  photo: string | null
+}
+
+export type DogAnswer = {
+  stance: DogStance | null
+  /** Only meaningful when stance is 'has-dog'; cleared on save otherwise. */
+  dog: DogDetails
+}
+
 export type UniversalProfile = {
   personality: {
     energy: SocialEnergy | null
@@ -135,6 +156,8 @@ export type UniversalProfile = {
     notes: string
     shareWithMatches: boolean
   }
+  /** Optional. May be missing on profiles saved before this question existed; read via dogsOf(). */
+  dogs: DogAnswer
 }
 
 // ---- Tourist mode -----------------------------------------------------------------------------
@@ -175,7 +198,6 @@ export type HostActivity =
 
 export type Availability = 'weekday-day' | 'weekday-evening' | 'weekend-day' | 'weekend-evening'
 export type HostDuration = 'quick' | 'couple-hours' | 'half-day' | 'full-day'
-export type DogPreference = 'bring-my-dog' | 'love-dogs' | 'no-dogs'
 
 export type LocalContext = {
   /** Typed by the person. Never inferred from GPS. */
@@ -189,7 +211,6 @@ export type LocalContext = {
   availability: Availability[]
   duration: HostDuration | null
   transport: Transport[]
-  dogs: DogPreference | null
   updatedAt: number
 }
 

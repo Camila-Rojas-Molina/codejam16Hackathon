@@ -1,6 +1,8 @@
 // Pure helpers for the profile model: blank values, defaults, validation, normalising stored data.
 import type {
   Budget,
+  DogAnswer,
+  DogDetails,
   ExploreMode,
   LocalContext,
   ProfileRecord,
@@ -24,7 +26,32 @@ export function emptyUniversal(): UniversalProfile {
     },
     languages: { spoken: [], preferred: [] },
     accessibility: { needs: [], notes: '', shareWithMatches: false },
+    dogs: emptyDogs(),
   }
+}
+
+// ---- Dogs -------------------------------------------------------------------------------------
+
+export const emptyDog = (): DogDetails => ({ name: '', size: null, vibe: null, goodWithDogs: null, photo: null })
+export const emptyDogs = (): DogAnswer => ({ stance: null, dog: emptyDog() })
+
+/** The dog answer, safe on profiles cached before the question existed. */
+export const dogsOf = (u: Pick<UniversalProfile, 'dogs'> | null | undefined): DogAnswer => u?.dogs ?? emptyDogs()
+
+/** Only "has a dog" needs follow-ups: name, size, vibe and how they get on with dogs (photo optional). */
+export function dogDetailsError(dogs: DogAnswer | undefined): string | null {
+  if (!dogs || dogs.stance !== 'has-dog') return null
+  const d = dogs.dog
+  if (!d.name.trim()) return 'What’s your dog called?'
+  if (!d.size || !d.vibe || !d.goodWithDogs) return 'Pick a size, a vibe, and how they get on with other dogs.'
+  return null
+}
+
+/** Drops dog details (name, photo…) when the person doesn't have a dog, so nothing stale is stored. */
+export function tidyDogs(u: UniversalProfile): UniversalProfile {
+  const dogs = dogsOf(u)
+  if (dogs.stance === 'has-dog') return { ...u, dogs: { ...dogs, dog: { ...dogs.dog, name: dogs.dog.name.trim() } } }
+  return { ...u, dogs: { stance: dogs.stance, dog: emptyDog() } }
 }
 
 export function emptyRecord(accountId: string): ProfileRecord {
@@ -72,7 +99,6 @@ export function newLocal(universal: UniversalProfile | null): LocalContext {
     availability: [],
     duration: null,
     transport: universal ? [...universal.exploration.transport] : [],
-    dogs: null,
     updatedAt: Date.now(),
   }
 }
@@ -104,7 +130,9 @@ export function isUniversalComplete(u: UniversalProfile | null): u is UniversalP
     e.attractions.length > 0 &&
     e.transport.length > 0 &&
     e.groupSize !== null &&
-    u.languages.spoken.length > 0
+    u.languages.spoken.length > 0 &&
+    // The dog question is optional, but "has a dog" must come with its follow-ups.
+    dogDetailsError(dogsOf(u)) === null
   )
 }
 
@@ -204,6 +232,8 @@ export function normalizeUniversal(v: unknown): UniversalProfile | null {
   const f = isObj(e.food) ? e.food : {}
   const l = isObj(v.languages) ? v.languages : {}
   const a = isObj(v.accessibility) ? v.accessibility : {}
+  const dg = isObj(v.dogs) ? v.dogs : {}
+  const dd = isObj(dg.dog) ? dg.dog : {}
   return {
     personality: {
       energy: strOrNull(p.energy),
@@ -231,6 +261,16 @@ export function normalizeUniversal(v: unknown): UniversalProfile | null {
       needs: strArr(a.needs),
       notes: str(a.notes),
       shareWithMatches: a.shareWithMatches === true ? true : base.accessibility.shareWithMatches,
+    },
+    dogs: {
+      stance: strOrNull(dg.stance),
+      dog: {
+        name: str(dd.name),
+        size: strOrNull(dd.size),
+        vibe: strOrNull(dd.vibe),
+        goodWithDogs: strOrNull(dd.goodWithDogs),
+        photo: typeof dd.photo === 'string' && dd.photo.startsWith('data:image/') ? dd.photo : null,
+      },
     },
   }
 }
@@ -268,7 +308,6 @@ function normLocal(v: unknown): LocalContext | null {
     availability: strArr(v.availability),
     duration: strOrNull(v.duration),
     transport: strArr(v.transport),
-    dogs: strOrNull(v.dogs),
     updatedAt: numOrNull(v.updatedAt) ?? Date.now(),
   }
 }

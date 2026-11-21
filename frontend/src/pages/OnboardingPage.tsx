@@ -8,6 +8,7 @@ import Screen from '../components/layout/Screen'
 import Button from '../components/ui/Button'
 import { AVATARS, NAME_MAX_LENGTH } from '../features/onboarding/options'
 import { nextOnboardingStep } from '../features/profile/flow'
+import { avatarFor, DEFAULT_AVATAR, resolveAvatar } from '../lib/avatars'
 import { cn } from '../lib/cn'
 import { useStore } from '../store/useStore'
 
@@ -21,7 +22,8 @@ export default function OnboardingPage() {
   const nameId = useId()
 
   const [name, setName] = useState(account?.name ?? '')
-  const [avatar, setAvatar] = useState<string | null>(account?.avatar ?? null)
+  // New accounts start on the default avatar; old emoji avatars resolve to an image one.
+  const [avatar, setAvatar] = useState<string | null>(account ? resolveAvatar(account.avatar) : DEFAULT_AVATAR)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -90,21 +92,22 @@ export default function OnboardingPage() {
         <fieldset>
           <legend className={labelClass}>Pick an avatar</legend>
           <div className="grid grid-cols-4 gap-3">
-            {AVATARS.map((emoji) => {
-              const selected = avatar === emoji
+            {AVATARS.map((id) => {
+              const selected = avatar === id
+              const { src, alt } = avatarFor(id)
               return (
                 <button
-                  key={emoji}
+                  key={id}
                   type="button"
                   aria-pressed={selected}
-                  aria-label={`Avatar ${emoji}`}
-                  onClick={() => setAvatar(emoji)}
+                  onClick={() => setAvatar(id)}
                   className={cn(
                     'grid aspect-square min-h-14 place-items-center rounded-full border-[3px] text-3xl transition-transform duration-100 active:scale-90',
                     selected ? 'scale-110 border-navy bg-sun' : 'border-navy/0 bg-paper',
                   )}
                 >
-                  {emoji}
+                  {/* The image's alt text names the button ("Star avatar"). */}
+                  <img src={src} alt={alt} className="aspect-square w-[85%] object-contain" />
                 </button>
               )
             })}

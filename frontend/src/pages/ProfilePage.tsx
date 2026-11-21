@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import Screen from '../components/layout/Screen'
+import Avatar from '../components/ui/Avatar'
 import Badge from '../components/ui/Badge'
 import BottomNav from '../components/ui/BottomNav'
 import Button from '../components/ui/Button'
@@ -102,9 +103,7 @@ export default function ProfilePage() {
   return (
     <Screen withNav className="gap-8 md:max-w-xl">
       <header className="flex items-center gap-4">
-        <span className="grid size-20 shrink-0 place-items-center rounded-full border-4 border-navy bg-paper text-4xl" aria-hidden>
-          {account.avatar}
-        </span>
+        <Avatar id={account.avatar} size="lg" framed decorative />
         <div className="min-w-0">
           <h1 className="truncate text-4xl text-navy">{account.name}</h1>
           <Link to="/onboarding" state={{ from: 'profile' }} className="font-semibold underline underline-offset-4">
@@ -131,9 +130,7 @@ export default function ProfilePage() {
         </h2>
         <Card tone="bubble-light" tilt="right" className="space-y-3">
           <div className="flex items-center gap-3">
-            <span className="text-5xl" aria-hidden>
-              {view.avatar}
-            </span>
+            <Avatar id={view.avatar} size="md" decorative />
             <div className="min-w-0">
               <p className="truncate font-display text-3xl uppercase">{view.name}</p>
               {view.mode && <Badge tone="navy">{`${modeMeta(view.mode).emoji} ${modeMeta(view.mode).title} mode`}</Badge>}

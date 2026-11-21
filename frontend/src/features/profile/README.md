@@ -10,7 +10,7 @@ Nobody is permanently a tourist or a local. Every account has one universal prof
 | `Account` | name, avatar | registration (`/onboarding`) |
 | `UniversalProfile` | personality, interests, companion preferences, budget, pace, attractions, food, transport, group size, languages, accessibility | onboarding questionnaire (`/onboarding/questions`) |
 | `TouristTrip[]` | destination, dates, group, trip budget, trip interests and activities, extra access needs | first time Tourist mode is used, then per trip (`/mode/tourist`, `/trips`) |
-| `LocalContext` | home city, neighbourhood, known areas, recommendations, hosting activities, languages, availability, duration, transport, dog preference | first time Local mode is used (`/mode/local`) |
+| `LocalContext` | home city, neighbourhood, known areas, recommendations, hosting activities, languages, availability, duration, transport (dogs come from the universal profile) | first time Local mode is used (`/mode/local`) |
 | `ProfileRecord` | all of the above, plus `activeMode`, `activeTripId` and `universalCompletedAt` | |
 
 - New trips and the local profile are **pre-filled by copying** from the universal profile. Editing a trip

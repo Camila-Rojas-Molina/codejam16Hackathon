@@ -1,5 +1,5 @@
 // Shared data types (PRD section 6). Screens import types from here, never from mockData.
-import type { Interest } from '../features/profile/types'
+import type { DogDetails, DogStance, Interest } from '../features/profile/types'
 
 export type Role = 'tourist' | 'local'
 
@@ -13,6 +13,8 @@ export type User = {
   /** Public profile bits used to rank partners. Values are Interest ids from features/profile. */
   interests?: Interest[]
   languages?: string[]
+  /** Public dog answer. `dog` only when stance is 'has-dog'. */
+  dogs?: { stance: DogStance; dog?: DogDetails }
 }
 
 export type Difficulty = 'easy' | 'medium' | 'hard'
@@ -29,6 +31,8 @@ export type Hunt = {
   difficulty: Difficulty
   /** Shown after it's found. */
   revealText: string
+  /** Fine to bring a (leashed) dog. Undefined = unknown (the Supabase hunts table has no column for it yet). */
+  dogFriendly?: boolean
 }
 
 export type Team = {

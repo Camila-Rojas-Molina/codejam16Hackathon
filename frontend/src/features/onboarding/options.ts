@@ -1,3 +1,4 @@
+import { AVATAR_LIST } from '../../lib/avatars'
 import type { Role } from '../../lib/types'
 
 /** Tourist and Local are modes anyone can switch between, not account types. */
@@ -32,7 +33,8 @@ export const MODE_OPTIONS: {
 
 export const modeMeta = (mode: Role) => MODE_OPTIONS.find((m) => m.mode === mode)!
 
-export const AVATARS = ['🦊', '🐸', '🐼', '🦉', '🐝', '🐢', '🦝', '🐧'] as const
+/** Avatar ids, in picker order (images and alt text live in lib/avatars.ts). */
+export const AVATARS = AVATAR_LIST.map((a) => a.id)
 
 export const NAME_MAX_LENGTH = 20
 

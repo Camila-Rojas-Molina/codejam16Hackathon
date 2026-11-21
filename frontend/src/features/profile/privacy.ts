@@ -2,13 +2,16 @@
 // used for matching, but it is never shown to another person.
 //
 // Public: name, avatar, vibe, planning and decision style, interests, ideal adventure, topics, pace,
-//         must-see spots, group size, languages, and the city-level context of the active mode.
+//         must-see spots, group size, languages, dog stance (has a dog / loves dogs / neutral) and
+//         dog details (name, size, vibe, good with dogs, photo), and the city-level context of the
+//         active mode.
 // Private: comfort meeting new people, buddy qualities, budget and spending range, food and dietary
-//          needs, transport, neighbourhood, hidden gems, trip party, and accessibility (unless the
-//          person turns on sharing with matches; notes are never shared).
+//          needs, transport, neighbourhood, hidden gems, trip party, "prefers no dogs" (a matching
+//          filter only, never shown), and accessibility (unless the person turns on sharing with
+//          matches; notes are never shared).
 // Keep in sync with the `visibility` of rows in features/onboarding/questionnaire.tsx and
 // features/profile/contextSummary.ts.
-import { activeTrip, formatTripDates } from './model'
+import { activeTrip, dogsOf, formatTripDates } from './model'
 import type {
   AccessibilityNeed,
   Account,
@@ -16,7 +19,8 @@ import type {
   Attraction,
   Availability,
   DecisionStyle,
-  DogPreference,
+  DogDetails,
+  DogStance,
   ExploreMode,
   GroupSize,
   HostActivity,
@@ -47,6 +51,10 @@ export type PublicProfile = {
   preferredLanguages: string[]
   /** Only present when the person opted in. */
   accessibilityNeeds?: AccessibilityNeed[]
+  /** Absent when unanswered or when they prefer no dogs (that answer is never shown). */
+  dogStance?: Exclude<DogStance, 'no-dogs'>
+  /** Only present when they have a dog. */
+  dog?: DogDetails
   tourist?: { destination: string; when: string; interests: Interest[]; activities: Attraction[] }
   local?: {
     homeCity: string
@@ -56,7 +64,6 @@ export type PublicProfile = {
     languages: string[]
     availability: Availability[]
     duration: HostDuration | null
-    dogs: DogPreference | null
   }
 }
 
@@ -84,6 +91,9 @@ export function publicProfile(account: Account, record: ProfileRecord): PublicPr
   if (u?.accessibility.shareWithMatches && u.accessibility.needs.length > 0) {
     view.accessibilityNeeds = [...u.accessibility.needs]
   }
+  const dogs = dogsOf(u)
+  if (dogs.stance && dogs.stance !== 'no-dogs') view.dogStance = dogs.stance
+  if (dogs.stance === 'has-dog') view.dog = { ...dogs.dog }
   if (record.activeMode === 'tourist' && trip) {
     view.tourist = { destination: trip.destination, when: formatTripDates(trip), interests: trip.interests, activities: trip.activities }
   }
@@ -97,7 +107,6 @@ export function publicProfile(account: Account, record: ProfileRecord): PublicPr
       languages: local.languages,
       availability: local.availability,
       duration: local.duration,
-      dogs: local.dogs,
     }
   }
   return view

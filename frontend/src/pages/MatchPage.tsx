@@ -10,7 +10,7 @@ import { nextOnboardingStep } from '../features/profile/flow'
 import { compatibility, toMatchProfile } from '../features/profile/matching'
 import { activeTrip } from '../features/profile/model'
 import { INTEREST_OPTIONS, labelsFor } from '../features/profile/options'
-import { findPartner } from '../lib/api'
+import { findPartner, matchDogs } from '../lib/api'
 import type { User } from '../lib/types'
 import { useStore } from '../store/useStore'
 
@@ -110,7 +110,7 @@ export default function MatchPage() {
   }
 
   const { partner } = phase
-  const match = compatibility(me ?? {}, { interests: partner.interests, languages: partner.languages })
+  const match = compatibility(me ?? {}, { interests: partner.interests, languages: partner.languages, dogs: matchDogs(partner) })
   const common = labelsFor(INTEREST_OPTIONS, match.sharedInterests)
 
   return (
@@ -145,6 +145,11 @@ export default function MatchPage() {
             <Badge tone="navy" className="mt-1">
               {roleLabel(partner.role)}
             </Badge>
+            {match.dogDuo && (
+              <Badge tone="sun" className="mt-1 ml-1.5">
+                🐾 Dog duo
+              </Badge>
+            )}
           </div>
         </div>
         {(common.length > 0 || match.sharedLanguages.length > 0) && (

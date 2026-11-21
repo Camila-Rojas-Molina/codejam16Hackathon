@@ -1,6 +1,7 @@
 // The only data-access module. Returns mock data now; swap the bodies for Supabase /
 // Google Places later without changing the signatures. Screens must not import mockData.
-import { compatibility, type MatchProfile } from '../features/profile/matching'
+import { compatibility, type MatchDogs, type MatchProfile } from '../features/profile/matching'
+import { tidyDogs } from '../features/profile/model'
 import type {
   Account,
   ExploreMode,
@@ -36,6 +37,10 @@ export async function getHunt(id: string): Promise<Hunt | null> {
   return hunt ? clone(hunt) : null
 }
 
+/** A candidate's public dog answer in the shape compatibility() expects. */
+export const matchDogs = (u: Pick<User, 'dogs'>): MatchDogs | undefined =>
+  u.dogs ? { stance: u.dogs.stance, goodWithDogs: u.dogs.dog?.goodWithDogs ?? null } : undefined
+
 /**
  * Picks a partner in the opposite mode. With a profile, candidates are ranked by compatibility
  * (shared interests, languages, …) and one of the best is chosen; without one it's random.
@@ -46,8 +51,12 @@ export async function findPartner(role: Role, me?: MatchProfile | null): Promise
   const pool = USERS.filter((u) => u.role === wanted)
   if (!me) return clone(pool[Math.floor(Math.random() * pool.length)])
   const scored = pool
-    .map((u) => ({ u, score: compatibility(me, { interests: u.interests, languages: u.languages }).total ?? 0 }))
+    .map((u) => ({ u, match: compatibility(me, { interests: u.interests, languages: u.languages, dogs: matchDogs(u) }) }))
+    // Hard filter: "prefers no dogs" is never paired with a dog owner.
+    .filter((s) => !s.match.blocked)
+    .map((s) => ({ u: s.u, score: s.match.total ?? 0 }))
     .sort((a, b) => b.score - a.score)
+  if (scored.length === 0) throw new Error('No compatible partner right now.')
   // A little variety: pick randomly among everyone within 0.1 of the best score.
   const best = scored.filter((s) => s.score >= scored[0].score - 0.1)
   return clone(best[Math.floor(Math.random() * best.length)].u)
@@ -106,7 +115,8 @@ export async function saveUniversalProfile(accountId: string, universal: Univers
   await delay(250)
   return updateRecord(accountId, (r) => ({
     ...r,
-    universal: clone(universal),
+    // Dog details are dropped unless they have a dog, so no stale name/photo is kept.
+    universal: clone(tidyDogs(universal)),
     universalCompletedAt: r.universalCompletedAt ?? Date.now(),
   }))
 }
