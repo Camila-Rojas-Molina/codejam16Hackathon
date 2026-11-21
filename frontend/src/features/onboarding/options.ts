@@ -32,8 +32,6 @@ export const MODE_OPTIONS: {
 
 export const modeMeta = (mode: Role) => MODE_OPTIONS.find((m) => m.mode === mode)!
 
-export const AVATARS = ['🦊', '🐸', '🐼', '🦉', '🐝', '🐢', '🦝', '🐧'] as const
-
 export const NAME_MAX_LENGTH = 20
 
 export const roleLabel = (role: Role) => (role === 'tourist' ? 'Tourist 🧳' : 'Local 📍')

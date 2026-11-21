@@ -252,6 +252,7 @@ export const DOG_OPTIONS: Option<DogPreference>[] = [
 ]
 
 export const CITY_MAX_LENGTH = 60
+export const MAX_CITIES = 100
 export const AREA_MAX_LENGTH = 40
 export const MAX_AREAS = 8
 export const GEMS_MAX_LENGTH = 300

@@ -1,6 +1,9 @@
 // Pure helpers for the profile model: blank values, defaults, validation, normalising stored data.
 import type {
   Budget,
+  DiscoveredCity,
+  PointsEntry,
+  Rewards,
   ExploreMode,
   LocalContext,
   ProfileRecord,
@@ -11,6 +14,8 @@ import type {
 
 export function emptyUniversal(): UniversalProfile {
   return {
+    homeCity: '',
+    citiesDiscovered: [],
     personality: { energy: null, newPeople: null, planning: null, decisions: null },
     interests: [],
     companion: { qualities: [], idealAdventure: null, idealAdventureNote: '', topics: [] },
@@ -35,6 +40,8 @@ export function emptyRecord(accountId: string): ProfileRecord {
     activeMode: null,
     tourist: { trips: [], activeTripId: null },
     local: null,
+    rewards: { ledger: [], owned: [], equipped: {} },
+    likes: [],
     updatedAt: Date.now(),
   }
 }
@@ -62,7 +69,8 @@ export function newTrip(universal: UniversalProfile | null): TouristTrip {
 /** A blank local profile, with languages and transport pre-filled from the universal profile. */
 export function newLocal(universal: UniversalProfile | null): LocalContext {
   return {
-    homeCity: '',
+    // Usually where they host; they can change it for Local mode without touching their profile.
+    homeCity: universal?.homeCity ?? '',
     neighbourhood: '',
     languages: universal ? [...universal.languages.spoken] : [],
     knownAreas: [],
@@ -93,6 +101,7 @@ export function isUniversalComplete(u: UniversalProfile | null): u is UniversalP
   const p = u.personality
   const e = u.exploration
   return (
+    u.homeCity.trim().length > 0 &&
     p.energy !== null &&
     p.newPeople !== null &&
     p.planning !== null &&
@@ -195,6 +204,32 @@ function normBudget(v: unknown): Budget {
   }
 }
 
+function normCity(v: unknown): DiscoveredCity | null {
+  if (!isObj(v) || typeof v.name !== 'string' || !v.name.trim()) return null
+  const source = v.source === 'trip' || v.source === 'quest' ? v.source : 'manual'
+  return {
+    id: typeof v.id === 'string' ? v.id : `city-${v.name.trim().toLowerCase()}`,
+    name: v.name.trim(),
+    source,
+    refId: typeof v.refId === 'string' ? v.refId : undefined,
+    addedAt: numOrNull(v.addedAt) ?? Date.now(),
+  }
+}
+
+function normRewards(v: unknown): Rewards {
+  if (!isObj(v)) return { ledger: [], owned: [], equipped: {} }
+  const ledger = (Array.isArray(v.ledger) ? v.ledger : []).filter(
+    (e): e is PointsEntry => isObj(e) && typeof e.id === 'string' && typeof e.amount === 'number' && typeof e.refId === 'string',
+  )
+  const equipped: Rewards['equipped'] = {}
+  if (isObj(v.equipped)) {
+    for (const slot of ['head', 'face', 'neck'] as const) {
+      if (typeof v.equipped[slot] === 'string') equipped[slot] = v.equipped[slot] as string
+    }
+  }
+  return { ledger, owned: strArr(v.owned), equipped }
+}
+
 export function normalizeUniversal(v: unknown): UniversalProfile | null {
   if (!isObj(v)) return null
   const base = emptyUniversal()
@@ -205,6 +240,10 @@ export function normalizeUniversal(v: unknown): UniversalProfile | null {
   const l = isObj(v.languages) ? v.languages : {}
   const a = isObj(v.accessibility) ? v.accessibility : {}
   return {
+    homeCity: str(v.homeCity),
+    citiesDiscovered: (Array.isArray(v.citiesDiscovered) ? v.citiesDiscovered : [])
+      .map(normCity)
+      .filter((x): x is DiscoveredCity => x !== null),
     personality: {
       energy: strOrNull(p.energy),
       newPeople: strOrNull(p.newPeople),
@@ -286,6 +325,30 @@ export function normalizeRecord(v: unknown, accountId: string): ProfileRecord {
     activeMode: mode,
     tourist: { trips, activeTripId },
     local: normLocal(v.local),
+    rewards: normRewards(v.rewards),
+    likes: strArr(v.likes),
     updatedAt: numOrNull(v.updatedAt) ?? Date.now(),
   }
+}
+
+// ---- Cities & points --------------------------------------------------------------------------
+
+export const cityKey = (name: string) => name.trim().replace(/\s+/g, ' ').toLowerCase()
+
+/** Adds a city unless it's already there (case-insensitive). Returns the same list if nothing changed. */
+export function addCity(cities: DiscoveredCity[], name: string, source: DiscoveredCity['source'] = 'manual', refId?: string) {
+  const clean = name.trim().replace(/\s+/g, ' ')
+  if (!clean || cities.some((c) => cityKey(c.name) === cityKey(clean))) return cities
+  const city: DiscoveredCity = { id: `city-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, name: clean, source, refId, addedAt: Date.now() }
+  return [...cities, city]
+}
+
+export const pointsBalance = (rewards: Rewards | null | undefined) => (rewards?.ledger ?? []).reduce((sum, e) => sum + e.amount, 0)
+export const pointsEarned = (rewards: Rewards | null | undefined) =>
+  (rewards?.ledger ?? []).filter((e) => e.amount > 0).reduce((sum, e) => sum + e.amount, 0)
+
+/** Rebuilds a city list from names (e.g. a tag input), keeping existing entries and their metadata. */
+export function citiesFromNames(existing: DiscoveredCity[], names: string[]): DiscoveredCity[] {
+  const kept = existing.filter((c) => names.some((n) => cityKey(n) === cityKey(c.name)))
+  return names.reduce((list, n) => addCity(list, n), kept)
 }

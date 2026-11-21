@@ -268,7 +268,7 @@ export default function TouristSetupPage() {
 
   // New trips started from a mode switch become the active trip and turn Tourist mode on.
   const activate = nav?.activate ?? !existing
-  const returnTo = nav?.returnTo ?? (activate ? '/hunts' : '/trips')
+  const returnTo = nav?.returnTo ?? (activate ? '/map' : '/trips')
   const cancelTo = nav?.returnTo ?? (existing ? '/trips' : '/mode')
 
   return (

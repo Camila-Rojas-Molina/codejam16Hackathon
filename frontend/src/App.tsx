@@ -1,6 +1,8 @@
 import { BrowserRouter, Route, Routes } from 'react-router'
 import AppShell from './components/layout/AppShell'
+import DashboardLayout from './components/layout/DashboardLayout'
 import AccessibilityPage from './pages/AccessibilityPage'
+import ChatPage from './pages/ChatPage'
 import DogsPage from './pages/DogsPage'
 import HuntsPage from './pages/HuntsPage'
 import LocalSetupPage from './pages/LocalSetupPage'
@@ -12,6 +14,8 @@ import OnboardingPage from './pages/OnboardingPage'
 import ProfilePage from './pages/ProfilePage'
 import QuestionnairePage from './pages/QuestionnairePage'
 import QuestsPage from './pages/QuestsPage'
+import SettingsPage from './pages/SettingsPage'
+import ShopPage from './pages/ShopPage'
 import StyleguidePage from './pages/StyleguidePage'
 import TeamPage from './pages/TeamPage'
 import TouristSetupPage from './pages/TouristSetupPage'
@@ -32,8 +36,18 @@ export default function App() {
         <Route path="mode/tourist" element={<TouristSetupPage />} />
         <Route path="mode/tourist/:tripId" element={<TouristSetupPage />} />
         <Route path="mode/local" element={<LocalSetupPage />} />
-        <Route path="trips" element={<TripsPage />} />
-        <Route path="profile" element={<ProfilePage />} />
+
+        {/* The main app: left nav, centre section, right status sidebar. */}
+        <Route element={<DashboardLayout />}>
+          <Route path="map" element={<MapPage />} />
+          <Route path="quests" element={<QuestsPage />} />
+          <Route path="chat" element={<ChatPage />} />
+          <Route path="chat/:personId" element={<ChatPage />} />
+          <Route path="profile" element={<ProfilePage />} />
+          <Route path="shop" element={<ShopPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+          <Route path="trips" element={<TripsPage />} />
+        </Route>
 
         <Route path="match" element={<MatchPage />} />
         <Route path="hunts" element={<HuntsPage />} />
@@ -43,8 +57,6 @@ export default function App() {
 
         {/* Original scaffold pages, not part of the PRD loop. */}
         <Route element={<AppShell />}>
-          <Route path="quests" element={<QuestsPage />} />
-          <Route path="map" element={<MapPage />} />
           <Route path="team" element={<TeamPage />} />
           <Route path="dogs" element={<DogsPage />} />
           <Route path="accessibility" element={<AccessibilityPage />} />

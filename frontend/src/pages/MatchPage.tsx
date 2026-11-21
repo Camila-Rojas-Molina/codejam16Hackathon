@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router'
 import Screen from '../components/layout/Screen'
 import { SpeechBubble, Star } from '../components/illustrations/Stickers'
+import Avatar from '../components/ui/Avatar'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
@@ -21,14 +22,7 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 type Phase = { kind: 'searching' } | { kind: 'found'; partner: User } | { kind: 'error' }
 
 function AvatarDisc({ emoji, className = '' }: { emoji: string; className?: string }) {
-  return (
-    <span
-      className={`grid size-20 place-items-center rounded-full border-4 border-navy bg-paper text-4xl ${className}`}
-      aria-hidden
-    >
-      {emoji}
-    </span>
-  )
+  return <Avatar avatar={emoji} size="lg" className={className} />
 }
 
 export default function MatchPage() {
@@ -136,9 +130,7 @@ export default function MatchPage() {
 
       <Card tone="bubble-light" tilt="right" className="motion-safe:animate-pop">
         <div className="flex items-center gap-4">
-          <span className="text-6xl" aria-hidden>
-            {partner.avatar}
-          </span>
+          <Avatar avatar={partner.avatar} size="xl" className="bg-paper" />
           <div className="min-w-0">
             <p className="font-type text-xs tracking-wider uppercase">Your teammate</p>
             <h2 className="truncate text-4xl">{partner.name}</h2>

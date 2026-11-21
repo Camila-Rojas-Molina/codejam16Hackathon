@@ -54,7 +54,7 @@ export default function ModePage() {
             <button
               key={m.mode}
               type="button"
-              onClick={() => choose(m.mode, { returnTo: '/hunts', then: () => navigate('/hunts') })}
+              onClick={() => choose(m.mode, { returnTo: '/map', then: () => navigate('/map') })}
               aria-busy={pending === m.mode || undefined}
               aria-describedby={`mode-${m.mode}-status`}
               className={cn(

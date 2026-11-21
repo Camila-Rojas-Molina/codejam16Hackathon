@@ -1,6 +1,8 @@
 // Migo, the MIGO mascot: a friendly map pin. Original hand-drawn style art, flat fills, wobbly navy strokes.
 import type { ReactNode } from 'react'
+import type { AccessorySlot } from '../../features/profile/types'
 import { cn } from '../../lib/cn'
+import { AccessoryArt } from './Accessories'
 
 export type MascotMood = 'wave' | 'cheer' | 'think'
 
@@ -16,11 +18,21 @@ type MascotProps = {
   className?: string
   /** Pin fill. Sun for Tourist mode, bubble for Local, by convention. */
   fill?: string
+  /** Shop items Migo is wearing, one per slot. */
+  accessories?: Partial<Record<AccessorySlot, string>>
+  /** Set to describe Migo for screen readers (e.g. on the wardrobe). Decorative otherwise. */
+  label?: string
 }
 
-export function Mascot({ mood = 'wave', className, fill = 'var(--color-bubble)' }: MascotProps) {
+export function Mascot({ mood = 'wave', className, fill = 'var(--color-bubble)', accessories, label }: MascotProps) {
   return (
-    <svg viewBox="0 0 120 152" className={cn('h-32 w-auto', className)} aria-hidden>
+    <svg
+      viewBox="0 0 120 152"
+      className={cn('h-32 w-auto overflow-visible', className)}
+      role={label ? 'img' : undefined}
+      aria-label={label}
+      aria-hidden={label ? undefined : true}
+    >
       <ellipse cx="60" cy="146" rx="22" ry="4" fill="var(--color-navy)" opacity="0.2" />
 
       {/* Arms behind the body */}
@@ -91,6 +103,11 @@ export function Mascot({ mood = 'wave', className, fill = 'var(--color-bubble)' 
       ) : (
         <path d="M49 75 Q60 85 71 75" fill="none" {...stroke} />
       )}
+
+      {/* Accessories: neckwear, then eyewear, then hats on top */}
+      {accessories?.neck && <AccessoryArt id={accessories.neck} />}
+      {accessories?.face && <AccessoryArt id={accessories.face} />}
+      {accessories?.head && <AccessoryArt id={accessories.head} />}
 
       {/* Thinking hand on the chin, drawn over the body */}
       {mood === 'think' && (

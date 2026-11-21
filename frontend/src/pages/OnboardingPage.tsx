@@ -6,7 +6,8 @@ import { useLocation, useNavigate } from 'react-router'
 import { MascotSays } from '../components/illustrations/Mascot'
 import Screen from '../components/layout/Screen'
 import Button from '../components/ui/Button'
-import { AVATARS, NAME_MAX_LENGTH } from '../features/onboarding/options'
+import { NAME_MAX_LENGTH } from '../features/onboarding/options'
+import { AVATAR_OPTIONS } from '../features/profile/avatars'
 import { nextOnboardingStep } from '../features/profile/flow'
 import { cn } from '../lib/cn'
 import { useStore } from '../store/useStore'
@@ -37,7 +38,7 @@ export default function OnboardingPage() {
     try {
       if (account) {
         await updateAccount({ name: trimmed, avatar })
-        navigate(fromProfile ? '/profile' : (nextOnboardingStep(account, profile) ?? '/hunts'))
+        navigate(fromProfile ? '/profile' : (nextOnboardingStep(account, profile) ?? '/map'))
       } else {
         await createAccount({ name: trimmed, avatar })
         navigate('/onboarding/questions')
@@ -90,21 +91,21 @@ export default function OnboardingPage() {
         <fieldset>
           <legend className={labelClass}>Pick an avatar</legend>
           <div className="grid grid-cols-4 gap-3">
-            {AVATARS.map((emoji) => {
-              const selected = avatar === emoji
+            {AVATAR_OPTIONS.map((a) => {
+              const selected = avatar === a.id
               return (
                 <button
-                  key={emoji}
+                  key={a.id}
                   type="button"
                   aria-pressed={selected}
-                  aria-label={`Avatar ${emoji}`}
-                  onClick={() => setAvatar(emoji)}
+                  aria-label={`Avatar: ${a.label}`}
+                  onClick={() => setAvatar(a.id)}
                   className={cn(
-                    'grid aspect-square min-h-14 place-items-center rounded-full border-[3px] text-3xl transition-transform duration-100 active:scale-90',
-                    selected ? 'scale-110 border-navy bg-sun' : 'border-navy/0 bg-paper',
+                    'grid aspect-square min-h-14 place-items-center rounded-2xl border-[3px] p-1 transition-transform duration-100 active:scale-90',
+                    selected ? 'scale-105 border-navy bg-sun' : 'border-navy/0 bg-paper',
                   )}
                 >
-                  {emoji}
+                  <img src={a.src} alt="" draggable={false} className="size-full object-contain" />
                 </button>
               )
             })}

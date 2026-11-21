@@ -2,21 +2,23 @@
 // Nothing here assumes the person is a tourist or a local; both modes use these answers.
 import type { ReactNode } from 'react'
 import Choices from '../../components/ui/Choices'
-import { TextArea, Toggle } from '../../components/ui/Fields'
+import { TagInput, TextArea, TextField, Toggle } from '../../components/ui/Fields'
 import BudgetFields from '../profile/components/BudgetFields'
 import LanguageFields from '../profile/components/LanguageFields'
-import { rangeError } from '../profile/model'
+import { citiesFromNames, rangeError } from '../profile/model'
 import {
   ACCESSIBILITY_OPTIONS,
   ADVENTURE_OPTIONS,
   ATTRACTION_OPTIONS,
   BUDGET_OPTIONS,
+  CITY_MAX_LENGTH,
   DECISION_OPTIONS,
   DIETARY_OPTIONS,
   ENERGY_OPTIONS,
   FOOD_STYLE_OPTIONS,
   GROUP_OPTIONS,
   INTEREST_OPTIONS,
+  MAX_CITIES,
   MAX_QUALITIES,
   NEW_PEOPLE_OPTIONS,
   NOTE_MAX_LENGTH,
@@ -72,6 +74,25 @@ const exploration = (update: Update, patch: Partial<UniversalProfile['exploratio
 
 export const QUESTIONS: QuestionStep[] = [
   // ---- Get to know you ----------------------------------------------------------------------
+  {
+    id: 'home',
+    section: 'you',
+    title: 'Where do you call home?',
+    subtitle: 'The city you live in, so visitors can meet you as a local. We never guess it from your location.',
+    isValid: (d) => d.homeCity.trim().length > 0,
+    blockedReason: 'Add your home city.',
+    render: (d, update) => (
+      <TextField
+        label="Home city"
+        value={d.homeCity}
+        onChange={(homeCity) => update((x) => ({ ...x, homeCity }))}
+        maxLength={CITY_MAX_LENGTH}
+        placeholder="e.g. Montréal"
+        autoComplete="address-level2"
+        hint="👀 Shown on your profile (city only). You can change it any time."
+      />
+    ),
+  },
   {
     id: 'energy',
     section: 'you',
@@ -401,6 +422,26 @@ export const QUESTIONS: QuestionStep[] = [
     },
   },
   {
+    id: 'cities',
+    section: 'style',
+    title: 'Where have you explored?',
+    subtitle: 'Add cities you’ve discovered. They become stamps on your profile, and great conversation starters.',
+    optional: true,
+    isValid: () => true,
+    isAnswered: (d) => d.citiesDiscovered.length > 0,
+    render: (d, update) => (
+      <TagInput
+        label="Cities I’ve discovered"
+        values={d.citiesDiscovered.map((c) => c.name)}
+        onChange={(names) => update((x) => ({ ...x, citiesDiscovered: citiesFromNames(x.citiesDiscovered, names) }))}
+        placeholder="e.g. Lisbon"
+        maxLength={CITY_MAX_LENGTH}
+        max={MAX_CITIES}
+        hint="Type a city and press Enter. Add more from your profile later."
+      />
+    ),
+  },
+  {
     id: 'accessibility',
     section: 'style',
     title: 'Anything that makes a day out easier for you?',
@@ -489,6 +530,7 @@ export function summaryRows(u: UniversalProfile): SummaryRow[] {
   const langs = u.languages.preferred.length > 0 ? `${list(u.languages.spoken)} (prefers ${list(u.languages.preferred)})` : list(u.languages.spoken)
 
   return [
+    { stepId: 'home', section: 'you', label: 'Home city', value: u.homeCity.trim() || 'Not answered yet', visibility: 'public' },
     { stepId: 'energy', section: 'you', label: 'Vibe', value: withEmoji(ENERGY_OPTIONS, u.personality.energy), visibility: 'public' },
     { stepId: 'new-people', section: 'you', label: 'Meeting new people', value: withEmoji(NEW_PEOPLE_OPTIONS, u.personality.newPeople), visibility: 'private' },
     { stepId: 'planning', section: 'you', label: 'Planning', value: withEmoji(PLANNING_OPTIONS, u.personality.planning), visibility: 'public' },
@@ -504,6 +546,7 @@ export function summaryRows(u: UniversalProfile): SummaryRow[] {
     { stepId: 'transport', section: 'style', label: 'Getting around', value: list(labelsFor(TRANSPORT_OPTIONS, u.exploration.transport)), visibility: 'private' },
     { stepId: 'group', section: 'style', label: 'Group size', value: withEmoji(GROUP_OPTIONS, u.exploration.groupSize), visibility: 'public' },
     { stepId: 'languages', section: 'style', label: 'Languages', value: langs, visibility: 'public' },
+    { stepId: 'cities', section: 'style', label: 'Cities discovered', value: list(u.citiesDiscovered.map((c) => c.name), 'None yet'), visibility: 'public' },
     {
       stepId: 'accessibility',
       section: 'style',

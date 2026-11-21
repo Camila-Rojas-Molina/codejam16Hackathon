@@ -2,9 +2,7 @@
 // Trips are independent of each other and of the universal profile.
 import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
-import Screen from '../components/layout/Screen'
 import Badge from '../components/ui/Badge'
-import BottomNav from '../components/ui/BottomNav'
 import Button from '../components/ui/Button'
 import { buttonClasses } from '../components/ui/buttonStyles'
 import Card from '../components/ui/Card'
@@ -58,7 +56,7 @@ export default function TripsPage() {
   const newTripState: SetupNavState = { activate: false, returnTo: '/trips' }
 
   return (
-    <Screen withNav className="gap-6 md:max-w-xl">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <Button variant="ghost" className="self-start px-0" onClick={() => navigate('/profile')}>
         ← Profile
       </Button>
@@ -138,7 +136,6 @@ export default function TripsPage() {
         Plan a new trip
       </Link>
 
-      <BottomNav />
-    </Screen>
+    </div>
   )
 }

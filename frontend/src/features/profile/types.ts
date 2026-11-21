@@ -101,7 +101,24 @@ export type GroupSize = 'one-on-one' | 'small-group' | 'large-group' | 'no-prefe
 /** Practical needs only. We never ask for a diagnosis. */
 export type AccessibilityNeed = 'step-free' | 'wheelchair' | 'accessible-transit' | 'quiet' | 'rest-stops'
 
+/** Where a discovered city came from. Manual today; quests and trips can add them automatically later. */
+export type CitySource = 'manual' | 'trip' | 'quest'
+
+export type DiscoveredCity = {
+  id: string
+  /** As typed, e.g. "Lisbon" or "Mexico City". */
+  name: string
+  source: CitySource
+  /** Trip or quest id when added automatically. */
+  refId?: string
+  addedAt: number
+}
+
 export type UniversalProfile = {
+  /** The city the person lives in. Typed by them, never inferred from GPS. */
+  homeCity: string
+  /** Places they've explored. Part of the universal profile, so no mode can overwrite it. */
+  citiesDiscovered: DiscoveredCity[]
   personality: {
     energy: SocialEnergy | null
     newPeople: NewPeopleComfort | null
@@ -195,6 +212,29 @@ export type LocalContext = {
 
 // ---- Account state ----------------------------------------------------------------------------
 
+// ---- Rewards & social --------------------------------------------------------------------------
+
+export type AccessorySlot = 'head' | 'face' | 'neck'
+
+/** One change to the points balance. The balance is the sum of the ledger. */
+export type PointsEntry = {
+  id: string
+  amount: number
+  reason: 'challenge' | 'purchase'
+  /** e.g. "challenge:daily-hunt:2026-11-21" or "item:shades". Unique per reason, so nothing pays twice. */
+  refId: string
+  label: string
+  at: number
+}
+
+export type Rewards = {
+  ledger: PointsEntry[]
+  /** Shop item ids the person owns. */
+  owned: string[]
+  /** What Migo is wearing, one item per slot. */
+  equipped: Partial<Record<AccessorySlot, string>>
+}
+
 export type ProfileRecord = {
   accountId: string
   universal: UniversalProfile | null
@@ -203,5 +243,8 @@ export type ProfileRecord = {
   activeMode: ExploreMode | null
   tourist: { trips: TouristTrip[]; activeTripId: string | null }
   local: LocalContext | null
+  rewards: Rewards
+  /** People this account has shown interest in (Chat → Discover). */
+  likes: string[]
   updatedAt: number
 }

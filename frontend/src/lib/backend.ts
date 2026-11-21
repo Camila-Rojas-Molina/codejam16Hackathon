@@ -1,6 +1,7 @@
 // Client for the Supabase backend (backend/supabase/migrations). Uses plain fetch, so no
 // extra npm package is needed. Not wired into the screens yet: api.ts still returns mock
 // data. To switch, call these from api.ts when isBackendConfigured() is true.
+import type { Account, ProfileRecord } from '../features/profile/types'
 import { config } from './config'
 import type { Difficulty, Hunt, LatLng, Role, ScoreBreakdown, Team, User } from './types'
 
@@ -210,4 +211,40 @@ export async function submitSelfie(s: BackendSubmission): Promise<BackendScore> 
 export async function getLeaderboard(): Promise<Team[]> {
   const rows = await request<TeamRow[]>('/rest/v1/leaderboard?select=*&order=points.desc')
   return rows.map(toTeam)
+}
+
+// ---- MIGO accounts & profiles (004_migo_profiles.sql) ----------------------------
+// One profile row per person (no permanent role); the universal profile, trips, local context,
+// rewards and likes live in one JSON record next to it. profiles.role mirrors the active mode
+// so find_partner() keeps working.
+
+type MigoAccountRow = { id: string; name: string; avatar: string; created_at: string }
+
+const toAccount = (row: MigoAccountRow): Account => ({
+  id: row.id,
+  name: row.name,
+  avatar: row.avatar,
+  createdAt: Date.parse(row.created_at) || Date.now(),
+})
+
+export async function createMigoAccount(input: { name: string; avatar: string }): Promise<Account> {
+  return toAccount(await rpc<MigoAccountRow>('migo_create_account', { p_name: input.name, p_avatar: input.avatar }))
+}
+
+/** The account and its stored record (null record = nothing saved yet). Null if the account is gone. */
+export async function getMigoProfile(id: string): Promise<{ account: Account; record: unknown } | null> {
+  const row = await rpc<{ account: MigoAccountRow; record: unknown } | null>('migo_get_profile', { p_profile_id: id })
+  return row ? { account: toAccount(row.account), record: row.record } : null
+}
+
+export async function updateMigoAccount(account: Account): Promise<void> {
+  await rpc('migo_update_account', { p_profile_id: account.id, p_name: account.name, p_avatar: account.avatar })
+}
+
+export async function saveMigoRecord(record: ProfileRecord): Promise<void> {
+  await rpc('migo_save_record', { p_profile_id: record.accountId, p_record: record })
+}
+
+export async function deleteMigoAccount(id: string): Promise<void> {
+  await rpc('migo_delete_account', { p_profile_id: id })
 }
