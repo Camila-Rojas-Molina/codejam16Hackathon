@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router'
 import { cn } from '../../lib/cn'
+import Logo from '../ui/Logo'
 
 const links = [
   { to: '/', label: 'Home' },
@@ -22,7 +23,7 @@ export default function Navigation() {
       {/* Desktop: top bar */}
       <header className="sticky top-0 z-10 hidden border-b-[3px] border-navy bg-paper md:block">
         <nav className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
-          <span className="font-display text-2xl text-red uppercase">Travel Quest</span>
+          <Logo size="sm" />
           <ul className="flex gap-1">
             {links.map((link) => (
               <li key={link.to}>

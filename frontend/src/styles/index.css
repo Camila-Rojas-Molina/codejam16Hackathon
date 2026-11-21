@@ -38,6 +38,29 @@
   --animate-pop: pop 380ms var(--ease-spring) both;
   --animate-breathe: breathe 6s ease-in-out infinite;
   --animate-tick: tick 1s ease-in-out infinite;
+  --animate-ring: ring 2s ease-out infinite;
+  --animate-wiggle: wiggle 2.4s ease-in-out infinite;
+
+  @keyframes ring {
+    0% {
+      transform: scale(0.5);
+      opacity: 0.9;
+    }
+    100% {
+      transform: scale(1.9);
+      opacity: 0;
+    }
+  }
+
+  @keyframes wiggle {
+    0%,
+    100% {
+      transform: rotate(-6deg);
+    }
+    50% {
+      transform: rotate(6deg);
+    }
+  }
 
   @keyframes pop {
     0% {

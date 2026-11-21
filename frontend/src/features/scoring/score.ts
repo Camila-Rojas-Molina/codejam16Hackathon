@@ -1,13 +1,15 @@
-// Points for finding a quest location. The first team earns the most,
-// and each later finder earns less, down to a floor.
+import type { Hunt, ScoreBreakdown } from '../../lib/types'
+
+// Points for one completed hunt (PRD 5.8).
 export const SCORING = {
-  firstFinderPoints: 100,
-  pointsLostPerFinder: 10,
-  minimumPoints: 10,
+  speedBonusShare: 0.5,
+  metSomeoneNewBonus: 50,
 } as const
 
-export function pointsForFinder(finderNumber: number): number {
-  const points =
-    SCORING.firstFinderPoints - (finderNumber - 1) * SCORING.pointsLostPerFinder
-  return Math.max(points, SCORING.minimumPoints)
+export function scoreHunt(hunt: Pick<Hunt, 'basePoints' | 'timeLimitSec'>, secondsLeft: number): ScoreBreakdown {
+  const base = hunt.basePoints
+  const left = Math.min(hunt.timeLimitSec, Math.max(0, secondsLeft))
+  const speedBonus = Math.round(((base * left) / hunt.timeLimitSec) * SCORING.speedBonusShare)
+  const metSomeoneBonus = SCORING.metSomeoneNewBonus
+  return { base, speedBonus, metSomeoneBonus, total: base + speedBonus + metSomeoneBonus }
 }

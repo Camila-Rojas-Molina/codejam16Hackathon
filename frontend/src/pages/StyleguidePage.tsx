@@ -5,6 +5,7 @@ import BottomNav from '../components/ui/BottomNav'
 import Button from '../components/ui/Button'
 import { buttonClasses } from '../components/ui/buttonStyles'
 import Card from '../components/ui/Card'
+import Logo from '../components/ui/Logo'
 import Timer from '../components/ui/Timer'
 
 const colours = [
@@ -63,7 +64,7 @@ export default function StyleguidePage() {
       <header className="space-y-3">
         <Badge tone="bubble-light">Temporary · step 1</Badge>
         {/* Red on sky is 1.5:1 — allowed only at this huge logo/display size. */}
-        <p className="font-display text-6xl leading-[0.9] text-red uppercase">Travel Quest</p>
+        <Logo />
         <p>Hand-drawn scrapbook / zine. Every token and base component in one place.</p>
       </header>
 

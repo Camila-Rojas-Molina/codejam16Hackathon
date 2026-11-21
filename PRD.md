@@ -155,6 +155,21 @@ Put the tokens in `src/styles/` (Tailwind theme):
 - **Map:** a custom map style tinted toward sky/light blue with navy roads, POI labels hidden so it doesn't give the answer away. The hint circle is `bubble` at ~35% opacity with a dashed navy stroke.
 - **Accessibility:** contrast ≥ 4.5:1 for text, tap targets ≥ 44 px, and respect `prefers-reduced-motion`.
 
+## 7b. Branding placeholders (the name and logo aren't final)
+- The app name lives in **one constant**, `APP_NAME` in `src/lib/config.ts`. Never hard-code the name anywhere else.
+- One `Logo` component at `src/components/ui/Logo.tsx`: it renders `/assets/logo.png` if it exists, otherwise a text wordmark of `APP_NAME` in the stamp font. Use it everywhere a logo appears.
+- Hunt photos are placeholders at `public/assets/hunts/<id>.jpg` until real photos are added.
+
+## 7c. Feels like a real app (PWA)
+- This is a **mobile-first web app, on purpose**: tourists scan a QR code and start with no download.
+- Add a web manifest and app icons so it can be added to the home screen and opens full-screen (`display: standalone`), with `theme_color` and `background_color` set to `sky`.
+- Use safe-area padding (`env(safe-area-inset-*)`) so nothing sits under the phone notch or home bar.
+- It will be deployed to Vercel (https), which phones require for camera and location.
+
+## 7d. Built to go beyond McGill (stretch goal, don't build yet)
+- The McGill hunts are hand-curated mock data for a reliable demo.
+- **Later:** `getHunts({ lat, lng })` will be able to generate hunts anywhere using the Google Places API (nearby tourist attractions plus their photos). So `api.ts` should already take the user's location as an argument and return the same `Hunt` type. No screen should import mock data directly; everything goes through `api.ts`.
+
 ## 8. Out of scope (for now)
 - A real backend, auth, or matching algorithm (mock it all)
 - Photo verification with AI (we check arrival by GPS instead, which is cheap and honest)
@@ -168,7 +183,7 @@ Put the tokens in `src/styles/` (Tailwind theme):
 4. Hunt list → **Active hunt with map** (the priority screen)
 5. Phone Away → Selfie → Result
 6. Leaderboard
-7. Desktop layout and polish
+7. Desktop layout, PWA manifest/icons, polish, and delete the temporary `/styleguide` page
 
 ## 10. Done when
 - The whole loop (Welcome → Leaderboard) works on a phone in demo mode with no backend.
