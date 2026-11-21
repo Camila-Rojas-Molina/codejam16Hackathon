@@ -82,12 +82,12 @@ export const HUNTS: Hunt[] = [
 
 // The pool partners are matched from: 3 tourists, 3 locals.
 export const USERS: User[] = [
-  { id: 'u-ana', name: 'Ana', avatar: '🦜', role: 'tourist', funFact: 'Flew in from Lisbon and has never seen snow.' },
-  { id: 'u-kenji', name: 'Kenji', avatar: '🐙', role: 'tourist', funFact: 'Collects a postcard from every city he visits.' },
-  { id: 'u-priya', name: 'Priya', avatar: '🦒', role: 'tourist', funFact: 'Is here for one weekend and wants to see everything.' },
-  { id: 'u-marc', name: 'Marc', avatar: '🦫', role: 'local', funFact: 'Knows every bagel shop in Mile End by smell.' },
-  { id: 'u-sophie', name: 'Sophie', avatar: '🐿️', role: 'local', funFact: 'Has climbed Mount Royal more than 200 times.' },
-  { id: 'u-yasmine', name: 'Yasmine', avatar: '🦔', role: 'local', funFact: 'Plays drums at the Tam-Tams most Sundays.' },
+  { id: 'u-ana', name: 'Ana', avatar: '🦜', role: 'tourist', funFact: 'Flew in from Lisbon and has never seen snow.', interests: ['food', 'architecture', 'photography'], languages: ['Portuguese', 'English', 'Spanish'] },
+  { id: 'u-kenji', name: 'Kenji', avatar: '🐙', role: 'tourist', funFact: 'Collects a postcard from every city he visits.', interests: ['art', 'history', 'technology'], languages: ['Japanese', 'English'] },
+  { id: 'u-priya', name: 'Priya', avatar: '🦒', role: 'tourist', funFact: 'Is here for one weekend and wants to see everything.', interests: ['nightlife', 'music', 'shopping', 'food'], languages: ['English', 'Hindi'] },
+  { id: 'u-marc', name: 'Marc', avatar: '🦫', role: 'local', funFact: 'Knows every bagel shop in Mile End by smell.', interests: ['food', 'traditions', 'music'], languages: ['French', 'English'] },
+  { id: 'u-sophie', name: 'Sophie', avatar: '🐿️', role: 'local', funFact: 'Has climbed Mount Royal more than 200 times.', interests: ['nature', 'photography', 'sports'], languages: ['French', 'English', 'Spanish'] },
+  { id: 'u-yasmine', name: 'Yasmine', avatar: '🦔', role: 'local', funFact: 'Plays drums at the Tam-Tams most Sundays.', interests: ['music', 'art', 'nightlife', 'history'], languages: ['Arabic', 'French', 'English'] },
 ]
 
 const person = (id: string, name: string, avatar: string, role: User['role']): User => ({ id, name, avatar, role })

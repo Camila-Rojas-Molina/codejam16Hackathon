@@ -1,31 +1,74 @@
+import { activeTrip } from '../features/profile/model'
+import type { Account, ProfileRecord } from '../features/profile/types'
 import { readJSON, writeJSON } from '../lib/storage'
 import type { HuntResult, ScoreBreakdown, Team, User } from '../lib/types'
 
+/** A partner, team and results for one exploring context (a trip, or Local mode). */
+export type MatchSession = {
+  partner: User | null
+  team: Team | null
+  results: Record<string, HuntResult>
+}
+
 export type AppState = {
-  user: User | null
+  /** The signed-in account on this device. One per person, whichever mode they use. */
+  account: Account | null
+  /** Cached copy of the account's profile record. The source of truth is api.ts. */
+  profile: ProfileRecord | null
   partner: User | null
   team: Team | null
   /** Completed hunts by id. */
   results: Record<string, HuntResult>
+  /**
+   * Matches for the contexts you're not in right now, keyed by contextKey(). Switching from a
+   * Paris trip to Local mode and back brings the Paris teammate back.
+   */
+  parked: Record<string, MatchSession>
   /** Settings toggle for demo mode (?demo=1 in the URL also turns it on). */
   demoMode: boolean
 }
 
 export type Action =
-  | { type: 'setUser'; user: User }
+  | { type: 'signIn'; account: Account; profile: ProfileRecord }
+  | { type: 'setAccount'; account: Account }
+  | { type: 'setProfile'; profile: ProfileRecord }
   | { type: 'setPartner'; partner: User }
+  | { type: 'clearMatch' }
   | { type: 'completeHunt'; huntId: string; score: ScoreBreakdown; secondsLeft: number; selfieUrl?: string }
   | { type: 'setDemoMode'; on: boolean }
   | { type: 'reset' }
 
-const STORAGE_KEY = 'tq:state:v1'
+const STORAGE_KEY = 'migo:state:v2'
+
+const emptySession: MatchSession = { partner: null, team: null, results: {} }
 
 export const initialState: AppState = {
-  user: null,
-  partner: null,
-  team: null,
-  results: {},
+  account: null,
+  profile: null,
+  ...emptySession,
+  parked: {},
   demoMode: false,
+}
+
+/** Which exploring context the profile is in: a specific trip, Local mode, or nothing yet. */
+export function contextKey(profile: ProfileRecord | null): string {
+  if (profile?.activeMode === 'tourist') return `tourist:${activeTrip(profile)?.id ?? 'none'}`
+  if (profile?.activeMode === 'local') return 'local'
+  return 'none'
+}
+
+/** The signed-in person as a match participant, in whichever mode they're using. */
+export function currentUser(state: Pick<AppState, 'account' | 'profile'>): User | null {
+  const { account, profile } = state
+  if (!account) return null
+  return {
+    id: account.id,
+    name: account.name,
+    avatar: account.avatar,
+    role: profile?.activeMode ?? 'tourist',
+    interests: profile?.universal?.interests,
+    languages: profile?.universal?.languages.spoken,
+  }
 }
 
 const TEAM_ADJECTIVES = ['Wandering', 'Lucky', 'Sneaky', 'Brave', 'Curious', 'Speedy', 'Midnight', 'Rooftop']
@@ -40,21 +83,53 @@ function teamName(a: User, b: User) {
 
 export function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
-    case 'setUser':
-      // A new player starts fresh: new match, new team, no results. Keeps the demo setting.
-      return { ...initialState, demoMode: state.demoMode, user: action.user }
+    case 'signIn':
+      // A new account starts fresh: no match, no results. Keeps the demo setting.
+      return { ...initialState, demoMode: state.demoMode, account: action.account, profile: action.profile }
+
+    case 'setAccount': {
+      // Keep the name/avatar on the current team card in sync with profile edits.
+      const team =
+        state.team && state.team.members[0].id === action.account.id
+          ? {
+              ...state.team,
+              members: [
+                { ...state.team.members[0], name: action.account.name, avatar: action.account.avatar },
+                state.team.members[1],
+              ] as Team['members'],
+            }
+          : state.team
+      return { ...state, account: action.account, team }
+    }
+
+    case 'setProfile': {
+      const before = contextKey(state.profile)
+      const after = contextKey(action.profile)
+      if (before === after) return { ...state, profile: action.profile }
+      // Context changed (mode switch or a different trip): park this match, restore that one.
+      const parked = { ...state.parked }
+      if (state.team || state.partner) parked[before] = { partner: state.partner, team: state.team, results: state.results }
+      else delete parked[before]
+      const restored = parked[after] ?? emptySession
+      delete parked[after]
+      return { ...state, profile: action.profile, ...restored, parked }
+    }
 
     case 'setPartner': {
-      if (!state.user) return state
+      const user = currentUser(state)
+      if (!user) return state
       const team: Team = {
         id: 'my-team',
-        name: teamName(state.user, action.partner),
-        members: [state.user, action.partner],
+        name: teamName(user, action.partner),
+        members: [user, action.partner],
         points: 0,
         completedHuntIds: [],
       }
       return { ...state, partner: action.partner, team, results: {} }
     }
+
+    case 'clearMatch':
+      return { ...state, ...emptySession }
 
     case 'completeHunt': {
       if (!state.team) return state
@@ -81,20 +156,23 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, demoMode: action.on }
 
     case 'reset':
-      return initialState
+      return { ...initialState, demoMode: state.demoMode }
   }
 }
 
 export function loadState(): AppState {
   const saved = readJSON<Partial<AppState>>(STORAGE_KEY)
   if (!saved || typeof saved !== 'object') return initialState
-  return { ...initialState, ...saved, results: saved.results ?? {} }
+  return { ...initialState, ...saved, results: saved.results ?? {}, parked: saved.parked ?? {} }
 }
+
+const withoutSelfies = (results: Record<string, HuntResult>) =>
+  Object.fromEntries(Object.entries(results).map(([id, r]) => [id, { ...r, selfieUrl: undefined }]))
 
 /** Persists everything except selfie images (they're large and don't need to survive reloads). */
 export function saveState(state: AppState) {
-  const results = Object.fromEntries(
-    Object.entries(state.results).map(([id, r]) => [id, { ...r, selfieUrl: undefined }]),
+  const parked = Object.fromEntries(
+    Object.entries(state.parked).map(([key, s]) => [key, { ...s, results: withoutSelfies(s.results) }]),
   )
-  writeJSON(STORAGE_KEY, { ...state, results })
+  writeJSON(STORAGE_KEY, { ...state, results: withoutSelfies(state.results), parked })
 }

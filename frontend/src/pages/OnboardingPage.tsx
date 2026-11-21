@@ -1,70 +1,75 @@
+// /onboarding: create your MIGO account (name + avatar). No role here: everyone can be a tourist
+// and a local, so the mode is picked later and can change any time.
+// Also used to edit your name/avatar (returning users land back where they came from).
 import { useId, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
+import { MascotSays } from '../components/illustrations/Mascot'
 import Screen from '../components/layout/Screen'
 import Button from '../components/ui/Button'
-import { AVATARS, NAME_MAX_LENGTH, ROLE_OPTIONS } from '../features/onboarding/options'
+import { AVATARS, NAME_MAX_LENGTH } from '../features/onboarding/options'
+import { nextOnboardingStep } from '../features/profile/flow'
 import { cn } from '../lib/cn'
-import type { Role } from '../lib/types'
 import { useStore } from '../store/useStore'
 
 const labelClass = 'mb-2 block font-type text-sm tracking-wider uppercase'
 
 export default function OnboardingPage() {
-  const { user, setUser } = useStore()
+  const { account, profile, createAccount, updateAccount } = useStore()
   const navigate = useNavigate()
+  const location = useLocation()
+  const fromProfile = (location.state as { from?: string } | null)?.from === 'profile'
   const nameId = useId()
 
-  const [role, setRole] = useState<Role | null>(user?.role ?? null)
-  const [name, setName] = useState(user?.name ?? '')
-  const [avatar, setAvatar] = useState<string | null>(user?.avatar ?? null)
+  const [name, setName] = useState(account?.name ?? '')
+  const [avatar, setAvatar] = useState<string | null>(account?.avatar ?? null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const trimmed = name.trim()
-  const ready = role !== null && trimmed.length > 0 && avatar !== null
+  const ready = trimmed.length > 0 && avatar !== null
+  const missing = [!trimmed && 'add your name', !avatar && 'choose an avatar'].filter(Boolean)
 
-  const missing = [!role && 'pick a role', !trimmed && 'add your name', !avatar && 'choose an avatar'].filter(Boolean)
-
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!ready) return
-    setUser({ id: `me-${Date.now().toString(36)}`, name: trimmed, avatar, role })
-    navigate('/match')
+    if (!ready || busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      if (account) {
+        await updateAccount({ name: trimmed, avatar })
+        navigate(fromProfile ? '/profile' : (nextOnboardingStep(account, profile) ?? '/hunts'))
+      } else {
+        await createAccount({ name: trimmed, avatar })
+        navigate('/onboarding/questions')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+      setBusy(false)
+    }
   }
 
   return (
-    <Screen>
+    <Screen className="md:max-w-xl">
       <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-7">
+        {fromProfile && (
+          <Button variant="ghost" className="self-start px-0" onClick={() => navigate('/profile')}>
+            ← Back to profile
+          </Button>
+        )}
         <header>
-          <h1 className="text-4xl text-navy">Who are you?</h1>
-          <p className="mt-1">Every team is one tourist and one local.</p>
+          <h1 className="text-4xl text-navy">{account ? 'Your name & avatar' : 'Who are you?'}</h1>
+          <p className="mt-1">
+            {account
+              ? 'This is how teammates see you.'
+              : 'One account for everything. Tourist at the weekend, local on Monday.'}
+          </p>
         </header>
 
-        <fieldset>
-          <legend className={labelClass}>I'm a…</legend>
-          <div className="grid grid-cols-2 gap-3">
-            {ROLE_OPTIONS.map((opt, i) => {
-              const selected = role === opt.role
-              return (
-                <button
-                  key={opt.role}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => setRole(opt.role)}
-                  className={cn(
-                    'flex min-h-44 flex-col items-center justify-center gap-2 rounded-[1.6rem_1.4rem_1.7rem_1.3rem] border-[3px] border-navy p-4 text-center transition-transform duration-100 active:scale-95',
-                    i === 0 ? '-rotate-1' : 'rotate-1',
-                    selected ? 'bg-sun text-ink motion-safe:animate-pop' : 'bg-paper text-navy',
-                  )}
-                >
-                  <span className="text-5xl" aria-hidden>
-                    {opt.emoji}
-                  </span>
-                  <span className="font-display text-2xl uppercase">{opt.title}</span>
-                  <span className="text-sm leading-snug">{opt.blurb}</span>
-                </button>
-              )
-            })}
-          </div>
-        </fieldset>
+        {!account && (
+          <MascotSays>
+            <p>Hey! I’m Migo. What should I call you?</p>
+          </MascotSays>
+        )}
 
         <div>
           <label htmlFor={nameId} className={labelClass}>
@@ -107,11 +112,16 @@ export default function OnboardingPage() {
         </fieldset>
 
         <div className="mt-auto space-y-2 pt-2">
-          <Button type="submit" size="lg" fullWidth disabled={!ready}>
-            Find my partner
+          {error && (
+            <p role="alert" className="rounded-2xl border-[3px] border-navy bg-sun px-4 py-2 text-ink">
+              {error}
+            </p>
+          )}
+          <Button type="submit" size="lg" fullWidth disabled={!ready || busy}>
+            {busy ? 'Saving…' : account ? 'Save' : 'Create my profile'}
           </Button>
           <p className="min-h-6 text-center text-sm" aria-live="polite">
-            {!ready && `To continue, ${missing.join(', ')}.`}
+            {!ready && `To continue, ${missing.join(' and ')}.`}
           </p>
         </div>
       </form>

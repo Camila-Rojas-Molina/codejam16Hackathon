@@ -1,4 +1,5 @@
 // Shared data types (PRD section 6). Screens import types from here, never from mockData.
+import type { Interest } from '../features/profile/types'
 
 export type Role = 'tourist' | 'local'
 
@@ -6,8 +7,12 @@ export type User = {
   id: string
   name: string
   avatar: string
+  /** The mode this person is in for this match (contextual, not a permanent account type). */
   role: Role
   funFact?: string
+  /** Public profile bits used to rank partners. Values are Interest ids from features/profile. */
+  interests?: Interest[]
+  languages?: string[]
 }
 
 export type Difficulty = 'easy' | 'medium' | 'hard'

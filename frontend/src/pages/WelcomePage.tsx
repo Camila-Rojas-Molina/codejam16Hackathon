@@ -4,20 +4,21 @@ import { Squiggle, Star } from '../components/illustrations/Stickers'
 import { buttonClasses } from '../components/ui/buttonStyles'
 import Card from '../components/ui/Card'
 import Logo from '../components/ui/Logo'
+import { nextOnboardingStep } from '../features/profile/flow'
 import { TAGLINE } from '../lib/config'
 import { useStore } from '../store/useStore'
 
 const steps = [
-  { n: '1', text: 'Get a photo of a mystery spot.' },
-  { n: '2', text: 'Find it with a local (or a tourist).' },
-  { n: '3', text: 'Phone away. Explore. Selfie. Points.' },
+  { n: '1', text: 'Be a tourist or a local. Switch any time.' },
+  { n: '2', text: 'Get matched and a photo of a mystery spot.' },
+  { n: '3', text: 'Find it together. Phone away. Selfie. Points.' },
 ]
 
 export default function WelcomePage() {
-  const { user } = useStore()
+  const { account, profile } = useStore()
 
-  // Returning player: skip straight to the hunts.
-  if (user) return <Navigate to="/hunts" replace />
+  // Returning player: pick up where they left off (never repeat onboarding).
+  if (account) return <Navigate to={nextOnboardingStep(account, profile) ?? '/hunts'} replace />
 
   return (
     <Screen className="justify-between gap-8">

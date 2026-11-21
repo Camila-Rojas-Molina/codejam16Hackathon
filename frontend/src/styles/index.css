@@ -40,6 +40,47 @@
   --animate-tick: tick 1s ease-in-out infinite;
   --animate-ring: ring 2s ease-out infinite;
   --animate-wiggle: wiggle 2.4s ease-in-out infinite;
+  --animate-step-in: step-in 320ms var(--ease-spring) both;
+  --animate-wave: wave 1.6s ease-in-out infinite;
+  --animate-bob: bob 3.2s ease-in-out infinite;
+
+  /* One question per screen: each new step slides up gently. */
+  @keyframes step-in {
+    0% {
+      transform: translateY(14px);
+      opacity: 0;
+    }
+    100% {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  /* Mascot waving hello. */
+  @keyframes wave {
+    0%,
+    60%,
+    100% {
+      transform: rotate(0deg);
+    }
+    15%,
+    45% {
+      transform: rotate(-22deg);
+    }
+    30% {
+      transform: rotate(8deg);
+    }
+  }
+
+  @keyframes bob {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-5px);
+    }
+  }
 
   @keyframes ring {
     0% {

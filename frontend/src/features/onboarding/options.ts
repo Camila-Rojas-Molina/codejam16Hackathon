@@ -1,9 +1,36 @@
 import type { Role } from '../../lib/types'
 
-export const ROLE_OPTIONS: { role: Role; emoji: string; title: string; blurb: string }[] = [
-  { role: 'tourist', emoji: '🧳', title: 'Tourist', blurb: "I'm visiting and want the real city." },
-  { role: 'local', emoji: '📍', title: 'Local', blurb: 'I live here and love showing it off.' },
+/** Tourist and Local are modes anyone can switch between, not account types. */
+export const MODE_OPTIONS: {
+  mode: Role
+  emoji: string
+  title: string
+  blurb: string
+  /** Visual identity so the active mode is obvious at a glance. */
+  activeClass: string
+  fill: string
+}[] = [
+  {
+    mode: 'tourist',
+    emoji: '🧳',
+    title: 'Tourist',
+    blurb: 'I’m visiting somewhere and want to discover it with a local.',
+    // Ink on sun = 13.9:1
+    activeClass: 'bg-sun text-ink',
+    fill: 'var(--color-sun)',
+  },
+  {
+    mode: 'local',
+    emoji: '📍',
+    title: 'Local',
+    blurb: 'I’m home and want to show visitors my favourite spots.',
+    // Navy on bubble = 9.4:1
+    activeClass: 'bg-bubble text-navy',
+    fill: 'var(--color-bubble)',
+  },
 ]
+
+export const modeMeta = (mode: Role) => MODE_OPTIONS.find((m) => m.mode === mode)!
 
 export const AVATARS = ['🦊', '🐸', '🐼', '🦉', '🐝', '🐢', '🦝', '🐧'] as const
 
