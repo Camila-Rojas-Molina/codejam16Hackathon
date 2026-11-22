@@ -1,4 +1,6 @@
+import type { EconomyState } from '../features/economy/types'
 import { activeTrip, normalizeRecord } from '../features/profile/model'
+import { normalizeEconomyState } from '../lib/economy/normalize'
 import type { Account, ProfileRecord } from '../features/profile/types'
 import { readJSON, writeJSON } from '../lib/storage'
 import type { HuntResult, ScoreBreakdown, Team, User } from '../lib/types'
@@ -26,6 +28,11 @@ export type AppState = {
   parked: Record<string, MatchSession>
   /** Settings toggle for demo mode (?demo=1 in the URL also turns it on). */
   demoMode: boolean
+  /**
+   * Last points/quests/inventory state for `account` (lib/economy). A cache so the balance shows
+   * straight away on reload; the server (or the device economy) is the source of truth.
+   */
+  economy: EconomyState | null
 }
 
 export type Action =
@@ -36,6 +43,7 @@ export type Action =
   | { type: 'clearMatch' }
   | { type: 'completeHunt'; huntId: string; score: ScoreBreakdown; secondsLeft: number; selfieUrl?: string }
   | { type: 'setDemoMode'; on: boolean }
+  | { type: 'setEconomy'; accountId: string; economy: EconomyState }
   | { type: 'reset' }
 
 const STORAGE_KEY = 'migo:state:v2'
@@ -48,6 +56,7 @@ export const initialState: AppState = {
   ...emptySession,
   parked: {},
   demoMode: false,
+  economy: null,
 }
 
 /** Which exploring context the profile is in: a specific trip, Local mode, or nothing yet. */
@@ -155,6 +164,11 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'setDemoMode':
       return { ...state, demoMode: action.on }
 
+    case 'setEconomy':
+      // A late answer for an account that has since signed out (or switched) is dropped.
+      if (state.account?.id !== action.accountId) return state
+      return { ...state, economy: action.economy }
+
     case 'reset':
       return { ...initialState, demoMode: state.demoMode }
   }
@@ -167,7 +181,8 @@ export function loadState(): AppState {
   // first render works before the fresh copy arrives from api.ts.
   const account = saved.account && typeof saved.account.id === 'string' ? saved.account : null
   const profile = account && saved.profile ? normalizeRecord(saved.profile, account.id) : null
-  return { ...initialState, ...saved, account, profile, results: saved.results ?? {}, parked: saved.parked ?? {} }
+  const economy = account && saved.economy ? normalizeEconomyState(saved.economy, saved.economy.source === 'server' ? 'server' : 'device') : null
+  return { ...initialState, ...saved, account, profile, results: saved.results ?? {}, parked: saved.parked ?? {}, economy }
 }
 
 const withoutSelfies = (results: Record<string, HuntResult>) =>

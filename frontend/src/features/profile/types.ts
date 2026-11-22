@@ -253,8 +253,8 @@ export type LocalContext = {
 
 // ---- Rewards & social --------------------------------------------------------------------------
 
-/** Where a shop item goes on your avatar: worn pieces, plus the backdrop behind the picture. */
-export type AccessorySlot = 'head' | 'face' | 'neck' | 'backdrop'
+/** Where a shop item goes on your avatar: worn pieces, plus the backdrop behind the picture. (= ShopSlot in features/economy/types.ts) */
+export type AccessorySlot = 'head' | 'hair' | 'face' | 'ears' | 'neck' | 'back' | 'hand' | 'backdrop'
 
 /** One change to the points balance. The balance is the sum of the ledger. */
 export type PointsEntry = {

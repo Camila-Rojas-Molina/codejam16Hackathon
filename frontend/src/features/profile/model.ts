@@ -289,8 +289,8 @@ function normCity(v: unknown): DiscoveredCity | null {
   }
 }
 
-/** Every accessory slot, in drawing order (backdrop first, hats last). */
-export const ACCESSORY_SLOTS: readonly AccessorySlot[] = ['backdrop', 'neck', 'face', 'head']
+/** Every accessory slot, in default drawing order (backdrop first, hats last; 'back' sits behind the picture). */
+export const ACCESSORY_SLOTS: readonly AccessorySlot[] = ['backdrop', 'back', 'neck', 'hair', 'ears', 'face', 'hand', 'head']
 
 function normRewards(v: unknown): Rewards {
   if (!isObj(v)) return { ledger: [], owned: [], equipped: {} }

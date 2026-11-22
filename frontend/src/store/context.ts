@@ -8,8 +8,10 @@ import type {
   UniversalProfile,
 } from '../features/profile/types'
 import type { Person, Thread } from '../features/chat/types'
+import type { EconomyPage } from '../lib/economy'
 import type { PlacePick } from '../features/places/types'
 import type { HuntResult, ScoreBreakdown, User } from '../lib/types'
+import type { EconomyState } from '../features/economy/types'
 import type { AppState } from './state'
 
 export type StoreValue = AppState & {
@@ -54,12 +56,29 @@ export type StoreValue = AppState & {
   addCity: (place: PlacePick) => Promise<ProfileRecord>
   removeCity: (cityId: string) => Promise<ProfileRecord>
 
-  // Points, challenges & shop
+  // Points, quests & shop (lib/economy: the server when signed in to Supabase, else this device).
+  // `economy` is also mirrored into `profile.rewards` (ledger/owned/equipped, read-only) so older
+  // code that reads the record keeps working; nothing writes points into the record any more.
   /** Completed hunts across every exploring context (current and parked). */
   huntResults: HuntResult[]
-  claimChallenge: (challengeId: string) => Promise<ProfileRecord>
-  purchase: (itemId: string) => Promise<ProfileRecord>
-  setEquipped: (itemId: string, on: boolean) => Promise<ProfileRecord>
+  /** Balance, ledger, quests, inventory. Null until the first load (or when signed out). */
+  economy: EconomyState | null
+  /** The last economy failure (load or action), as a message to show. Cleared by the next success. */
+  economyError: string | null
+  /** Keys of economy actions in flight ('claim:<id>', 'refresh:<id>', 'purchase:<id>', 'equip:<id>'), to disable buttons. */
+  economyPending: readonly string[]
+  /** Re-reads the economy (e.g. after something that may have moved a quest on). */
+  reloadEconomy: () => Promise<void>
+  /** Claims a finished quest's reward. Throws the server's message (e.g. not finished yet). */
+  claimQuest: (assignmentId: string) => Promise<void>
+  /** Swaps one daily quest for another (once per day). Throws 'Daily refresh already used' etc. */
+  refreshDaily: (assignmentId: string) => Promise<void>
+  /** Buys an item. Does NOT put it on. Throws 'Not enough points' etc. */
+  purchase: (itemId: string) => Promise<void>
+  /** Puts an owned item on (replacing that slot) or takes it off. */
+  setEquipped: (itemId: string, on: boolean) => Promise<void>
+  /** Records that a section of the app was opened (visit quests). Once per page per account. */
+  recordVisit: (page: EconomyPage) => void
 
   // People & messages
   setLiked: (personId: string, liked: boolean) => Promise<ProfileRecord>
