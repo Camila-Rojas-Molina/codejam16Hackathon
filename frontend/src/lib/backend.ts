@@ -4,7 +4,7 @@
 // signed-in login's token (auth.ts) when there is one.
 import { prepareImage } from '../features/gallery/image'
 import type { Photo, PhotoMeta } from '../features/gallery/types'
-import type { Connection, Person } from '../features/chat/types'
+import type { Connection, Message, Person } from '../features/chat/types'
 import type { Account, ProfileRecord } from '../features/profile/types'
 import { getAccessToken, getSession } from './auth'
 import { config } from './config'
@@ -332,6 +332,41 @@ export async function removeConnection(id: string): Promise<Connection> {
 
 export async function markConnectionsSeen(ids?: string[]): Promise<void> {
   await rpc('migo_mark_connections_seen', { p_ids: ids ?? null })
+}
+
+// ---- Messages (015_messages.sql) ------------------------------------------------
+// Only people who are matched (or hunt teammates) can message each other; the server checks.
+
+/** A message plus who the conversation is with (the other person's profile id). */
+export type ServerMessage = Message & { with: string }
+type MessageRow = Omit<ServerMessage, 'at'> & { at: string }
+
+const toMessage = (row: MessageRow): ServerMessage => ({
+  id: row.id,
+  with: row.with,
+  from: row.from === 'them' ? 'them' : 'me',
+  text: row.text,
+  at: Date.parse(row.at),
+  read: row.read,
+  seenByThem: row.seenByThem,
+})
+
+export async function sendChatMessage(to: string, text: string): Promise<ServerMessage> {
+  return toMessage(await rpc<MessageRow>('migo_send_message', { p_to: to, p_text: text }))
+}
+
+/**
+ * Messages sent or read after `since` (an ISO time from a previous call; null = the most recent).
+ * `now` is the server's clock: pass it back next time (the caller subtracts a little overlap).
+ */
+export async function messageChanges(since: string | null): Promise<{ now: string; messages: ServerMessage[]; people: Record<string, Person> }> {
+  const res = await rpc<{ now: string; messages: MessageRow[] | null; people: Record<string, Person> | null }>('migo_message_changes', { p_since: since })
+  return { now: res.now, messages: (res.messages ?? []).map(toMessage), people: res.people ?? {} }
+}
+
+/** Marks everything this person sent you as read. */
+export async function markMessagesRead(withId: string): Promise<void> {
+  await rpc('migo_mark_messages_read', { p_with: withId })
 }
 
 // ---- Gallery (006_gallery.sql, 007_landmarks_geofencing.sql) -------------------------

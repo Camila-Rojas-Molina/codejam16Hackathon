@@ -1,10 +1,11 @@
 import { startTransition, useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react'
-import type { Connection, Thread } from '../features/chat/types'
+import { mergeThreads, type Inbox } from '../features/chat/threads'
+import type { Connection, Person, Thread } from '../features/chat/types'
 import type { EconomyApi, EconomyState } from '../features/economy/types'
 import type { ProfileRecord } from '../features/profile/types'
 import { shopItem } from '../features/rewards/shop'
 import * as api from '../lib/api'
-import { BackendError } from '../lib/backend'
+import { BackendError, type ServerMessage } from '../lib/backend'
 import * as auth from '../lib/auth'
 import { STORAGE_KEY as CONNECTIONS_KEY } from '../lib/connectionsDb'
 import { economyFor, forgetDeviceEconomy, mirrorRewards, type DeviceFacts, type EconomyPage } from '../lib/economy'
@@ -40,6 +41,8 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
   const [threads, setThreads] = useState<{ owner: string | null; byPerson: Record<string, Thread> }>({ owner: null, byPerson: {} })
   // Connection requests and connections (api.ts). Kept with the account they belong to.
   const [connections, setConnections] = useState<{ owner: string | null; list: Connection[] | null }>({ owner: null, list: null })
+  // Server messages (015_messages.sql) by id, and the cards of the people they're with.
+  const [inbox, setInbox] = useState<Inbox & { owner: string | null }>({ owner: null, byId: {}, people: {} })
   // The login (only when AUTH_ENABLED). Updated when a token refresh fails or another tab logs in/out.
   const [session, setSession] = useState<auth.Session | null>(() => (AUTH_ENABLED ? auth.getSession() : null))
   const sessionUserId = session?.user.id ?? null
@@ -245,9 +248,49 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
     setConnections({ owner: accountId, list })
   }, [accountId])
 
+  // Server messages: the first call fetches the recent ones, then only what changed since (sent or
+  // read). Asked again from 10 s before the server's clock each time, so a message whose transaction
+  // committed a moment late isn't missed; duplicates are merged by id.
+  const cursor = useRef<{ owner: string | null; at: string | null }>({ owner: null, at: null })
+  const syncing = useRef<Promise<void> | null>(null)
+  const knownPeople = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    knownPeople.current = new Set((connections.list ?? []).map((c) => c.person.id))
+  }, [connections])
+
+  const syncMessages = useCallback(async () => {
+    if (!accountId) return
+    if (syncing.current) return syncing.current
+    const job = (async () => {
+      const since = cursor.current.owner === accountId ? cursor.current.at : null
+      const res = await api.syncMessages(since)
+      if (!res) return
+      cursor.current = { owner: accountId, at: new Date(Date.parse(res.now) - 10_000).toISOString() }
+      setInbox((prev) => {
+        const base = prev.owner === accountId ? prev : { byId: {}, people: {} }
+        if (res.messages.length === 0 && prev.owner === accountId) return prev
+        const byId = { ...base.byId }
+        for (const m of res.messages) {
+          // Read here a moment ago but not on the server yet: stays read.
+          byId[m.id] = byId[m.id]?.read && !m.read ? { ...m, read: true } : m
+        }
+        return { owner: accountId, byId, people: { ...base.people, ...res.people } }
+      })
+      // A message from someone we don't know yet: they've just matched with you.
+      if (res.messages.some((m) => !knownPeople.current.has(m.with))) await loadConnections().catch(() => {})
+    })().finally(() => {
+      syncing.current = null
+    })
+    syncing.current = job
+    return job
+  }, [accountId, loadConnections])
+
   useEffect(() => {
     if (!accountId) return
-    const refresh = () => void loadConnections().catch(() => {})
+    const refresh = () => {
+      void loadConnections().catch(() => {})
+      void syncMessages().catch(() => {})
+    }
     refresh()
     const onVisible = () => document.visibilityState === 'visible' && refresh()
     const onStorage = (e: StorageEvent) => (e.key === CONNECTIONS_KEY || e.key === null) && refresh()
@@ -261,7 +304,14 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('storage', onStorage)
       window.clearInterval(timer)
     }
-  }, [accountId, loadConnections])
+  }, [accountId, loadConnections, syncMessages])
+
+  const myConnectionList = connections.owner === accountId ? connections.list : null
+  const myInbox = useMemo<Inbox>(() => (inbox.owner === accountId ? inbox : { byId: {}, people: {} }), [inbox, accountId])
+  const myThreads = useMemo(
+    () => mergeThreads(threads.owner === accountId ? threads.byPerson : {}, myInbox, myConnectionList, api.messageDelivery),
+    [threads, accountId, myInbox, myConnectionList],
+  )
 
   const value = useMemo<StoreValue>(() => {
     const requireId = () => {
@@ -272,10 +322,14 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'setProfile', profile })
       return profile
     }
-    const myThreads = threads.owner === accountId ? threads.byPerson : {}
-    const myConnections = connections.owner === accountId ? connections.list : null
+    const myConnections = myConnectionList
     const setThread = (thread: Thread) =>
       setThreads((t) => ({ owner: accountId, byPerson: { ...(t.owner === accountId ? t.byPerson : {}), [thread.person.id]: thread } }))
+    const addServerMessage = (m: ServerMessage, person: Person) =>
+      setInbox((prev) => {
+        const base = prev.owner === accountId ? prev : { byId: {}, people: {} }
+        return { owner: accountId, byId: { ...base.byId, [m.id]: m }, people: { [person.id]: person, ...base.people } }
+      })
 
     // profile.rewards mirrors the economy (read-only), so older readers see the real balance/outfit.
     const profile = state.profile && state.economy ? { ...state.profile, rewards: mirrorRewards(state.economy) } : state.profile
@@ -418,14 +472,33 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
       },
       setTutorial: async (status) => commit(await api.setTutorialStatus(requireId(), status)),
       threads: myThreads,
-      sendMessage: async (person, text) => setThread(await api.sendMessage(requireId(), person, text)),
+      sendMessage: async (person, text) => {
+        const sent = await api.sendMessage(requireId(), person, text)
+        if (sent.delivery === 'device') setThread(sent.thread)
+        else addServerMessage(sent.message, person)
+      },
+      syncMessages,
       markRead: async (personId) => {
-        if ((myThreads[personId]?.messages ?? []).every((m) => m.read)) return
-        const thread = await api.markThreadRead(requireId(), personId)
-        if (thread) setThread(thread)
+        const id = requireId()
+        const unreadServer = Object.values(myInbox.byId).filter((m) => m.with === personId && m.from === 'them' && !m.read)
+        if (unreadServer.length > 0) {
+          // Shown as read straight away; the server tells your other devices (and the sender).
+          setInbox((prev) => {
+            if (prev.owner !== id) return prev
+            const byId = { ...prev.byId }
+            for (const m of unreadServer) byId[m.id] = { ...m, read: true }
+            return { ...prev, byId }
+          })
+          await api.markServerMessagesRead(personId)
+        }
+        const device = threads.owner === id ? threads.byPerson[personId] : undefined
+        if (device && device.messages.some((m) => !m.read)) {
+          const thread = await api.markThreadRead(id, personId)
+          if (thread) setThread(thread)
+        }
       },
     }
-  }, [state, accountId, threads, session, huntResults, economyError, pending, reloadEconomy, runEconomy, recordVisit, connections, loadConnections])
+  }, [state, accountId, threads, session, huntResults, economyError, pending, reloadEconomy, runEconomy, recordVisit, myConnectionList, loadConnections, myInbox, myThreads, syncMessages])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

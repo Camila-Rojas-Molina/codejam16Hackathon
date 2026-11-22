@@ -4,8 +4,9 @@
 // How people meet: a tourist sees their top-matched locals in Discover and picks one: it's a match
 // straight away, and both see each other in Messages (and no longer in Discover). The local doesn't
 // browse: they get "You've been matched!" (MatchNotice, and the top of Messages) and pick Say hi or
-// Not now. Rules live in api.ts (People, matches & messages) and 013_connections.sql.
-// Message delivery isn't built yet: messages are kept on this device.
+// Not now. Rules live in api.ts (People, matches & messages), 013_connections.sql and 015_messages.sql.
+// Messages to real people go through Supabase: while Chat is open it checks for new ones every few
+// seconds (no Realtime yet). Without a backend, and with sample profiles, they stay on this device.
 //
 // Phones and tablets: one view at a time (list, discover, or a thread). Laptops and up: two panes,
 // conversations on the left and the open thread (or Discover) on the right.
@@ -30,6 +31,11 @@ import { toMatchProfile } from '../features/profile/matching'
 import { discoverLocals, isSamplePerson } from '../lib/api'
 import { cn } from '../lib/cn'
 import { useStore } from '../store/useStore'
+
+/** How often Chat checks for new messages while it's open (and the tab is visible). */
+const POLL_MS = 3_000
+/** Matches are checked every this many polls (a new match can arrive with its first message). */
+const CONNECTIONS_EVERY = 4
 
 const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
 const dayFmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
@@ -564,15 +570,16 @@ function Thread({ personId, embedded = false }: { personId: string; embedded?: b
         </div>
       )}
 
-      <p className="flex items-start gap-2 border-2 border-dashed border-ink px-3 py-2 text-sm">
-        <Icon name="info" accent="sheet" className="size-5" />
-        <span>
-        {person.demo || isSamplePerson(person.id)
-          ? `${person.name} is a sample profile from the demo pool, so they won’t reply. `
-          : ''}
-        Messages are saved on this device until MIGO messaging goes live.
-        </span>
-      </p>
+      {conversation.delivery === 'device' && (
+        <p className="flex items-start gap-2 border-2 border-dashed border-ink px-3 py-2 text-sm">
+          <Icon name="info" accent="sheet" className="size-5" />
+          <span>
+            {person.demo || isSamplePerson(person.id)
+              ? `${person.name} is a sample profile from the demo pool, so they won’t reply, and messages stay on this device.`
+              : 'MIGO isn’t connected to its server here, so messages are saved on this device only.'}
+          </span>
+        </p>
+      )}
 
       <ol aria-label={`Conversation with ${person.name}`} aria-live="polite" className="sheet-grain flex min-h-72 flex-1 flex-col gap-3 border-2 border-ink p-4 shadow-block">
         {messages.length === 0 && (
@@ -591,7 +598,10 @@ function Thread({ personId, embedded = false }: { personId: string; embedded?: b
             >
               <p className="sr-only">{m.from === 'me' ? 'You' : person.name}:</p>
               <p className="break-words whitespace-pre-wrap">{m.text}</p>
-              <p className="mt-0.5 text-right text-xs font-semibold">{when(m.at)}</p>
+              <p className="mt-0.5 text-right text-xs font-semibold">
+                {m.local ? 'Not sent · only on this device' : when(m.at)}
+                {m.from === 'me' && m.seenByThem && !m.local && <span> · Seen</span>}
+              </p>
             </div>
           </li>
         ))}
@@ -645,7 +655,24 @@ function PickAChat({ hasChats }: { hasChats: boolean }) {
   )
 }
 
+/** While Chat is open: new messages every few seconds, new matches a little less often. */
+function usePolling() {
+  const { syncMessages, refreshConnections } = useStore()
+  useEffect(() => {
+    let ticks = 0
+    const tick = () => {
+      if (document.visibilityState !== 'visible') return
+      void syncMessages().catch(() => {})
+      if (++ticks % CONNECTIONS_EVERY === 0) void refreshConnections().catch(() => {})
+    }
+    tick()
+    const timer = window.setInterval(tick, POLL_MS)
+    return () => window.clearInterval(timer)
+  }, [syncMessages, refreshConnections])
+}
+
 export default function ChatPage() {
+  usePolling()
   const { personId } = useParams()
   const [params] = useSearchParams()
   const conversations = useConversations()
