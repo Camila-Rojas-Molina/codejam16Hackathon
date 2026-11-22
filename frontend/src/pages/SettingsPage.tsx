@@ -15,10 +15,11 @@ import { useStore } from '../store/useStore'
 const sectionTitle = 'mb-4 flex items-center gap-3 text-3xl'
 
 export default function SettingsPage() {
-  const { account, profile, saveUniversal, saveTrip, deleteAccount, demoMode, setDemoMode } = useStore()
+  const { account, profile, saveUniversal, saveTrip, deleteAccount, demoMode, setDemoMode, session, signOut } = useStore()
   const navigate = useNavigate()
   const [confirm, setConfirm] = useState<null | 'access' | 'account'>(null)
   const [busy, setBusy] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
   const [message, setMessage] = useState('')
 
   if (!account || !profile?.universal) return null
@@ -35,6 +36,17 @@ export default function SettingsPage() {
     } finally {
       setBusy(false)
       setConfirm(null)
+    }
+  }
+
+  async function handleSignOut() {
+    setSigningOut(true)
+    try {
+      await signOut()
+      navigate('/', { replace: true })
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : 'Something went wrong.')
+      setSigningOut(false)
     }
   }
 
@@ -64,9 +76,19 @@ export default function SettingsPage() {
           Account
         </h2>
         <Card className="space-y-4">
+          {session ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-ink pb-4">
+              <p className="min-w-0">
+                Signed in as <strong className="break-all">{session.email}</strong>
+              </p>
+              <Button variant="dark" disabled={signingOut} aria-busy={signingOut || undefined} onClick={handleSignOut}>
+                {signingOut ? 'Logging out…' : 'Log out'}
+              </Button>
+            </div>
+          ) : null}
           <p>
-            Signed in as <strong>{account.name}</strong>. One account for both modes, so switching never creates a second
-            profile.
+            {session ? 'Your profile name is' : 'Signed in as'} <strong>{account.name}</strong>. One account for both modes, so
+            switching never creates a second profile.
           </p>
           <div className="flex flex-wrap gap-2">
             <Link to="/profile?tab=style" className={buttonClasses({ variant: 'secondary' })}>
