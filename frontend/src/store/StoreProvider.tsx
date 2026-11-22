@@ -1,15 +1,36 @@
-import { startTransition, useCallback, useEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
+import { startTransition, useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react'
 import type { Connection, Thread } from '../features/chat/types'
+import type { EconomyApi, EconomyState } from '../features/economy/types'
 import type { ProfileRecord } from '../features/profile/types'
-import { todayKey } from '../features/quests/challenges'
+import { shopItem } from '../features/rewards/shop'
 import * as api from '../lib/api'
 import * as auth from '../lib/auth'
 import { STORAGE_KEY as CONNECTIONS_KEY } from '../lib/connectionsDb'
+import { economyFor, forgetDeviceEconomy, mirrorRewards, type DeviceFacts, type EconomyPage } from '../lib/economy'
+import { readJSON, writeJSON } from '../lib/storage'
 import { StoreContext, type StoreValue } from './context'
 import { currentUser, loadState, reducer, saveState } from './state'
 
 // Fixed for the life of the page (config is read once at startup).
 const AUTH_ENABLED = auth.authEnabled()
+
+// Pages already reported to the economy today, per account ("visit" quests). Daily quests can ask
+// for a visit, so it's once per page per account per local day; the server dedupes anyway.
+const VISITS_KEY = 'migo:visits:v1'
+const localDay = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+function visitedToday(accountId: string, page: EconomyPage): boolean {
+  const saved = readJSON<Record<string, Record<string, string>>>(VISITS_KEY)
+  return saved?.[accountId]?.[page] === localDay()
+}
+function markVisited(accountId: string, page: EconomyPage) {
+  const saved = readJSON<Record<string, Record<string, string>>>(VISITS_KEY) ?? {}
+  writeJSON(VISITS_KEY, { ...saved, [accountId]: { ...(saved[accountId] ?? {}), [page]: localDay() } })
+}
+
+const errorText = (err: unknown) => (err instanceof Error && err.message ? err.message : 'Something went wrong. Try again.')
 
 export default function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, loadState)
@@ -86,6 +107,135 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [accountId])
 
+  // ---- Economy (points, quests, shop) ----------------------------------------------------------
+  const [economyError, setEconomyError] = useState<string | null>(null)
+  const [pending, setPending] = useState<readonly string[]>([])
+  const inFlight = useRef(new Map<string, Promise<void>>())
+  // The device economy measures quest progress from the profile and hunts: give it the latest.
+  const factsRef = useRef<DeviceFacts>({ profile: state.profile, account: state.account, huntResults: [] })
+  const huntResults = useMemo(
+    () => [...Object.values(state.results), ...Object.values(state.parked).flatMap((s) => Object.values(s.results))],
+    [state.results, state.parked],
+  )
+  useEffect(() => {
+    factsRef.current = { profile: state.profile, account: state.account, huntResults }
+  }, [state.profile, state.account, huntResults])
+
+  const signedIn = Boolean(sessionUserId)
+  // Built where it's used (effects and handlers), so the device economy reads the latest facts.
+  const getEconomy = useCallback((): EconomyApi | null => {
+    if (!accountId) return null
+    // With Supabase on, the account is only usable with its login (see the profile effect above).
+    if (AUTH_ENABLED && !signedIn) return null
+    return economyFor(accountId, { signedIn, facts: factsRef })
+  }, [accountId, signedIn])
+
+  // Every economy request takes a number when it starts; an answer older than the one already shown
+  // is dropped, so a slow reload can't bring back a reward that was just claimed.
+  const seq = useRef({ next: 0, shown: 0 })
+  const applyEconomy = useCallback(
+    (ticket: number, next: EconomyState) => {
+      if (!accountId || ticket < seq.current.shown) return
+      seq.current.shown = ticket
+      dispatch({ type: 'setEconomy', accountId, economy: next })
+      setEconomyError(null)
+    },
+    [accountId],
+  )
+
+  const reloadEconomy = useCallback(async () => {
+    const economyApi = getEconomy()
+    if (!economyApi) return
+    const t = ++seq.current.next
+    try {
+      applyEconomy(t, await economyApi.load())
+    } catch (err) {
+      setEconomyError(errorText(err))
+    }
+  }, [getEconomy, applyEconomy])
+
+  // Load after sign-in / app open, and again when something that can move a quest on changes
+  // (profile saved, a hunt finished). Also when the tab comes back, and right after the daily reset.
+  const progressKey = `${state.profile?.updatedAt ?? 0}:${huntResults.length}:${state.account?.avatar ?? ''}`
+  useEffect(() => {
+    const economyApi = getEconomy()
+    if (!economyApi) return
+    const t = ++seq.current.next
+    economyApi.load().then(
+      (next) => applyEconomy(t, next),
+      (err: unknown) => setEconomyError(errorText(err)),
+    )
+  }, [getEconomy, applyEconomy, progressKey])
+
+  useEffect(() => {
+    const economyApi = getEconomy()
+    if (!economyApi) return
+    const onVisible = () => document.visibilityState === 'visible' && void reloadEconomy()
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [getEconomy, reloadEconomy])
+
+  const nextReset = state.economy?.nextDailyReset
+  useEffect(() => {
+    const at = nextReset ? Date.parse(nextReset) : NaN
+    if (!getEconomy() || !Number.isFinite(at)) return
+    // A second late, so the new day has started on the server too. Capped so timers stay sane.
+    const wait = Math.min(Math.max(at - Date.now() + 1000, 1000), 24 * 3600_000)
+    const timer = window.setTimeout(() => void reloadEconomy(), wait)
+    return () => window.clearTimeout(timer)
+  }, [getEconomy, nextReset, reloadEconomy])
+
+  /** Runs one economy write. The same key while it's in flight returns the same promise (double clicks). */
+  const runEconomy = useCallback(
+    (key: string, write: (economy: EconomyApi) => Promise<EconomyState>): Promise<void> => {
+      const running = inFlight.current.get(key)
+      if (running) return running
+      const economyApi = getEconomy()
+      if (!economyApi) return Promise.reject(new Error(accountId ? 'Please log in again.' : 'Please create your profile first.'))
+      setPending((p) => [...p, key])
+      const t = ++seq.current.next
+      const job = (async () => {
+        try {
+          applyEconomy(t, await write(economyApi))
+        } catch (err) {
+          const message = errorText(err)
+          setEconomyError(message)
+          throw err instanceof Error ? err : new Error(message)
+        } finally {
+          inFlight.current.delete(key)
+          setPending((p) => p.filter((k) => k !== key))
+        }
+      })()
+      inFlight.current.set(key, job)
+      return job
+    },
+    [getEconomy, accountId, applyEconomy],
+  )
+
+  const recordVisit = useCallback(
+    (page: EconomyPage) => {
+      const economyApi = getEconomy()
+      if (!economyApi || !accountId || visitedToday(accountId, page)) return
+      const key = `visit:${page}`
+      if (inFlight.current.has(key)) return
+      const job = (async () => {
+        try {
+          await economyApi.recordVisit(page)
+          markVisited(accountId, page)
+          // A visit can finish a quest: show it as claimable.
+          const t = ++seq.current.next
+          applyEconomy(t, await economyApi.load())
+        } catch {
+          // Not worth bothering anyone: it's retried on the next visit.
+        } finally {
+          inFlight.current.delete(key)
+        }
+      })()
+      inFlight.current.set(key, job)
+    },
+    [getEconomy, accountId, applyEconomy],
+  )
+
   // Load connections, then keep them fresh: when the app regains focus, every 30 s while it's open
   // (a local's answer or a new request arrives from someone else), and when another tab changes them.
   const loadConnections = useCallback(async () => {
@@ -121,14 +271,17 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'setProfile', profile })
       return profile
     }
-    const huntResults = [...Object.values(state.results), ...Object.values(state.parked).flatMap((s) => Object.values(s.results))]
     const myThreads = threads.owner === accountId ? threads.byPerson : {}
     const myConnections = connections.owner === accountId ? connections.list : null
     const setThread = (thread: Thread) =>
       setThreads((t) => ({ owner: accountId, byPerson: { ...(t.owner === accountId ? t.byPerson : {}), [thread.person.id]: thread } }))
 
+    // profile.rewards mirrors the economy (read-only), so older readers see the real balance/outfit.
+    const profile = state.profile && state.economy ? { ...state.profile, rewards: mirrorRewards(state.economy) } : state.profile
+
     return {
       ...state,
+      profile,
       user: currentUser(state),
       setPartner: (partner) => dispatch({ type: 'setPartner', partner }),
       clearMatch: () => dispatch({ type: 'clearMatch' }),
@@ -189,7 +342,9 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
       saveLocal: async (local, opts) => commit(await api.saveLocalContext(requireId(), local, opts)),
       clearLocal: async () => commit(await api.clearLocalContext(requireId())),
       deleteAccount: async (then) => {
-        await api.deleteAccount(requireId())
+        const id = requireId()
+        await api.deleteAccount(id)
+        forgetDeviceEconomy(id)
         // One transition with the caller's navigation (`then`), so guards never see a
         // signed-out page and bounce to /login first.
         startTransition(() => {
@@ -203,10 +358,23 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
       removeCity: async (cityId) => commit(await api.removeDiscoveredCity(requireId(), cityId)),
 
       huntResults,
-      claimChallenge: async (challengeId) =>
-        commit(await api.claimChallengeReward(requireId(), challengeId, { huntResults, today: todayKey() })),
-      purchase: async (itemId) => commit(await api.purchaseItem(requireId(), itemId)),
-      setEquipped: async (itemId, on) => commit(await api.setEquipped(requireId(), itemId, on)),
+      economy: state.economy,
+      economyError,
+      economyPending: pending,
+      reloadEconomy,
+      claimQuest: (assignmentId) => runEconomy(`claim:${assignmentId}`, (e) => e.claim(assignmentId)),
+      refreshDaily: (assignmentId) => runEconomy(`refresh:${assignmentId}`, (e) => e.refreshDaily(assignmentId)),
+      // No auto-equip: buying and wearing are separate choices.
+      purchase: (itemId) => runEconomy(`purchase:${itemId}`, (e) => e.purchase(itemId)),
+      setEquipped: (itemId, on) => {
+        const item = shopItem(itemId)
+        if (!item) return Promise.reject(new Error('That item isn’t in the shop.'))
+        const equipped = state.economy?.equipped ?? state.profile?.rewards.equipped ?? {}
+        // Taking off something that isn't on: nothing to do.
+        if (!on && equipped[item.slot] !== item.id) return Promise.resolve()
+        return runEconomy(`equip:${item.id}`, (e) => e.equip(item.slot, on ? item.id : null))
+      },
+      recordVisit,
 
       connections: myConnections,
       refreshConnections: loadConnections,
@@ -243,7 +411,7 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
         if (thread) setThread(thread)
       },
     }
-  }, [state, accountId, threads, session, connections, loadConnections])
+  }, [state, accountId, threads, session, huntResults, economyError, pending, reloadEconomy, runEconomy, recordVisit, connections, loadConnections])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

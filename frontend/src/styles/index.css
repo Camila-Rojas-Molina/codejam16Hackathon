@@ -499,3 +499,13 @@
     }
   }
 }
+
+/* MapLibre (features/map/MapLibreView.tsx): keep the map's controls and its data credit above the
+   landmark pins, which use z-index 1–10 on their marker elements. (The library's CSS loads later
+   with the lazy map chunk, so these selectors are one class more specific.) */
+.maplibregl-map .maplibregl-ctrl-top-left,
+.maplibregl-map .maplibregl-ctrl-top-right,
+.maplibregl-map .maplibregl-ctrl-bottom-left,
+.maplibregl-map .maplibregl-ctrl-bottom-right {
+  z-index: 20;
+}

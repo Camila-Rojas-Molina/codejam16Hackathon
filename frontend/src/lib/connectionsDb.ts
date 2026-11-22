@@ -1,4 +1,4 @@
-// Device-local connection requests. The same rules as backend/supabase/migrations/007_connections.sql,
+// Device-local connection requests. The same rules as backend/supabase/migrations/013_connections.sql,
 // for when Supabase isn't configured (every account on this device shares one table, so two accounts
 // on one device can try the whole tourist → local flow) and for MIGO's sample profiles, which only
 // exist in the app. Only the data layer (api.ts) imports this.

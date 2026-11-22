@@ -43,26 +43,41 @@ export function fitWithin(width: number, height: number, maxEdge = MAX_EDGE_PX) 
   return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) }
 }
 
-export async function prepareImage(file: Blob): Promise<PreparedImage> {
-  if (file.type && !file.type.startsWith('image/')) throw new ImageReadError('That file isn’t a picture.')
-  const img = await decode(file)
+/**
+ * Draws the source scaled to fit MAX_EDGE_PX and encodes it as JPEG. The drawing happens
+ * synchronously, before the first await, so a live video frame is grabbed at the moment of the call;
+ * only the encoding is async. The canvas is released once the JPEG exists.
+ */
+export async function renderJpeg(source: CanvasImageSource, srcWidth: number, srcHeight: number): Promise<PreparedImage> {
+  if (!srcWidth || !srcHeight) throw new ImageReadError('This picture looks empty.')
+  const { width, height } = fitWithin(srcWidth, srcHeight)
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new ImageReadError('This browser can’t prepare photos for upload.')
+  // JPEG has no transparency: put see-through PNGs on white rather than black.
+  ctx.fillStyle = 'white'
+  ctx.fillRect(0, 0, width, height)
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(source, 0, 0, width, height)
   try {
-    if (!img.width || !img.height) throw new ImageReadError('This picture looks empty.')
-    const { width, height } = fitWithin(img.width, img.height)
-    const canvas = document.createElement('canvas')
-    canvas.width = width
-    canvas.height = height
-    const ctx = canvas.getContext('2d')
-    if (!ctx) throw new ImageReadError('This browser can’t prepare photos for upload.')
-    // JPEG has no transparency: put see-through PNGs on white rather than black.
-    ctx.fillStyle = 'white'
-    ctx.fillRect(0, 0, width, height)
-    ctx.imageSmoothingQuality = 'high'
-    ctx.drawImage(img.source, 0, 0, width, height)
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY))
     if (!blob) throw new ImageReadError('This picture couldn’t be prepared for upload.')
     if (blob.size > MAX_UPLOAD_BYTES) throw new ImageReadError('This picture is too large to upload.')
     return { blob, width, height }
+  } finally {
+    // Free the pixels now rather than whenever the canvas is collected (matters on phones).
+    canvas.width = 0
+    canvas.height = 0
+  }
+}
+
+export async function prepareImage(file: Blob): Promise<PreparedImage> {
+  if (file.type && !file.type.startsWith('image/')) throw new ImageReadError('That file isn’t a picture.')
+  const img = await decode(file)
+  try {
+    return await renderJpeg(img.source, img.width, img.height)
   } finally {
     img.close()
   }

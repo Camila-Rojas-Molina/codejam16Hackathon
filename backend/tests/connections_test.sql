@@ -1,4 +1,4 @@
--- Checks 007_connections.sql: tourist → local requests, accept / not now, no duplicates, Discover
+-- Checks 013_connections.sql: tourist → local requests, accept / not now, no duplicates, Discover
 -- leaves out connected people (both sides), removal, and the owner rules. Rolls back.
 -- Run after the migrations (psql or the Supabase SQL editor). Prints "All connection checks passed".
 begin;

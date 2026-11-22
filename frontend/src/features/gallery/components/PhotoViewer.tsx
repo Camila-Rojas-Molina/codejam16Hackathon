@@ -1,11 +1,14 @@
 // Large photo viewer: full screen on phones, a big framed print on desktop. Arrow keys or swipe to
-// move between photos, Esc or the close button to leave. Delete asks first.
+// move between photos, Esc or the close button to leave. Delete asks first. Camera captures show
+// their MIGO place (with "See on map"), a "Visited place" / "Montréal memory" tag and the time.
 import { useEffect, useId, useRef, useState, type PointerEvent } from 'react'
+import { Link } from 'react-router'
 import Icon from '../../../components/icons/Icon'
+import Badge from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
 import { ErrorText } from '../../../components/ui/Fields'
 import { cn } from '../../../lib/cn'
-import { cityLabel, formatFullDate, photoAlt } from '../grouping'
+import { associationLabel, cityLabel, formatFullDate, formatTime, photoAlt } from '../grouping'
 import type { Photo } from '../types'
 import Modal from './Modal'
 
@@ -46,7 +49,7 @@ export default function PhotoViewer({ photos, index, onIndex, onClose, onDelete 
   useEffect(() => {
     if (!open) return
     for (const n of [photos[i - 1], photos[i + 1]]) {
-      if (n) new Image().src = n.url
+      if (n?.url) new Image().src = n.url
     }
   }, [open, i, photos])
 
@@ -79,6 +82,8 @@ export default function PhotoViewer({ photos, index, onIndex, onClose, onDelete 
   }
 
   const where = photo ? cityLabel(photo) : null
+  const tag = photo ? associationLabel(photo) : null
+  const camera = photo?.associationStatus != null
 
   return (
     <Modal
@@ -123,14 +128,21 @@ export default function PhotoViewer({ photos, index, onIndex, onClose, onDelete 
               onPointerCancel={() => (swipe.current = null)}
             >
               {loaded !== photo.id && <span className="hatch-soft absolute inset-6 opacity-40 sm:inset-20" aria-hidden />}
-              <img
-                key={photo.id}
-                src={photo.url}
-                alt={photoAlt(photo)}
-                draggable={false}
-                onLoad={() => setLoaded(photo.id)}
-                className="relative max-h-full max-w-full border-2 border-sheet object-contain"
-              />
+              {photo.url ? (
+                <img
+                  key={photo.id}
+                  src={photo.url}
+                  alt={photoAlt(photo)}
+                  draggable={false}
+                  onLoad={() => setLoaded(photo.id)}
+                  className="relative max-h-full max-w-full border-2 border-sheet object-contain"
+                />
+              ) : (
+                <p className="relative flex items-center gap-2 font-bold">
+                  <Icon name="alert" accent="sienna" className="size-6" />
+                  Image unavailable right now
+                </p>
+              )}
               <NavButton dir="prev" disabled={!hasPrev} onClick={() => go(i - 1)} />
               <NavButton dir="next" disabled={!hasNext} onClick={() => go(i + 1)} />
             </div>
@@ -138,22 +150,49 @@ export default function PhotoViewer({ photos, index, onIndex, onClose, onDelete 
 
           {/* Details */}
           <aside id={infoId} className="sheet-grain max-h-[45dvh] shrink-0 overflow-y-auto border-t-2 border-ink p-4 text-ink sm:p-5 lg:max-h-none lg:w-96 lg:border-t-0 lg:border-l-2">
+            {tag && (
+              <Badge tone={photo.associationStatus === 'landmark_visit' ? 'saffron' : 'teal'} icon={photo.landmark ? 'flag' : 'globe'} className="mb-2">
+                {tag}
+              </Badge>
+            )}
             <h2 id={titleId} className="text-2xl break-words">
-              {photo.caption ?? (photo.city?.name ? `In ${photo.city.name}` : 'A photo')}
+              {photo.caption ?? (photo.landmark ? photo.landmark.name : photo.city?.name ? `In ${photo.city.name}` : 'A photo')}
             </h2>
             <dl className="mt-3 grid gap-2 text-sm">
               <div className="flex items-start gap-2">
                 <dt>
                   <Icon name="calendar" accent="teal" className="size-5" label="Taken" />
                 </dt>
-                <dd className="font-semibold">{formatFullDate(photo.takenAt)}</dd>
+                <dd className="font-semibold">
+                  {formatFullDate(photo.takenAt)}
+                  {camera && <>, {formatTime(photo.takenAt)}</>}
+                </dd>
               </div>
-              <div className="flex items-start gap-2">
-                <dt>
-                  <Icon name="pin" accent="sienna" className="size-5" label="Where" />
-                </dt>
-                <dd className="font-semibold">{where ?? 'No city added'}</dd>
-              </div>
+              {photo.landmark && (
+                <div className="flex items-start gap-2">
+                  <dt>
+                    <Icon name="flag" accent="saffron" className="size-5" label="MIGO place" />
+                  </dt>
+                  <dd className="min-w-0">
+                    <span className="block font-semibold break-words">{photo.landmark.name}</span>
+                    <Link
+                      to={`/map?landmark=${encodeURIComponent(photo.landmark.id)}`}
+                      className="inline-flex min-h-11 items-center gap-1 font-bold underline decoration-2 underline-offset-4"
+                    >
+                      <Icon name="map" className="size-5" />
+                      See on map
+                    </Link>
+                  </dd>
+                </div>
+              )}
+              {(where || !photo.landmark) && (
+                <div className="flex items-start gap-2">
+                  <dt>
+                    <Icon name="pin" accent="sienna" className="size-5" label="Where" />
+                  </dt>
+                  <dd className="font-semibold">{where ?? (photo.associationStatus === 'montreal_unassigned' ? 'Montréal' : 'No city added')}</dd>
+                </div>
+              )}
               {(photo.huntId || photo.questId) && (
                 <div className="flex items-start gap-2">
                   <dt>
@@ -169,7 +208,10 @@ export default function PhotoViewer({ photos, index, onIndex, onClose, onDelete 
                 {confirming ? (
                   <div role="group" aria-label="Confirm delete">
                     <p className="font-bold">Delete this photo for good?</p>
-                    <p className="text-sm">It’s removed from your gallery and from storage. This can’t be undone.</p>
+                    <p className="text-sm">
+                      It’s removed from your gallery and from storage. This can’t be undone.
+                      {photo.landmark && ` Your visit to ${photo.landmark.name} stays on your map.`}
+                    </p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button variant="danger" icon="trash" onClick={remove} disabled={busy} aria-busy={busy || undefined} autoFocus>
                         {busy ? 'Deleting…' : 'Delete'}

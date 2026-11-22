@@ -1,4 +1,4 @@
--- 007_connections.sql: CHAT connection requests (tourist → local, the local accepts or says not now).
+-- 013_connections.sql: CHAT connection requests (tourist → local, the local accepts or says not now).
 -- Run after 005_auth.sql (and 006). Safe to run again.
 --
 -- The flow

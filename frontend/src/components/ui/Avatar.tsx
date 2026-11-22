@@ -1,6 +1,8 @@
 // A person's avatar: always one of the character pictures in lib/avatars.ts, framed like a stamp.
 // Unknown or old values (e.g. emoji from early versions) show the default character, so no emoji
-// ever reaches the screen. Pass `accessories` (profile.rewards.equipped) to dress it in shop items.
+// ever reaches the screen. Pass `accessories` (the equipped map: head, hair, face, ears, neck, back,
+// hand + backdrop) to dress it in shop items; each item sits by its per-avatar fit (see
+// components/illustrations/Accessories.tsx) and items that don't fit this avatar are left off.
 import Icon from '../icons/Icon'
 import { AvatarBackdrop, AvatarWear, type Outfit } from '../illustrations/Accessories'
 import { AVATAR_CATALOG, AVATAR_LIST, avatarFor } from '../../lib/avatars'
@@ -27,7 +29,7 @@ type AvatarProps = {
   name?: string
   size?: AvatarSize
   className?: string
-  /** Shop items to wear, by slot (profile.rewards.equipped). Only for the signed-in person's own avatar. */
+  /** Shop items to wear, by slot (the equipped map). Only for the signed-in person's own avatar. */
   accessories?: Outfit
 }
 
@@ -41,10 +43,12 @@ export default function Avatar({ avatar, name, size = 'md', className, accessori
       aria-label={name ? `${name}’s avatar` : undefined}
       aria-hidden={name ? undefined : true}
     >
-      {accessories && <AvatarBackdrop outfit={accessories} className="absolute inset-0 size-full" />}
+      {accessories && <AvatarBackdrop outfit={accessories} still={size === 'xs' || size === 'sm' || size === 'md'} className="absolute inset-0 size-full" />}
+      {/* Layers, back to front: backdrop, items worn behind (backpacks, wings), the picture, the rest. */}
       <span className={cn('relative', AVATAR_ART_FRAME)} style={scale !== 1 ? { transform: `scale(${scale})` } : undefined}>
-        <img src={art.src} alt="" draggable={false} className="size-full object-contain" />
-        {accessories && <AvatarWear avatar={art.id} outfit={accessories} className="absolute inset-0 size-full overflow-visible" />}
+        {accessories && <AvatarWear avatar={art.id} outfit={accessories} side="behind" className="absolute inset-0 size-full overflow-visible" />}
+        <img src={art.src} alt="" draggable={false} className="relative size-full object-contain" />
+        {accessories && <AvatarWear avatar={art.id} outfit={accessories} side="front" className="absolute inset-0 size-full overflow-visible" />}
       </span>
     </span>
   )

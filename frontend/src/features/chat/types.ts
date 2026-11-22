@@ -28,7 +28,7 @@ export type PersonTraits = {
 
 // ---- Connections ------------------------------------------------------------------------------
 // A tourist asks a local to connect; the local says Connect or Not now. Accepted connections open a
-// conversation in Messages and leave Discover on both sides. Rules: backend/supabase/migrations/007_connections.sql.
+// conversation in Messages and leave Discover on both sides. Rules: backend/supabase/migrations/013_connections.sql.
 
 /**
  *   pending    waiting for the local's answer

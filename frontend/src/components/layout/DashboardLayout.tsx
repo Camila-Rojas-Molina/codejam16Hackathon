@@ -4,16 +4,31 @@
 //   laptops (lg)         full nav column + top status bar, so the section gets the width
 //   desktops (xl+)       nav column, the section, and the status sidebar on the right
 // Pages own their own max-width and columns; the frame just gives them the room.
-import { Navigate, Outlet } from 'react-router'
+import { useEffect } from 'react'
+import { Navigate, Outlet, useLocation } from 'react-router'
 import { hasUniversalProfile } from '../../features/profile/flow'
 import Tour from '../../features/tutorial/Tour'
+import { ECONOMY_PAGES, type EconomyPage } from '../../lib/economy'
 import { useStore } from '../../store/useStore'
 import { MobileTabBar, SideNav } from './DashboardNav'
 import RightSidebar from './RightSidebar'
 import { TopBar } from './StatusBar'
 
+/** The economy section a path belongs to ('/chat/p1' → 'chat'), for "visit" quests. */
+const visitPageOf = (pathname: string): EconomyPage | null => {
+  const first = pathname.split('/')[1] as EconomyPage
+  return ECONOMY_PAGES.includes(first) ? first : null
+}
+
 export default function DashboardLayout() {
-  const { account, profile } = useStore()
+  const { account, profile, recordVisit } = useStore()
+  const page = visitPageOf(useLocation().pathname)
+  const ready = !!account && hasUniversalProfile(profile)
+  // Opening Map, Shop, Gallery, Chat or Quests counts for visit quests (once a day per page).
+  useEffect(() => {
+    if (ready && page) recordVisit(page)
+  }, [ready, page, recordVisit])
+
   if (!account) return <Navigate to="/onboarding" replace />
   if (!hasUniversalProfile(profile)) return <Navigate to="/onboarding/questions" replace />
 

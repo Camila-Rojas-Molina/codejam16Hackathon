@@ -3,7 +3,7 @@
 //   /chat/:personId     one conversation
 // How people meet: a tourist taps Connect on a local in Discover; the local gets the request at the
 // top of Messages and picks Connect or Not now; once connected, both see each other in Messages and
-// no longer in Discover. Rules live in api.ts (People, connections & messages) and 007_connections.sql.
+// no longer in Discover. Rules live in api.ts (People, connections & messages) and 013_connections.sql.
 // Message delivery isn't built yet: messages are kept on this device.
 //
 // Phones and tablets: one view at a time (list, discover, or a thread). Laptops and up: two panes,

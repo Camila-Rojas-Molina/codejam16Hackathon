@@ -13,8 +13,9 @@ type PointsBadgeProps = {
 }
 
 export default function PointsBadge({ className, compact = false }: PointsBadgeProps) {
-  const { profile } = useStore()
-  const balance = pointsBalance(profile?.rewards)
+  const { economy, profile } = useStore()
+  // The economy's balance; before it first loads, the record's (cached) mirror.
+  const balance = economy?.balance ?? pointsBalance(profile?.rewards)
   const label = `${balance.toLocaleString()} point${balance === 1 ? '' : 's'}, open the shop`
   return (
     // NavLink: marked as the current page (and drawn inverted) while you're in the shop.

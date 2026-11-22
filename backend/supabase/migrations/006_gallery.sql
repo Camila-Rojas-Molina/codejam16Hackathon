@@ -8,8 +8,8 @@
 --     005_auth.sql (migo_assert_owner).
 --   * Saving a photo needs a login, and the profile must belong to that login (profiles made without
 --     a login can't have photos, because the files are filed under the login's id).
---   * The bucket is public-read, like 'selfies': anyone with a photo's URL can view it. File names
---     are random, so URLs can't be guessed, but don't treat them as secret.
+--   * The bucket is private: photos are shown through short-lived signed URLs that only the owner can
+--     create (007_landmarks_geofencing.sql made it private; this file now creates it private too).
 --   * The storage part (bucket + policies) only runs where Supabase's `storage` schema exists, so
 --     this file also runs on a plain local Postgres for the tests.
 --
@@ -183,7 +183,7 @@ grant execute on function gallery_delete_photo(uuid, uuid) to anon, authenticate
 -- ---------------------------------------------------------------------------
 -- Storage: the 'gallery' bucket (Supabase only; skipped where there's no storage schema)
 -- ---------------------------------------------------------------------------
--- Public read (public URLs: /storage/v1/object/public/gallery/<path>), 8 MB, JPEG/PNG/WebP.
+-- Private (signed URLs: POST /storage/v1/object/sign/gallery), 8 MB, JPEG/PNG/WebP.
 -- A signed-in user may upload, replace, list and delete files only in their own folder <auth uid>/.
 -- (The Storage API needs SELECT as well as DELETE to remove a file.)
 
@@ -196,7 +196,7 @@ begin
 
   execute $q$
     insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-    values ('gallery', 'gallery', true, 8388608, array['image/jpeg', 'image/png', 'image/webp'])
+    values ('gallery', 'gallery', false, 8388608, array['image/jpeg', 'image/png', 'image/webp'])
     on conflict (id) do update
       set public = excluded.public,
           file_size_limit = excluded.file_size_limit,

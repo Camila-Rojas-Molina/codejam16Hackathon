@@ -1,17 +1,21 @@
-// /gallery: photos taken while exploring. Grid grouped by month or city, a large viewer, adding
-// (camera or library) with an optional city and caption, and delete. Saved photos need an online,
-// signed-in account (006_gallery.sql); otherwise the page explains why instead of faking an upload.
+// /gallery: photos taken while exploring. Grid grouped by month, city or MIGO place, a large viewer,
+// "Take photo" (→ /camera: the server links the photo to a nearby place), manual "Upload" with an
+// optional city and caption (no location check), "Places visited", and delete. Saved photos need an
+// online, signed-in account (006/007); otherwise the page explains why instead of faking an upload.
 // This session's hunt selfies (kept in memory only) are shown apart, marked "Not saved yet".
 import { useMemo, useRef, useState, type ChangeEvent } from 'react'
-import Icon from '../components/icons/Icon'
+import { Link } from 'react-router'
+import Icon, { type IconName } from '../components/icons/Icon'
 import { Mascot } from '../components/illustrations/Mascot'
 import Button from '../components/ui/Button'
+import { buttonClasses } from '../components/ui/buttonStyles'
 import { ErrorText } from '../components/ui/Fields'
 import PageHeader from '../components/ui/PageHeader'
 import AddPhotoDialog from '../features/gallery/components/AddPhotoDialog'
 import GalleryNotice from '../features/gallery/components/GalleryNotice'
 import PhotoGrid, { gridCols } from '../features/gallery/components/PhotoGrid'
 import PhotoViewer from '../features/gallery/components/PhotoViewer'
+import PlacesVisited from '../features/gallery/components/PlacesVisited'
 import SessionSelfies from '../features/gallery/components/SessionSelfies'
 import { groupPhotos, recentCities } from '../features/gallery/grouping'
 import type { GroupBy, PhotoMeta } from '../features/gallery/types'
@@ -23,23 +27,25 @@ import type { HuntResult } from '../lib/types'
 import { useStore } from '../store/useStore'
 
 const GROUP_KEY = 'migo:gallery:groupBy'
-const GROUPS: { value: GroupBy; label: string; icon: 'calendar' | 'pin' }[] = [
+const GROUPS: { value: GroupBy; label: string; icon: IconName }[] = [
   { value: 'date', label: 'By date', icon: 'calendar' },
   { value: 'city', label: 'By city', icon: 'pin' },
+  { value: 'place', label: 'By place', icon: 'flag' },
 ]
+const readGroupBy = (): GroupBy => {
+  const saved = readJSON<GroupBy>(GROUP_KEY)
+  return saved === 'city' || saved === 'place' ? saved : 'date'
+}
 
 const pickToCity = (p: PlacePick | null | undefined): NonNullable<PhotoMeta['city']> | null =>
   p ? { name: p.name, country: p.country, countryCode: p.countryCode, placeId: p.placeId, lat: p.lat, lng: p.lng } : null
-
-/** Phones and tablets can open the camera straight from a file input. */
-const canUseCamera = () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
 
 export default function GalleryPage() {
   const { profile, huntResults } = useStore()
   const { availability, photos, status, error, reload, add, remove } = useGallery()
   const online = availability === 'online'
 
-  const [groupBy, setGroupByState] = useState<GroupBy>(() => (readJSON<GroupBy>(GROUP_KEY) === 'city' ? 'city' : 'date'))
+  const [groupBy, setGroupByState] = useState<GroupBy>(readGroupBy)
   const setGroupBy = (g: GroupBy) => {
     setGroupByState(g)
     writeJSON(GROUP_KEY, g)
@@ -53,9 +59,7 @@ export default function GalleryPage() {
   const [savedHuntIds, setSavedHuntIds] = useState<string[]>([])
   const [message, setMessage] = useState('')
   const [selfieError, setSelfieError] = useState<string | null>(null)
-  const cameraInput = useRef<HTMLInputElement>(null)
   const libraryInput = useRef<HTMLInputElement>(null)
-  const [camera] = useState(canUseCamera)
 
   const quickCities = useMemo(
     () =>
@@ -92,13 +96,12 @@ export default function GalleryPage() {
 
   const addButtons = online && (
     <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-      {camera && (
-        <Button icon="camera" onClick={() => cameraInput.current?.click()} className="flex-1 px-3 whitespace-nowrap sm:flex-none sm:px-5">
-          Take photo
-        </Button>
-      )}
-      <Button icon="plus" variant={camera ? 'secondary' : 'primary'} onClick={() => libraryInput.current?.click()} className="flex-1 px-3 whitespace-nowrap sm:flex-none sm:px-5">
-        {camera ? 'Upload' : 'Add photo'}
+      <Link to="/camera" className={buttonClasses({ className: 'flex-1 px-3 whitespace-nowrap sm:flex-none sm:px-5' })}>
+        <Icon name="camera" accent="sheet" className="size-5" />
+        Take photo
+      </Link>
+      <Button icon="plus" variant="secondary" onClick={() => libraryInput.current?.click()} className="flex-1 px-3 whitespace-nowrap sm:flex-none sm:px-5">
+        Upload
       </Button>
     </div>
   )
@@ -108,24 +111,21 @@ export default function GalleryPage() {
       <PageHeader
         eyebrow="Your adventures"
         title="Gallery"
-        description="Photos from your quests and explorations, with the city and the day you took them."
+        description="Photos from your quests and explorations, with the MIGO place, the city and the day you took them."
         // With no photos yet, the buttons sit in the empty state instead.
         aside={(status !== 'ready' || photos.length > 0) && addButtons ? addButtons : undefined}
       />
 
-      {/* Hidden pickers behind the buttons. `capture` opens the camera on phones. */}
-      {online && (
-        <>
-          <input ref={cameraInput} type="file" accept="image/*" capture="environment" onChange={onFile} className="sr-only" tabIndex={-1} aria-hidden />
-          <input ref={libraryInput} type="file" accept="image/*" onChange={onFile} className="sr-only" tabIndex={-1} aria-hidden />
-        </>
-      )}
+      {/* Hidden picker behind "Upload" (manual: no location check, city and caption by hand). */}
+      {online && <input ref={libraryInput} type="file" accept="image/*" onChange={onFile} className="sr-only" tabIndex={-1} aria-hidden />}
 
       <p className="sr-only" aria-live="polite">
         {message}
       </p>
 
       {!online && <GalleryNotice availability={availability} />}
+
+      {online && <PlacesVisited />}
 
       <SessionSelfies results={huntResults} savedHuntIds={savedHuntIds} onSave={online ? saveSelfie : undefined} />
       <ErrorText>{selfieError}</ErrorText>
@@ -157,7 +157,8 @@ export default function GalleryPage() {
             No photos yet
           </h2>
           <p className="max-w-md">
-            Snap the places you find on quests and explorations. Add a city and a caption, and they’ll be sorted here by day or by city.
+            Snap the places you find on quests and explorations. Photos taken at a MIGO place count as a visit on your map, and
+            everything is sorted here by day, city or place.
           </p>
           {addButtons}
         </section>
@@ -169,7 +170,7 @@ export default function GalleryPage() {
             <p className="eyebrow">
               {photos.length} {photos.length === 1 ? 'photo' : 'photos'}
             </p>
-            <div role="group" aria-label="Organise photos" className="sheet-grain flex border-2 border-ink">
+            <div role="group" aria-label="Organise photos" className="sheet-grain flex w-full border-2 border-ink sm:w-auto">
               {GROUPS.map((g, i) => (
                 <button
                   key={g.value}
@@ -177,12 +178,12 @@ export default function GalleryPage() {
                   aria-pressed={groupBy === g.value}
                   onClick={() => setGroupBy(g.value)}
                   className={cn(
-                    'flex min-h-11 items-center gap-1.5 px-3 text-xs font-bold tracking-[0.1em] uppercase transition-colors sm:px-4',
+                    'flex min-h-11 flex-1 items-center justify-center gap-1.5 px-2 text-xs font-bold tracking-[0.08em] whitespace-nowrap uppercase transition-colors sm:flex-none sm:px-4',
                     i > 0 && 'border-l-2 border-ink',
                     groupBy === g.value ? 'bg-saffron' : 'hover:bg-saffron-soft',
                   )}
                 >
-                  <Icon name={g.icon} accent={groupBy === g.value ? 'sheet' : 'saffron'} className="size-5" />
+                  <Icon name={g.icon} accent={groupBy === g.value ? 'sheet' : 'saffron'} className="hidden size-5 min-[400px]:block" />
                   {g.label}
                 </button>
               ))}
