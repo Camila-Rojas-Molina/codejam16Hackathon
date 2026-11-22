@@ -20,7 +20,8 @@ backend/
 │   ├── 011_economy.sql  points, quests and the shop, decided by the server (+ carries over old points)
 │   ├── 012_economy_catalog.sql  GENERATED: the quest and shop catalogues (`npm run gen:economy`)
 │   ├── 013_connections.sql  CHAT matching: a tourist picks a local, the local is notified "You've been matched!"
-│   └── 014_stale_login.sql  clear error (28000) when a deleted login tries to create a profile
+│   ├── 014_stale_login.sql  clear error (28000) when a deleted login tries to create a profile
+│   └── 015_match_album.sql  shared photo album for each match (both people see it while matched)
 ├── scripts/import_landmarks.mjs  rebuilds 008/009 from Montréal open data (see scripts/README.md)
 └── tests/
     ├── smoke_test.sql          checks the hunt flow, then rolls back
@@ -30,6 +31,7 @@ backend/
     ├── explore_test.sql        checks geofences, the island boundary, visits and owner rules, then rolls back
     ├── economy_test.sql        checks points, quests, refreshes, the shop and timezones, then rolls back
     ├── stale_login_test.sql    checks a deleted login gets a clear error, then rolls back
+    ├── match_album_test.sql    checks the shared match album rules, then rolls back
     ├── connections_test.sql    checks requests, answers, no duplicates, Discover exclusions, removal
     └── local_supabase_stub.sql fake `auth` schema for testing on plain Postgres (never run on Supabase)
 ```
