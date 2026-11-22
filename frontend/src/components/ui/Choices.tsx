@@ -51,7 +51,7 @@ const layouts: Record<ChoiceLayout, string> = {
 }
 
 /**
- * A tick drawn so its bounding box sits exactly in the middle of a 24-unit grid (x 6–18, y 7.5–16.5),
+ * A tick drawn so its bounding box sits exactly in the middle of a 24-unit grid (x 5–19, y 7–17),
  * so it centres in any square or round box. Use it for every "selected" badge.
  */
 export function CheckMark({ className, strokeWidth = 3 }: { className?: string; strokeWidth?: number }) {
@@ -67,19 +67,19 @@ export function CheckMark({ className, strokeWidth = 3 }: { className?: string; 
       aria-hidden
       focusable="false"
     >
-      <path d="M6 12.5 10 16.5 18 7.5" />
+      <path d="M5 12.5 9.5 17 19 7" />
     </svg>
   )
 }
 
-// Box and tick sizes per layout. The tick fills about 75% of the box's inside, so it reads clearly
-// without touching the rule.
+// Box and tick sizes per layout: the tick's SVG is about the size of the box's inside (the stroke
+// itself spans ~60% of it), so it reads clearly without touching the rule.
 const tickBox: Record<ChoiceLayout, string> = {
   row: 'absolute top-1/2 right-4 size-7 -translate-y-1/2',
   tile: 'absolute top-2 right-2 size-6',
   chip: 'size-5',
 }
-const tickMark: Record<ChoiceLayout, string> = { row: 'size-4.5', tile: 'size-4', chip: 'size-3.5' }
+const tickMark: Record<ChoiceLayout, string> = { row: 'size-5.5', tile: 'size-5', chip: 'size-4' }
 
 /** The tick box: an empty ruled square (round for single choice) that fills ink with a saffron tick. */
 function Tick({ multiple, layout }: { multiple: boolean; layout: ChoiceLayout }) {
@@ -92,7 +92,7 @@ function Tick({ multiple, layout }: { multiple: boolean; layout: ChoiceLayout })
         !multiple && 'rounded-full',
       )}
     >
-      <CheckMark className={cn(tickMark[layout], 'scale-0 transition-transform duration-200 ease-spring group-has-checked:scale-100')} />
+      <CheckMark strokeWidth={3.2} className={cn(tickMark[layout], 'scale-0 transition-transform duration-200 ease-spring group-has-checked:scale-100')} />
     </span>
   )
 }

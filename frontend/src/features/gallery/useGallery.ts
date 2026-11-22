@@ -13,31 +13,26 @@ export function useGallery() {
   const availability: GalleryAvailability = !isBackendConfigured() || !authEnabled ? 'device' : !session || !account ? 'signed-out' : 'online'
   const profileId = availability === 'online' ? (account?.id ?? null) : null
 
-  const [photos, setPhotos] = useState<Photo[]>([])
-  const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
-  const [error, setError] = useState<string | null>(null)
+  // The last load, tagged with what it was for, so a stale one never shows as current.
   const [reloadKey, setReloadKey] = useState(0)
+  const key = profileId ? `${profileId}:${reloadKey}` : null
+  const [loaded, setLoaded] = useState<{ key: string; photos: Photo[]; error: string | null } | null>(null)
 
   useEffect(() => {
-    if (!profileId) return
+    if (!profileId || !key) return
     let cancelled = false
-    setStatus('loading')
-    setError(null)
     listPhotos(profileId)
-      .then((list) => {
-        if (cancelled) return
-        setPhotos(list)
-        setStatus('ready')
-      })
+      .then((list) => !cancelled && setLoaded({ key, photos: list, error: null }))
       .catch((e: unknown) => {
-        if (cancelled) return
-        setError(e instanceof Error ? e.message : 'Couldn’t load your photos.')
-        setStatus('error')
+        if (!cancelled) setLoaded({ key, photos: [], error: e instanceof Error ? e.message : 'Couldn’t load your photos.' })
       })
     return () => {
       cancelled = true
     }
-  }, [profileId, reloadKey])
+  }, [profileId, key])
+
+  const current = loaded && loaded.key === key ? loaded : null
+  const status: 'idle' | 'loading' | 'ready' | 'error' = !key ? 'idle' : !current ? 'loading' : current.error ? 'error' : 'ready'
 
   const reload = useCallback(() => setReloadKey((k) => k + 1), [])
 
@@ -45,7 +40,7 @@ export function useGallery() {
     async (file: Blob, meta: PhotoMeta) => {
       if (!profileId) throw new Error('Sign in to save photos.')
       const photo = await uploadPhoto(profileId, file, meta)
-      setPhotos((list) => [photo, ...list].sort((a, b) => b.takenAt - a.takenAt || b.createdAt - a.createdAt))
+      setLoaded((l) => l && { ...l, photos: [photo, ...l.photos].sort((a, b) => b.takenAt - a.takenAt || b.createdAt - a.createdAt) })
       return photo
     },
     [profileId],
@@ -55,16 +50,16 @@ export function useGallery() {
     async (photoId: string) => {
       if (!profileId) throw new Error('Sign in to manage photos.')
       await deletePhoto(profileId, photoId)
-      setPhotos((list) => list.filter((p) => p.id !== photoId))
+      setLoaded((l) => l && { ...l, photos: l.photos.filter((p) => p.id !== photoId) })
     },
     [profileId],
   )
 
   return {
     availability,
-    photos: profileId ? photos : [],
-    status: profileId ? status : 'idle',
-    error,
+    photos: current?.photos ?? [],
+    status,
+    error: current?.error ?? null,
     reload,
     add,
     remove,

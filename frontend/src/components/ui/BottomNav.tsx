@@ -1,40 +1,40 @@
 import { NavLink } from 'react-router'
 import { cn } from '../../lib/cn'
-import Icon, { type IconName } from '../icons/Icon'
-
-type Tab = { to: string; label: string; icon: IconName }
-
-const tabs: Tab[] = [
-  { to: '/hunts', label: 'Hunts', icon: 'map' },
-  { to: '/leaderboard', label: 'Leaderboard', icon: 'trophy' },
-  { to: '/profile', label: 'Profile', icon: 'user' },
-]
+import { CountBadge, NavIcon } from '../layout/DashboardNav'
+import { useNavItems } from '../layout/navItems'
 
 type BottomNavProps = {
   className?: string
 }
 
-// Bottom tab bar for the hunt screens: a row of ruled cells, the active one filled saffron.
+// Floating tab bar for the full-screen flows outside the dashboard (hunts): the same five main
+// destinations as the dashboard nav, as a row of ruled cells, the active one filled saffron.
 export default function BottomNav({ className }: BottomNavProps) {
+  const items = useNavItems()
   return (
     <nav
-      aria-label="Hunt"
+      aria-label="Main"
       className={cn('fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-md px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]', className)}
     >
       <ul className="sheet-grain flex border-2 border-ink shadow-block-sm">
-        {tabs.map((tab, i) => (
-          <li key={tab.to} className={cn('flex-1', i > 0 && 'border-l-2 border-ink')}>
+        {items.map((item, i) => (
+          <li key={item.to} className={cn('min-w-0 flex-1', i > 0 && 'border-l-2 border-ink')}>
             <NavLink
-              to={tab.to}
+              to={item.to}
               className={({ isActive }) =>
                 cn(
-                  'flex min-h-14 flex-col items-center justify-center gap-0.5 text-[0.65rem] font-bold tracking-[0.1em] uppercase transition-colors',
+                  'relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[0.6rem] font-bold tracking-[0.08em] uppercase transition-colors',
                   isActive ? 'bg-saffron text-ink' : 'text-ink hover:bg-saffron-soft',
                 )
               }
             >
-              <Icon name={tab.icon} accent="sheet" />
-              <span>{tab.label}</span>
+              {({ isActive }) => (
+                <>
+                  <NavIcon icon={item.icon} accent={isActive ? 'sheet' : 'saffron'} className="size-6" />
+                  <span>{item.label}</span>
+                  <CountBadge count={item.badge} label={item.badgeLabel} className="absolute top-0.5 right-0.5 min-w-5 text-[0.6rem]" />
+                </>
+              )}
             </NavLink>
           </li>
         ))}

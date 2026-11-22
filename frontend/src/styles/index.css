@@ -89,6 +89,7 @@
   --saffron-on-ink: var(--day-saffron);
   /* Light halo behind cut-out art with dark outlines (mascot, logo). None by day. */
   --art-halo: none;
+  --art-outline: none;
   color-scheme: light;
 }
 
@@ -225,7 +226,8 @@
   --grain-sheet: var(--night-grain-sheet);
   --shadow-ink: var(--night-shadow);
   --saffron-on-ink: var(--night-saffron-on-ink);
-  --art-halo: drop-shadow(0 0 0.6px var(--night-ink)) drop-shadow(0 0 0.6px var(--night-ink)) drop-shadow(0 0 7px rgb(243 231 201 / 0.28));
+  --art-outline: drop-shadow(0 0 0.6px var(--night-ink)) drop-shadow(0 0 0.6px var(--night-ink));
+  --art-halo: var(--art-outline) drop-shadow(0 0 7px rgb(243 231 201 / 0.28));
   color-scheme: dark;
 }
 
@@ -252,6 +254,7 @@
   --grain-sheet: var(--day-grain-sheet);
   --saffron-on-ink: var(--day-saffron);
   --art-halo: none;
+  --art-outline: none;
   /* Inherited text colour is resolved by the parent, so re-resolve it here (any text-* class wins). */
   color: var(--color-ink);
 }
@@ -268,21 +271,40 @@
 @utility bg-sienna {
   @apply day-island;
 }
+/*
+ * An island's own outline stays in the surrounding (night) ink, so ruled grids stay unbroken when a
+ * cell turns saffron. Unlayered, so it beats the border-ink utility on the same element.
+ */
+:root[data-theme='dark']
+  :is(
+    .bg-saffron,
+    .bg-sandy,
+    .bg-teal,
+    .bg-sienna,
+    .has-checked\:bg-saffron:has(:checked),
+    .active\:bg-saffron:active
+  ).border-ink {
+  border-color: var(--night-ink);
+}
+
 /* On an ink fill, saffron letters and ticks use --saffron-on-ink (ochre on the cream night ink). */
 @utility bg-ink {
   --color-saffron: var(--saffron-on-ink);
 }
 
-/* Cut-out art with dark outlines (Migo, the logo) gets a faint cream halo at night. Applied
+/* Cut-out art with dark outlines (Migo, the logo) gets a thin cream edge and faint halo at night. Applied
    automatically to the mascot and logo images; add `art-halo` to any other such image. */
 @utility art-halo {
   filter: var(--art-halo);
 }
 @layer base {
-  img[src^='/assets/mascot/'],
+  img[src^='/assets/mascot/'] {
+    filter: var(--art-halo);
+  }
+  /* The logo is cropped tight to its artwork, so it only gets the thin outline (a glow would clip). */
   img[src^='/assets/logo'],
   img[src^='/assets/icon'] {
-    filter: var(--art-halo);
+    filter: var(--art-outline);
   }
 }
 

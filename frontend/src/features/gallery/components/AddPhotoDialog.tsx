@@ -1,6 +1,6 @@
 // Details for a photo that's about to be saved: a preview, an optional city, caption and date.
 // The picture is shrunk in the browser on save (features/gallery/image.ts), then uploaded.
-import { useEffect, useId, useMemo, useState, type FormEvent } from 'react'
+import { useId, useRef, useState, type FormEvent } from 'react'
 import Icon from '../../../components/icons/Icon'
 import Button from '../../../components/ui/Button'
 import { ErrorText, fieldLabel, inputBase, TextArea } from '../../../components/ui/Fields'
@@ -19,7 +19,8 @@ type AddPhotoDialogProps = {
   /** Extra details carried with the photo (e.g. a hunt id for a selfie). */
   extra?: Pick<PhotoMeta, 'huntId' | 'questId'>
   onCancel: () => void
-  onChooseAnother: () => void
+  /** Swap the picture for another one. Omit to hide "Choose another photo" (e.g. for a hunt selfie). */
+  onReplace?: (file: File) => void
   onSave: (file: File, meta: PhotoMeta) => Promise<void>
 }
 
@@ -55,18 +56,17 @@ export default function AddPhotoDialog(props: AddPhotoDialogProps) {
   )
 }
 
-function AddPhotoForm({ file, quickCities, extra, onCancel, onChooseAnother, onSave, titleId }: AddPhotoDialogProps & { file: File; titleId: string }) {
+function AddPhotoForm({ file, quickCities, extra, onCancel, onReplace, onSave, titleId }: AddPhotoDialogProps & { file: File; titleId: string }) {
   const dateId = useId()
   const [city, setCity] = useState<City | null>(null)
   const [caption, setCaption] = useState('')
-  const fileDate = useMemo(() => toDateInput(file.lastModified || Date.now()), [file])
-  const today = toDateInput(Date.now())
+  // Read once per form (the form is keyed by file, so a new file gets fresh values).
+  const [{ fileDate, today }] = useState(() => ({ fileDate: toDateInput(file.lastModified || Date.now()), today: toDateInput(Date.now()) }))
   const [date, setDate] = useState(fileDate > today ? today : fileDate)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const preview = useMemo(() => URL.createObjectURL(file), [file])
-  useEffect(() => () => URL.revokeObjectURL(preview), [preview])
+  // Its own picker: anything outside an open modal dialog is inert.
+  const replaceInput = useRef<HTMLInputElement>(null)
 
   const quick = quickCities.filter((c, i, all) => all.findIndex((x) => cityId(x) === cityId(c)) === i).slice(0, 5)
 
@@ -104,11 +104,38 @@ function AddPhotoForm({ file, quickCities, extra, onCancel, onChooseAnother, onS
         <div className="grid gap-5 sm:grid-cols-[13rem_minmax(0,1fr)]">
           <div>
             <div className="hatch-soft border-2 border-ink bg-paper">
-              <img src={preview} alt="The photo you picked" className="mx-auto max-h-64 w-full object-contain sm:max-h-56" />
+              <img
+                // A fresh object URL per attach, revoked by the ref cleanup (safe under StrictMode's double attach).
+                ref={(img) => {
+                  if (!img) return
+                  const url = URL.createObjectURL(file)
+                  img.src = url
+                  return () => URL.revokeObjectURL(url)
+                }}
+                alt="The photo you picked"
+                className="mx-auto max-h-64 w-full object-contain sm:max-h-56"
+              />
             </div>
-            <Button variant="ghost" size="sm" className="mt-1 px-0" onClick={onChooseAnother} disabled={busy}>
-              Choose another photo
-            </Button>
+            {onReplace && (
+              <>
+                <Button variant="ghost" size="sm" className="mt-1" onClick={() => replaceInput.current?.click()} disabled={busy}>
+                  Choose another photo
+                </Button>
+                <input
+                  ref={replaceInput}
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  tabIndex={-1}
+                  aria-hidden
+                  onChange={(e) => {
+                    const next = e.target.files?.[0]
+                    e.target.value = ''
+                    if (next) onReplace(next)
+                  }}
+                />
+              </>
+            )}
           </div>
 
           <div className="flex min-w-0 flex-col gap-5">
@@ -182,7 +209,7 @@ function AddPhotoForm({ file, quickCities, extra, onCancel, onChooseAnother, onS
         <Button variant="secondary" onClick={onCancel} disabled={busy} className="flex-1 sm:flex-none">
           Cancel
         </Button>
-        <Button type="submit" icon="check" disabled={busy} aria-busy={busy || undefined} className="flex-1 sm:flex-none">
+        <Button type="submit" disabled={busy} aria-busy={busy || undefined} className="flex-1 sm:flex-none">
           {busy ? 'Saving…' : 'Save photo'}
         </Button>
       </div>

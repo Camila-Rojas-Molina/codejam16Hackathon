@@ -169,7 +169,7 @@ export default function CityCollection({ cities, onAdd, onRemove, home = null, l
       </div>
 
       {cities.length > 0 && (
-        <ul className="grid border-t-2 border-l-2 border-ink @lg:grid-cols-2 @3xl:grid-cols-3" aria-label="Your cities">
+        <ul className="grid grid-cols-1 border-t-2 border-l-2 border-ink @lg:grid-cols-2" aria-label="Your cities">
           {cities.map((c) => {
             const isOnMap = isPinned(c)
             const active = selected === c.id

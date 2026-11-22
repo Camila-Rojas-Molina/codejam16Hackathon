@@ -6,11 +6,12 @@ import { useLocation, useNavigate } from 'react-router'
 import { MascotSays } from '../components/illustrations/Mascot'
 import Screen from '../components/layout/Screen'
 import Icon from '../components/icons/Icon'
+import { AvatarPicker } from '../components/ui/Avatar'
 import Button from '../components/ui/Button'
 import { ErrorText, fieldLabel, inputBase } from '../components/ui/Fields'
-import { AVATARS, NAME_MAX_LENGTH } from '../features/onboarding/options'
+import { NAME_MAX_LENGTH } from '../features/onboarding/options'
 import { nextOnboardingStep } from '../features/profile/flow'
-import { avatarFor, DEFAULT_AVATAR, resolveAvatar } from '../lib/avatars'
+import { DEFAULT_AVATAR, resolveAvatar } from '../lib/avatars'
 import { cn } from '../lib/cn'
 import { useStore } from '../store/useStore'
 
@@ -94,32 +95,7 @@ export default function OnboardingPage() {
 
         <fieldset>
           <legend className={labelClass}>Pick an avatar</legend>
-          <div className="grid grid-cols-4 border-t-2 border-l-2 border-ink">
-            {AVATARS.map((id) => {
-              const selected = avatar === id
-              const { src, alt } = avatarFor(id)
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => setAvatar(id)}
-                  className={cn(
-                    'relative grid aspect-square min-h-14 place-items-center border-r-2 border-b-2 border-ink transition-colors',
-                    selected ? 'bg-saffron' : 'sheet-grain hover:bg-saffron-soft',
-                  )}
-                >
-                  {/* The image's alt text names the button ("Star avatar"). */}
-                  <img src={src} alt={alt} className="aspect-square w-[82%] object-contain" />
-                  {selected && (
-                    <span className="absolute top-1.5 right-1.5 grid size-5 place-items-center bg-ink text-saffron" aria-hidden>
-                      <Icon name="check" accent="none" strokeWidth={3.2} className="size-4" />
-                    </span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
+          <AvatarPicker value={avatar} onChange={setAvatar} />
         </fieldset>
 
         <div className="mt-auto space-y-2 pt-2">

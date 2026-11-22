@@ -253,7 +253,8 @@ export type LocalContext = {
 
 // ---- Rewards & social --------------------------------------------------------------------------
 
-export type AccessorySlot = 'head' | 'face' | 'neck'
+/** Where a shop item goes on your avatar: worn pieces, plus the backdrop behind the picture. */
+export type AccessorySlot = 'head' | 'face' | 'neck' | 'backdrop'
 
 /** One change to the points balance. The balance is the sum of the ledger. */
 export type PointsEntry = {
@@ -270,7 +271,7 @@ export type Rewards = {
   ledger: PointsEntry[]
   /** Shop item ids the person owns. */
   owned: string[]
-  /** What Migo is wearing, one item per slot. */
+  /** What your avatar is wearing, one item per slot. (Saved under the same key as when Migo wore them.) */
   equipped: Partial<Record<AccessorySlot, string>>
 }
 

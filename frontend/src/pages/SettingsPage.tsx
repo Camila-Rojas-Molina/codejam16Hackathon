@@ -52,9 +52,9 @@ function AppearancePicker() {
             <span className="hidden text-xs leading-snug font-medium sm:block">{c.blurb}</span>
             <span
               aria-hidden
-              className="absolute top-2 right-2 grid size-5 place-items-center rounded-full border-2 border-ink bg-sheet text-saffron transition-colors group-has-checked:bg-ink"
+              className="absolute top-2 right-2 grid size-6 place-items-center rounded-full border-2 border-ink bg-sheet text-saffron transition-colors group-has-checked:bg-ink"
             >
-              <Icon name="check" accent="none" strokeWidth={3.2} className="size-3.5 scale-0 transition-transform duration-200 ease-spring group-has-checked:scale-100" />
+              <Icon name="check" accent="none" strokeWidth={3.2} className="size-4 scale-0 transition-transform duration-200 ease-spring group-has-checked:scale-100" />
             </span>
           </label>
         ))}

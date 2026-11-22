@@ -113,7 +113,10 @@ export default function RankedChoices<T extends string>({ legend, hideLegend, op
   useLayoutEffect(() => {
     for (const [v, row] of rowRefs.current) {
       if (drag && v === drag.value) {
-        const offset = drag.y - listTop() - drag.grabY - row.offsetTop
+        // Follow the pointer, but stay within the list.
+        const max = (listRef.current?.clientHeight ?? 0) - row.offsetHeight
+        const top = Math.min(Math.max(drag.y - listTop() - drag.grabY, 0), Math.max(max, 0))
+        const offset = top - row.offsetTop
         row.style.transform = `translateY(${Math.round(offset)}px)`
       } else {
         row.style.transform = ''

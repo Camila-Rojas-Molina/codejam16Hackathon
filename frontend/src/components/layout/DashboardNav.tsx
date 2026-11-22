@@ -3,27 +3,11 @@
 // Same five destinations, in the same order, everywhere: Map, Quests, Chat, Profile, Gallery.
 // (The shop is reached from the points balance, and from the sidebar on desktop.)
 import { NavLink } from 'react-router'
-import { useConversations } from '../../features/chat/useConversations'
-import { useChallenges } from '../../features/quests/useChallenges'
 import { cn } from '../../lib/cn'
-import Icon, { type IconAccent, type IconName } from '../icons/Icon'
+import Icon, { type IconAccent } from '../icons/Icon'
 import MascotIcon from '../icons/MascotIcon'
 import Logo from '../ui/Logo'
-
-export type NavItem = { to: string; label: string; icon: IconName | 'mascot'; badge?: number; badgeLabel?: string }
-
-/** The main destinations with their live counts (rewards to claim, unread messages). */
-export function useNavItems(): NavItem[] {
-  const { readyCount } = useChallenges()
-  const unread = useConversations().reduce((n, c) => n + c.unread, 0)
-  return [
-    { to: '/map', label: 'Map', icon: 'mascot' },
-    { to: '/quests', label: 'Quests', icon: 'quest', badge: readyCount, badgeLabel: `${readyCount} reward${readyCount === 1 ? '' : 's'} to claim` },
-    { to: '/chat', label: 'Chat', icon: 'chats', badge: unread, badgeLabel: `${unread} unread` },
-    { to: '/profile', label: 'Profile', icon: 'smile' },
-    { to: '/gallery', label: 'Gallery', icon: 'gallery' },
-  ]
-}
+import { useNavItems, type NavItem } from './navItems'
 
 /** A nav item's icon: Migo for the map, a line icon for the rest. */
 export function NavIcon({ icon, accent, className }: { icon: NavItem['icon']; accent: IconAccent; className?: string }) {
@@ -60,8 +44,8 @@ export function SideNav() {
               to={item.to}
               className={({ isActive }) =>
                 cn(
-                  'group relative flex min-h-[4.5rem] items-center gap-4 px-2 font-bold tracking-[0.12em] uppercase transition-colors',
-                  'flex-col justify-center gap-1 text-[0.62rem] lg:min-h-16 lg:flex-row lg:justify-start lg:px-6 lg:text-sm',
+                  'group relative flex min-h-[4.5rem] flex-col items-center justify-center gap-1.5 px-2 font-bold tracking-[0.12em] uppercase transition-colors',
+                  'text-[0.62rem] lg:min-h-16 lg:flex-row lg:justify-start lg:gap-4 lg:px-6 lg:text-sm',
                   isActive ? 'bg-saffron' : 'hover:bg-saffron-soft',
                 )
               }

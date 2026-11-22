@@ -1,6 +1,7 @@
 // Pure helpers for the profile model: blank values, defaults, validation, normalising stored data.
 import type { PlacePick } from '../places/types'
 import type {
+  AccessorySlot,
   Budget,
   DiscoveredCity,
   PointsEntry,
@@ -288,6 +289,9 @@ function normCity(v: unknown): DiscoveredCity | null {
   }
 }
 
+/** Every accessory slot, in drawing order (backdrop first, hats last). */
+export const ACCESSORY_SLOTS: readonly AccessorySlot[] = ['backdrop', 'neck', 'face', 'head']
+
 function normRewards(v: unknown): Rewards {
   if (!isObj(v)) return { ledger: [], owned: [], equipped: {} }
   const ledger = (Array.isArray(v.ledger) ? v.ledger : []).filter(
@@ -295,7 +299,7 @@ function normRewards(v: unknown): Rewards {
   )
   const equipped: Rewards['equipped'] = {}
   if (isObj(v.equipped)) {
-    for (const slot of ['head', 'face', 'neck'] as const) {
+    for (const slot of ACCESSORY_SLOTS) {
       if (typeof v.equipped[slot] === 'string') equipped[slot] = v.equipped[slot] as string
     }
   }

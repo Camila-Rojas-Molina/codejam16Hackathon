@@ -1,5 +1,7 @@
-// The MIGO mascot: a walking globe. Ten official poses live in public/assets/mascot/ (cut out
-// from the supplied character sheets, never redrawn). Pick the pose that fits the moment:
+// The MIGO mascot: a walking globe. Ten official poses live in public/assets/mascot/, cut out of
+// the high-resolution character sheets (never redrawn): <pose>.webp at the sheets' full resolution
+// (about 3x the largest size used, h-52) and <pose>-sm.webp at 360px tall for small spots; the
+// browser picks one from the rendered size. Pick the pose that fits the moment:
 //
 //   hello    strolling, fist up          welcomes, first steps, questionnaire part 1
 //   glide    hang-gliding in shades      travel, Tourist mode, exploration style (part 2)
@@ -8,28 +10,27 @@
 //   goodies  thumbs up with a sack       the shop
 //   play     spinning a ball             quests and challenges
 //   curious  cap on, wide-eyed           Local mode, discovering people
-//   cheer    big grin, thumbs up         account created, profile; also the wardrobe pose
+//   cheer    big grin, thumbs up         account created, profile
 //   search   shading eyes in the sun     loading, searching, waiting
 //   ponder   cloud overhead, side-eye    empty states, nothing here yet
 import type { ReactNode } from 'react'
 import type { AccessorySlot } from '../../features/profile/types'
 import { cn } from '../../lib/cn'
-import { AccessoryArt, WARDROBE_POSE } from './Accessories'
 
 export type MascotPose = 'hello' | 'glide' | 'leap' | 'read' | 'goodies' | 'play' | 'curious' | 'cheer' | 'search' | 'ponder'
 
-/** Intrinsic size of each cut-out (2x pixels), so the image never stretches or shifts layout. */
-const SIZES: Record<MascotPose, [number, number]> = {
-  hello: [344, 378],
-  glide: [450, 464],
-  leap: [420, 484],
-  read: [358, 388],
-  goodies: [348, 394],
-  play: [362, 420],
-  curious: [392, 496],
-  cheer: [498, 534],
-  search: [390, 588],
-  ponder: [522, 552],
+/** Pixel sizes of each cut-out: [width, height] of <pose>.webp, and the width of <pose>-sm.webp (360px tall). */
+const SIZES: Record<MascotPose, [number, number, number]> = {
+  hello: [445, 497, 322],
+  glide: [590, 611, 348],
+  leap: [556, 636, 315],
+  read: [464, 502, 333],
+  goodies: [448, 501, 322],
+  play: [466, 544, 308],
+  curious: [510, 651, 282],
+  cheer: [656, 704, 335],
+  search: [507, 779, 234],
+  ponder: [686, 729, 339],
 }
 
 const DESCRIPTIONS: Record<MascotPose, string> = {
@@ -45,11 +46,31 @@ const DESCRIPTIONS: Record<MascotPose, string> = {
   ponder: 'Migo the globe deep in thought under a cloud',
 }
 
+const BREAKPOINTS: Record<string, number> = { sm: 40, md: 48, lg: 64, xl: 80, '2xl': 96 }
+
+/**
+ * The `sizes` hint for srcset, read from the height classes the caller passes (h-28, sm:h-36…):
+ * the rendered width is that height times the pose's aspect ratio.
+ */
+function sizesFor(className: string | undefined, aspect: number): string {
+  const found: { min: number; px: number }[] = []
+  for (const cls of (className ?? '').split(/\s+/)) {
+    const m = /^(?:(sm|md|lg|xl|2xl):)?h-(\d+(?:\.\d+)?)$/.exec(cls)
+    if (m) found.push({ min: m[1] ? BREAKPOINTS[m[1]] : 0, px: Number(m[2]) * 4 })
+  }
+  if (found.length === 0) return `${Math.round(240 * aspect)}px`
+  found.sort((a, b) => b.min - a.min)
+  return found.map((f) => (f.min ? `(min-width: ${f.min}rem) ${Math.round(f.px * aspect)}px` : `${Math.round(f.px * aspect)}px`)).join(', ')
+}
+
 type MascotProps = {
   pose?: MascotPose
-  /** Size with a height class (h-32, h-48…). Width follows the image's own proportions. */
+  /** Size with a height class (h-32, h-48, sm:h-36…). Width follows the image's own proportions. */
   className?: string
-  /** Shop items to wear. Only drawn on the wardrobe pose (cheer). */
+  /**
+   * @deprecated Shop items are now worn by your avatar (<Avatar accessories>), not by Migo. Ignored;
+   * kept only so older callers still compile.
+   */
   accessories?: Partial<Record<AccessorySlot, string>>
   /** Describe Migo for screen readers when the picture carries meaning. Decorative otherwise. */
   label?: string | true
@@ -57,41 +78,20 @@ type MascotProps = {
   bob?: boolean
 }
 
-export function Mascot({ pose = 'hello', className, accessories, label, bob = false }: MascotProps) {
-  const [w, h] = SIZES[pose]
-  const wearing = pose === WARDROBE_POSE && accessories && Object.values(accessories).some(Boolean)
+export function Mascot({ pose = 'hello', className, label, bob = false }: MascotProps) {
+  const [w, h, smW] = SIZES[pose]
   const alt = label === true ? DESCRIPTIONS[pose] : (label ?? '')
-  const img = (
+  return (
     <img
       src={`/assets/mascot/${pose}.webp`}
-      width={w / 2}
-      height={h / 2}
-      alt={wearing ? '' : alt}
+      srcSet={`/assets/mascot/${pose}-sm.webp ${smW}w, /assets/mascot/${pose}.webp ${w}w`}
+      sizes={sizesFor(className, w / h)}
+      width={Math.round(w / 3)}
+      height={Math.round(h / 3)}
+      alt={alt}
       draggable={false}
-      className={cn(
-        'w-auto max-w-none object-contain select-none',
-        // On its own the image takes the caller's size class; inside the wardrobe wrapper it fills it.
-        wearing ? 'size-full' : className,
-        !wearing && bob && 'motion-safe:animate-bob',
-      )}
+      className={cn('w-auto max-w-none object-contain select-none', className, bob && 'motion-safe:animate-bob')}
     />
-  )
-  if (!wearing) return img
-  return (
-    <span
-      role={alt ? 'img' : undefined}
-      aria-label={alt || undefined}
-      aria-hidden={alt ? undefined : true}
-      className={cn('relative inline-block shrink-0', className, bob && 'motion-safe:animate-bob')}
-      style={{ aspectRatio: `${w} / ${h}` }}
-    >
-      {img}
-      <svg viewBox={`0 0 ${w} ${h}`} className="pointer-events-none absolute inset-0 size-full overflow-visible" aria-hidden>
-        {accessories?.neck && <AccessoryArt id={accessories.neck} />}
-        {accessories?.face && <AccessoryArt id={accessories.face} />}
-        {accessories?.head && <AccessoryArt id={accessories.head} />}
-      </svg>
-    </span>
   )
 }
 

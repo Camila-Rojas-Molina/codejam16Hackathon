@@ -63,10 +63,10 @@ function HomeMarker({ active }: { active: boolean }) {
 function useAnimatedView(target: MapView) {
   const [shown, setShown] = useState(target)
   const shownRef = useRef(target)
-  const key = `${target.x.toFixed(1)}|${target.y.toFixed(1)}|${target.w.toFixed(1)}|${target.h.toFixed(1)}`
+  const { x, y, w, h } = target
   useEffect(() => {
     const from = shownRef.current
-    const to = target
+    const to = { x, y, w, h }
     if (sameView(from, to)) return
     let raf = 0
     const start = performance.now()
@@ -81,8 +81,7 @@ function useAnimatedView(target: MapView) {
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-    // `key` stands for `target` (a new object every render).
-  }, [key])
+  }, [x, y, w, h])
   return shown
 }
 
@@ -285,7 +284,7 @@ export default function RetroAtlas({
           <path d={LAND_PATH} fill="none" stroke="var(--color-teal)" strokeOpacity=".16" strokeWidth="10" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
           <path d={LAND_PATH} fill="none" stroke="var(--color-teal)" strokeOpacity=".28" strokeWidth="5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
           <path d={LAND_PATH} fill="var(--color-saffron-soft)" stroke="var(--color-ink)" strokeWidth="1.3" strokeLinejoin="round" fillRule="evenodd" vectorEffect="non-scaling-stroke" />
-          <g fontFamily="var(--font-serif)" fontStyle="italic" fill="var(--color-teal-deep)" textAnchor="middle" fontSize={13 * k} letterSpacing={2 * k}>
+          <g fontFamily="var(--font-serif)" fontStyle="italic" fill="var(--color-teal-deep)" textAnchor="middle" fontSize={(width && width < NARROW_BELOW ? 10 : 13) * k} letterSpacing={1.5 * k}>
             {OCEANS.map(([label, lat, lng]) => {
               const [x, y] = project(lat, lng)
               return (

@@ -20,7 +20,7 @@ export function ModeCheck({ small = false, inverted = false, className }: { smal
       className={cn('grid shrink-0 place-items-center rounded-full', inverted ? 'bg-sheet text-ink' : 'bg-ink text-sheet', small ? 'size-4' : 'size-5', className)}
       aria-hidden
     >
-      <CheckMark className={small ? 'size-3' : 'size-3.5'} strokeWidth={3.4} />
+      <CheckMark className={small ? 'size-3.5' : 'size-4'} strokeWidth={3.4} />
     </span>
   )
 }
@@ -62,7 +62,7 @@ export default function ModeToggle({ compact = false, showContext = false, class
               <Icon name={m.icon} accent={m.accent} className="size-5" />
               {!compact && <span>{m.title}</span>}
               {/* Phones: the tick sits in the corner so the icon stays centred. */}
-              {active && compact && <ModeCheck small className="absolute top-0.5 left-0.5" />}
+              {active && compact && <ModeCheck small className="absolute -top-1.5 -left-1.5 ring-2 ring-sheet" />}
               {!ready && !compact && <span className="sr-only">(needs a quick setup)</span>}
               {/* Not set up yet: a small sienna corner flag. */}
               {!ready && <span className="absolute top-0 right-0 size-0 border-t-[10px] border-l-[10px] border-t-sienna border-l-transparent" aria-hidden />}

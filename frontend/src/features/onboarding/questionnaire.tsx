@@ -6,16 +6,17 @@ import Choices from '../../components/ui/Choices'
 import RankedChoices from '../../components/ui/RankedChoices'
 import { PrivacyNote, TextArea, TextField, Toggle } from '../../components/ui/Fields'
 import CityCollection from '../places/components/CityCollection'
+import HomeCityPicker from '../places/components/HomeCityPicker'
+import { placeLabel } from '../places/pins'
 import BudgetFields from '../profile/components/BudgetFields'
 import DogPhotoField from '../profile/components/DogPhotoField'
 import LanguageFields from '../profile/components/LanguageFields'
-import { addCity, cityLabel, dogDetailsError, dogsOf, rangeError } from '../profile/model'
+import { addCity, cityLabel, dogDetailsError, dogsOf, homeCityFields, needsHomePick, rangeError } from '../profile/model'
 import {
   ACCESSIBILITY_OPTIONS,
   ADVENTURE_OPTIONS,
   ATTRACTION_OPTIONS,
   BUDGET_OPTIONS,
-  CITY_MAX_LENGTH,
   DECISION_OPTIONS,
   DIETARY_OPTIONS,
   DOG_NAME_MAX_LENGTH,
@@ -87,16 +88,16 @@ export const QUESTIONS: QuestionStep[] = [
     section: 'you',
     title: 'Where do you call home?',
     subtitle: 'The city you live in, so visitors can meet you as a local. We never guess it from your location.',
-    isValid: (d) => d.homeCity.trim().length > 0,
-    blockedReason: 'Add your home city.',
+    // New answers must be a city picked from search. Profiles saved before map picking (text only)
+    // stay valid, and are asked to pick it on the map.
+    isValid: (d) => d.homeCityPlace !== null || needsHomePick(d),
+    blockedReason: 'Pick your home city from the suggestions.',
     render: (d, update) => (
-      <TextField
+      <HomeCityPicker
         label="Home city"
-        value={d.homeCity}
-        onChange={(homeCity) => update((x) => ({ ...x, homeCity }))}
-        maxLength={CITY_MAX_LENGTH}
-        placeholder="e.g. Montréal"
-        autoComplete="address-level2"
+        place={d.homeCityPlace}
+        legacyText={d.homeCity}
+        onPick={(place) => update((x) => ({ ...x, ...homeCityFields(place) }))}
         hint={<PrivacyNote kind="public">Shown on your profile (city only). You can change it any time.</PrivacyNote>}
       />
     ),
@@ -610,7 +611,14 @@ export function summaryRows(u: UniversalProfile): SummaryRow[] {
         : 'Skipped'
 
   return [
-    { stepId: 'home', section: 'you', label: 'Home city', value: u.homeCity.trim() || 'Not answered yet', icon: 'house', visibility: 'public' },
+    {
+      stepId: 'home',
+      section: 'you',
+      label: 'Home city',
+      value: u.homeCityPlace ? placeLabel(u.homeCityPlace) : u.homeCity.trim() ? `${u.homeCity.trim()} (not on the map yet)` : 'Not answered yet',
+      icon: 'house',
+      visibility: 'public',
+    },
     { stepId: 'energy', section: 'you', label: 'Vibe', value: answer(ENERGY_OPTIONS, u.personality.energy), icon: 'smile', visibility: 'public' },
     { stepId: 'new-people', section: 'you', label: 'Meeting new people', value: answer(NEW_PEOPLE_OPTIONS, u.personality.newPeople), icon: 'people2', visibility: 'private' },
     { stepId: 'planning', section: 'you', label: 'Planning', value: answer(PLANNING_OPTIONS, u.personality.planning), icon: 'clipboard', visibility: 'public' },

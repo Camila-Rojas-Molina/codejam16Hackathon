@@ -1,15 +1,18 @@
 // /mode/local: set up or edit Local mode (hosting visitors in your home city).
-// The home city is typed by the person. We never assume it from GPS.
+// The hosting city is picked on the map by the person (prefilled from their home city). We never
+// assume it from GPS.
 import { Navigate, useLocation, useNavigate } from 'react-router'
 import { MascotSays } from '../components/illustrations/Mascot'
 import SetupFlow, { type SetupStep } from '../components/layout/SetupFlow'
 import Choices from '../components/ui/Choices'
 import { PrivacyNote, TagInput, TextArea, TextField } from '../components/ui/Fields'
+import HomeCityPicker from '../features/places/components/HomeCityPicker'
+import type { PlacePick } from '../features/places/types'
 import LanguageFields from '../features/profile/components/LanguageFields'
 import SummaryList from '../features/profile/components/SummaryList'
 import { localItems, stepIdOf } from '../features/profile/contextSummary'
 import { hasUniversalProfile, type SetupNavState } from '../features/profile/flow'
-import { newLocal } from '../features/profile/model'
+import { homeCityFields, needsHomePick, newLocal } from '../features/profile/model'
 import {
   AREA_MAX_LENGTH,
   ATTRACTION_OPTIONS,
@@ -24,22 +27,25 @@ import {
 import type { LocalContext } from '../features/profile/types'
 import { useStore } from '../store/useStore'
 
-const STEPS: SetupStep<LocalContext>[] = [
+/** The steps, given the home city from the universal profile (offered as a one-tap choice). */
+const makeSteps = (home: PlacePick | null): SetupStep<LocalContext>[] => [
   {
     id: 'home',
     title: 'Where will you host?',
     subtitle: 'The city you’d show a visitor around. Usually your home city, so we’ve filled that in. We never guess it from your location.',
-    isValid: (l) => l.homeCity.trim().length > 0,
-    blockedReason: 'Add the city you’ll host in.',
+    // A city picked from search; older local profiles with typed text only stay valid.
+    isValid: (l) => l.homeCityPlace !== null || needsHomePick(l),
+    blockedReason: 'Pick the city you’ll host in from the suggestions.',
     render: (l, update) => (
       <>
-        <TextField
+        <HomeCityPicker
           label="Hosting city"
-          value={l.homeCity}
-          onChange={(homeCity) => update((x) => ({ ...x, homeCity }))}
-          maxLength={CITY_MAX_LENGTH}
-          placeholder="e.g. Montréal"
-          autoComplete="address-level2"
+          markerLabel="Hosting city"
+          place={l.homeCityPlace}
+          legacyText={l.homeCity}
+          onPick={(place) => update((x) => ({ ...x, ...homeCityFields(place) }))}
+          suggestion={home ? { label: `Use my home city (${home.name})`, place: home } : undefined}
+          hint={<PrivacyNote kind="public">Visitors see the city you host in.</PrivacyNote>}
         />
         <TextField
           label="Neighbourhood"
@@ -179,7 +185,7 @@ export default function LocalSetupPage() {
   return (
     <SetupFlow<LocalContext>
       label={existing ? 'Local profile' : 'Local setup'}
-      steps={STEPS}
+      steps={makeSteps(profile.universal.homeCityPlace)}
       initial={existing ? structuredClone(existing) : newLocal(profile.universal)}
       startAtReview={!!existing}
       intro={
