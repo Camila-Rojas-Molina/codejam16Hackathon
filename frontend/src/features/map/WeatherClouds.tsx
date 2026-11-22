@@ -1,4 +1,4 @@
-// Paper-cut clouds over the 3D map, driven by Montréal's real weather (Open-Meteo, no key):
+// Soft, see-through cumulus clouds over the 3D map, driven by Montréal's real weather (Open-Meteo, no key):
 // more clouds when it's overcast (always a couple so the sky isn't empty), drifting with the
 // real wind, each casting a soft shadow on the city. They pan with the map (a little slower,
 // as they sit above it), grow as you zoom in and fade out before street level, so they never
@@ -41,7 +41,7 @@ const FADE_END = 15.2
 const PARALLAX = 0.75
 const MARGIN = 320
 
-type Cloud = { x: number; y: number; scale: number; puffs: [number, number, number][]; speed: number }
+type Cloud = { x: number; y: number; scale: number; speed: number; src: string; shadow: string }
 
 function seeded(seed: number) {
   let x = seed
@@ -51,45 +51,81 @@ function seeded(seed: number) {
   }
 }
 
-function makeClouds(count: number, w: number, h: number): Cloud[] {
-  const rnd = seeded(42)
-  return Array.from({ length: count }, () => {
-    const n = 4 + Math.floor(rnd() * 3)
-    const puffs: [number, number, number][] = []
-    for (let i = 0; i < n; i++) {
-      const t = i / (n - 1)
-      const r = 26 + rnd() * 18 + Math.sin(t * Math.PI) * 22
-      puffs.push([30 + t * 140, 70 - Math.sin(t * Math.PI) * 22 - rnd() * 10, r])
+/** Canvas size of one cloud image (drawn once, then only moved). */
+const CW = 360
+const CH = 220
+
+type Puff = { x: number; y: number; r: number }
+
+/** A cumulus cluster: a flat-ish base, a towering rounded top, small puffs on the edges. */
+function cloudPuffs(rnd: () => number): Puff[] {
+  const puffs: Puff[] = []
+  const base = CH * 0.68
+  const width = CW * (0.42 + rnd() * 0.14)
+  const towers = 2 + Math.floor(rnd() * 3)
+  for (let t = 0; t < towers; t++) {
+    const tx = CW / 2 + (t / Math.max(1, towers - 1) - 0.5) * width * 0.75 + (rnd() - 0.5) * 20
+    const th = 45 + rnd() * 55 * (1 - Math.abs(t / Math.max(1, towers - 1) - 0.5))
+    for (let i = 0; i < 9; i++) {
+      const up = rnd()
+      puffs.push({ x: tx + (rnd() - 0.5) * 70, y: base - up * th, r: 26 + (1 - up) * 22 + rnd() * 12 })
     }
-    return { x: rnd() * (w + 2 * MARGIN), y: rnd() * (h + 2 * MARGIN), scale: 0.5 + rnd() * 0.45, puffs, speed: 0.7 + rnd() * 0.6 }
-  })
+  }
+  // Base layer and ragged edges.
+  for (let i = 0; i < 16; i++) puffs.push({ x: CW / 2 + (rnd() - 0.5) * width, y: base - rnd() * 18, r: 16 + rnd() * 18 })
+  for (let i = 0; i < 14; i++) puffs.push({ x: CW / 2 + (rnd() - 0.5) * width * 1.15, y: base - 10 - rnd() * 80, r: 7 + rnd() * 10 })
+  // Keep every puff inside the canvas so no cloud gets a cut edge.
+  for (const p of puffs) {
+    p.r = Math.min(p.r, CH * 0.3)
+    p.x = Math.max(p.r + 34, Math.min(CW - p.r - 34, p.x))
+    p.y = Math.max(p.r + 30, Math.min(CH - p.r * 1.4 - 30, p.y))
+  }
+  return puffs
 }
 
-function CloudShape({ puffs, shadow }: { puffs: Cloud['puffs']; shadow?: boolean }) {
-  if (shadow) {
-    return (
-      <svg width="200" height="120" viewBox="0 0 200 120" style={{ overflow: 'visible', filter: 'blur(10px)' }}>
-        {puffs.map(([cx, cy, r], i) => <circle key={i} cx={cx} cy={cy} r={r} style={{ fill: 'var(--color-ink)' }} />)}
-        <rect x="30" y="60" width="140" height="30" rx="15" style={{ fill: 'var(--color-ink)' }} />
-      </svg>
-    )
+function soft(ctx: CanvasRenderingContext2D, p: Puff, rgb: string, alpha: number) {
+  const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r)
+  g.addColorStop(0, `rgba(${rgb}, ${alpha})`)
+  g.addColorStop(0.55, `rgba(${rgb}, ${alpha * 0.75})`)
+  g.addColorStop(1, `rgba(${rgb}, 0)`)
+  ctx.fillStyle = g
+  ctx.beginPath()
+  ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
+  ctx.fill()
+}
+
+/** Paints a soft, see-through cumulus (grey belly, sunlit top) and its blurred ground shadow. */
+function renderCloud(seed: number): { src: string; shadow: string } | null {
+  if (typeof document === 'undefined') return null
+  const rnd = seeded(seed)
+  const puffs = cloudPuffs(rnd)
+  const canvas = document.createElement('canvas')
+  canvas.width = CW
+  canvas.height = CH
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  // Shaded underside first, then the lit body a little higher, then bright highlights on top.
+  for (const p of puffs) soft(ctx, { x: p.x + 4, y: p.y + p.r * 0.35, r: p.r * 1.05 }, '150, 162, 178', 0.5)
+  for (const p of puffs) soft(ctx, p, '246, 248, 252', 0.8)
+  for (const p of puffs) if (p.r > 22) soft(ctx, { x: p.x - p.r * 0.2, y: p.y - p.r * 0.3, r: p.r * 0.6 }, '255, 255, 255', 0.7)
+  const src = canvas.toDataURL()
+
+  ctx.clearRect(0, 0, CW, CH)
+  ctx.filter = 'blur(10px)'
+  for (const p of puffs) soft(ctx, p, '20, 32, 44', 0.5)
+  ctx.filter = 'none'
+  return { src, shadow: canvas.toDataURL() }
+}
+
+function makeClouds(count: number, w: number, h: number): Cloud[] {
+  const rnd = seeded(42)
+  const out: Cloud[] = []
+  for (let i = 0; i < count; i++) {
+    const img = renderCloud(1000 + i * 7919)
+    if (!img) continue
+    out.push({ x: rnd() * (w + 2 * MARGIN), y: rnd() * (h + 2 * MARGIN), scale: 0.45 + rnd() * 0.45, speed: 0.7 + rnd() * 0.6, ...img })
   }
-  // Outline first, fill on top: one inked edge around the whole union of puffs.
-  return (
-    <svg width="200" height="120" viewBox="0 0 200 120" style={{ overflow: 'visible' }}>
-      <g style={{ fill: 'var(--color-ink)', stroke: 'var(--color-ink)', strokeWidth: 5 }}>
-        {puffs.map(([cx, cy, r], i) => <circle key={i} cx={cx} cy={cy} r={r} />)}
-        <rect x="30" y="60" width="140" height="30" rx="15" />
-      </g>
-      <g style={{ fill: 'var(--color-sheet)' }}>
-        {puffs.map(([cx, cy, r], i) => <circle key={i} cx={cx} cy={cy} r={r} />)}
-        <rect x="30" y="60" width="140" height="30" rx="15" />
-      </g>
-      <g style={{ fill: 'var(--color-paper)', opacity: 0.9 }}>
-        {puffs.map(([cx, cy, r], i) => <circle key={i} cx={cx + r * 0.15} cy={cy + r * 0.25} r={r * 0.7} />)}
-      </g>
-    </svg>
-  )
+  return out
 }
 
 export default function WeatherClouds({ map }: { map: MapLibreMap }) {
@@ -166,7 +202,7 @@ export default function WeatherClouds({ map }: { map: MapLibreMap }) {
 
   if (!weather || clouds.length === 0) return null
 
-  const cell = { position: 'absolute', left: 0, top: 0, transformOrigin: '100px 60px', willChange: 'transform' } as const
+  const cell = { position: 'absolute', left: 0, top: 0, width: CW, height: CH, transformOrigin: `${CW / 2}px ${CH / 2}px`, willChange: 'transform' } as const
   return createPortal(
     <div
       ref={layer}
@@ -175,13 +211,13 @@ export default function WeatherClouds({ map }: { map: MapLibreMap }) {
       style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0, transition: 'opacity 200ms' }}
     >
       {clouds.map((c, i) => (
-        <div key={`s${i}`} ref={(el) => void (shadowEls.current[i] = el)} style={{ ...cell, opacity: 0.16 }}>
-          <CloudShape puffs={c.puffs} shadow />
+        <div key={`s${i}`} ref={(el) => void (shadowEls.current[i] = el)} style={{ ...cell, opacity: 0.22 }}>
+          <img src={c.shadow} alt="" width={CW} height={CH} draggable={false} />
         </div>
       ))}
       {clouds.map((c, i) => (
-        <div key={`c${i}`} ref={(el) => void (cloudEls.current[i] = el)} style={{ ...cell, opacity: 0.88 }}>
-          <CloudShape puffs={c.puffs} />
+        <div key={`c${i}`} ref={(el) => void (cloudEls.current[i] = el)} style={{ ...cell, opacity: 0.9 }}>
+          <img src={c.src} alt="" width={CW} height={CH} draggable={false} />
         </div>
       ))}
     </div>,
