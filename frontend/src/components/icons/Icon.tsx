@@ -5,6 +5,7 @@
 // <Icon name="pin" />                     decorative (hidden from screen readers)
 // <Icon name="pin" label="Location" />    meaningful on its own (announced)
 // <Icon name="pin" accent="teal" />       accent fill: saffron | teal | sienna | sandy | sheet | none
+// <Icon name="pin" className="size-4" />  any size utility overrides the default 24px (see `.icon` in index.css)
 import { cn } from '../../lib/cn'
 import { ICONS, type IconName } from './iconPaths'
 
@@ -39,7 +40,7 @@ export default function Icon({ name, label, accent = 'saffron', className, strok
       strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={cn('size-6 shrink-0', className)}
+      className={cn('icon shrink-0', className)}
       style={{ ['--icon-accent' as string]: accents[accent] }}
       role={label ? 'img' : undefined}
       aria-label={label}

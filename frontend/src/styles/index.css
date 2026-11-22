@@ -298,6 +298,13 @@
   filter: var(--art-halo);
 }
 @layer base {
+  /* Default icon size (<Icon>, <MascotIcon>). It lives in the base layer, not as a size-6 class, so
+     any size utility a caller passes (size-4, w-5, md:size-8...) wins whatever order Tailwind emits
+     the utilities in. Plain class concatenation can't guarantee that. */
+  .icon {
+    width: --spacing(6);
+    height: --spacing(6);
+  }
   img[src^='/assets/mascot/'] {
     filter: var(--art-halo);
   }

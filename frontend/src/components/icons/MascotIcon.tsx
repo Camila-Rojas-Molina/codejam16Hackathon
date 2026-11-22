@@ -44,7 +44,7 @@ export default function MascotIcon({ accent = 'saffron', label, className }: Mas
   return (
     <svg
       viewBox="0 0 24 24"
-      className={cn('size-6 shrink-0', className)}
+      className={cn('icon shrink-0', className)}
       style={{ ['--icon-accent' as string]: accents[accent] }}
       role={label ? 'img' : undefined}
       aria-label={label}
