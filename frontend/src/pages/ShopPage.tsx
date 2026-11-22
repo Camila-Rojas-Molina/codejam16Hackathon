@@ -15,11 +15,14 @@ import Button, { ArrowCell } from '../components/ui/Button'
 import { arrowLabel, arrowRowClasses } from '../components/ui/buttonStyles'
 import PageHeader from '../components/ui/PageHeader'
 import { pointsBalance } from '../features/profile/model'
-import type { Rewards } from '../features/profile/types'
+import type { AccessorySlot, Rewards } from '../features/profile/types'
 import { itemsForSale, SHOP_SLOTS, shopItem, SLOT_LABELS, type ShopItem } from '../features/rewards/shop'
 import { DEFAULT_AVATAR } from '../lib/avatars'
 import { cn } from '../lib/cn'
 import { useStore } from '../store/useStore'
+
+type Filter = 'all' | AccessorySlot
+const FILTERS: Filter[] = ['all', ...SHOP_SLOTS]
 
 const NO_REWARDS: Rewards = { ledger: [], owned: [], equipped: {} }
 
@@ -154,14 +157,15 @@ function ItemTile({ item, rewards, avatar, tryingOn, onTry }: TileProps) {
         )}
       </button>
       <div className="flex flex-1 flex-col p-3 sm:p-4">
+        <p className="eyebrow mb-1 text-[0.65rem]">{SLOT_LABELS[item.slot]}</p>
         <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
           <h3 id={`item-${item.id}`} className="text-xl leading-tight sm:text-2xl">
             {item.name}
           </h3>
           <ItemStatus item={item} rewards={rewards} />
         </div>
-        <p className="mt-1 flex-1 text-sm">{item.description}</p>
-        <div className="mt-3">
+        <p className="mt-1 hidden flex-1 text-sm sm:block">{item.description}</p>
+        <div className="mt-auto pt-3">
           <ItemActions item={item} rewards={rewards} compact />
         </div>
       </div>
@@ -197,6 +201,7 @@ function FittingRoom({ rewards, avatar, name, tryingId, onReset }: { rewards: Re
                 <h3 className="text-2xl leading-tight">{trying.name}</h3>
                 <ItemStatus item={trying} rewards={rewards} />
               </div>
+              <p className="mt-1 text-sm">{trying.description}</p>
               <div className="mt-3">
                 <ItemActions key={trying.id} item={trying} rewards={rewards} />
               </div>
@@ -231,9 +236,12 @@ function FittingRoom({ rewards, avatar, name, tryingId, onReset }: { rewards: Re
 export default function ShopPage() {
   const { account, profile } = useStore()
   const [tryingId, setTryingId] = useState<string | null>(null)
+  const [filter, setFilter] = useState<Filter>('all')
   const rewards = profile?.rewards ?? NO_REWARDS
   const avatar = account?.avatar ?? DEFAULT_AVATAR
   const balance = pointsBalance(rewards)
+  // Everything: grouped by slot in shop order. A slot: just those.
+  const items = filter === 'all' ? SHOP_SLOTS.flatMap((slot) => itemsForSale(slot)) : itemsForSale(filter)
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6">
@@ -250,9 +258,10 @@ export default function ShopPage() {
       />
 
       <div className="flex flex-wrap items-stretch gap-3">
-        <span className="inline-flex items-center gap-2 border-2 border-ink bg-saffron px-4 py-2 font-bold">
-          <Icon name="coin" accent="sheet" className="size-7" />
-          <span className="font-display text-2xl leading-none">{balance.toLocaleString()}</span> points to spend
+        <span className="inline-flex items-center gap-2 border-2 border-ink bg-saffron px-3 py-1.5 font-bold sm:px-4 sm:py-2">
+          <Icon name="coin" accent="sheet" className="size-6 sm:size-7" />
+          <span className="font-display text-xl leading-none sm:text-2xl">{balance.toLocaleString()}</span> points
+          <span className="hidden sm:inline">to spend</span>
         </span>
         <Link to="/quests" className={arrowRowClasses}>
           <span className={arrowLabel}>Earn more</span>
@@ -260,34 +269,42 @@ export default function ShopPage() {
         </Link>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(17rem,22rem)_minmax(0,1fr)] lg:items-start">
+      <div className="grid gap-6 lg:grid-cols-[minmax(17rem,22rem)_minmax(0,1fr)] lg:items-start lg:gap-8">
         <FittingRoom rewards={rewards} avatar={avatar} name={account?.name ?? 'You'} tryingId={tryingId} onReset={() => setTryingId(null)} />
 
-        <div className="space-y-8">
-          {SHOP_SLOTS.map((slot) => {
-            const items = itemsForSale(slot)
-            if (items.length === 0) return null
-            return (
-              <section key={slot} aria-labelledby={`slot-${slot}`}>
-                <h2 id={`slot-${slot}`} className="mb-3 text-3xl">
-                  {SLOT_LABELS[slot]}
-                </h2>
-                <div className="grid grid-cols-2 border-t-2 border-l-2 border-ink sm:grid-cols-3 lg:grid-cols-2 2xl:grid-cols-3">
-                  {items.map((item) => (
-                    <ItemTile
-                      key={item.id}
-                      item={item}
-                      rewards={rewards}
-                      avatar={avatar}
-                      tryingOn={tryingId === item.id}
-                      onTry={() => setTryingId(tryingId === item.id ? null : item.id)}
-                    />
-                  ))}
-                </div>
-              </section>
-            )
-          })}
-        </div>
+        <section aria-labelledby="catalogue-title" className="min-w-0">
+          <h2 id="catalogue-title" className="sr-only">
+            Catalogue
+          </h2>
+          <div role="group" aria-label="Show" className="mb-4 flex flex-wrap gap-2">
+            {FILTERS.map((f) => (
+              <button
+                key={f}
+                type="button"
+                aria-pressed={filter === f}
+                onClick={() => setFilter(f)}
+                className={cn(
+                  'min-h-11 border-2 border-ink px-3 font-sans text-xs font-bold tracking-[0.08em] uppercase transition-colors sm:px-4',
+                  filter === f ? 'bg-ink text-sheet' : 'sheet-grain text-ink hover:bg-saffron-soft',
+                )}
+              >
+                {f === 'all' ? 'Everything' : SLOT_LABELS[f]}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 border-t-2 border-l-2 border-ink sm:grid-cols-3 lg:grid-cols-2 2xl:grid-cols-3">
+            {items.map((item) => (
+              <ItemTile
+                key={item.id}
+                item={item}
+                rewards={rewards}
+                avatar={avatar}
+                tryingOn={tryingId === item.id}
+                onTry={() => setTryingId(tryingId === item.id ? null : item.id)}
+              />
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   )

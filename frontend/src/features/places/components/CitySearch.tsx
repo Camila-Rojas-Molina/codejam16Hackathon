@@ -74,6 +74,7 @@ export default function CitySearch({
   function choose(p: PlacePick) {
     if (takenIds.includes(p.placeId)) {
       onTaken?.(p)
+      setQuery('')
       setOpen(false)
       return
     }

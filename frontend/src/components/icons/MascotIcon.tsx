@@ -20,7 +20,7 @@ const accents: Record<IconAccent, string> = {
 }
 
 // Where the artwork sits in the 24×24 icon grid.
-const HEAD = { href: '/assets/mascot/nav-icon.webp', x: 0, y: 0, width: 24, height: 24 }
+const HEAD = { href: '/assets/mascot/nav-icon.webp', x: 0.6, y: 0.6, width: 22.8, height: 22.8 }
 // hello.webp is 344×378 with the globe centred near (157, 138), radius ~118: scale it so the globe
 // fills the grid, and clip to it (the clouds and the waving arm would just be noise at this size).
 const FALLBACK = { href: '/assets/mascot/hello.webp', x: -2.63, y: -0.86, width: 32.07, height: 35.24 }
@@ -58,7 +58,7 @@ export default function MascotIcon({ accent = 'saffron', label, className }: Mas
           <feComposite in="dark" in2="SourceAlpha" operator="in" result="darkIn" />
           {/* Linework: only the darkest tones, snapped to a crisp edge. */}
           <feComponentTransfer in="darkIn" result="lineAlpha">
-            <feFuncA type="linear" slope="3.5" intercept="-1.75" />
+            <feFuncA type="linear" slope="6.5" intercept="-4" />
           </feComponentTransfer>
           {/* Thicken it a touch so it holds up at 1x. */}
           <feMorphology in="lineAlpha" operator="dilate" radius="0.18" result="lineMask" />

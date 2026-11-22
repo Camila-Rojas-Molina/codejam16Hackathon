@@ -69,8 +69,8 @@ export default function SessionSelfies({ results, savedHuntIds, onSave }: Sessio
                     <Icon name="check" accent="teal" className="size-5" /> Saved
                   </p>
                 ) : onSave ? (
-                  <Button size="sm" variant="secondary" fullWidth className="mt-1" onClick={() => onSave(r, title)}>
-                    Save to gallery
+                  <Button size="sm" variant="secondary" fullWidth className="mt-1 min-h-11" onClick={() => onSave(r, title)} aria-label={`Save the ${title} selfie to your gallery`}>
+                    Save it
                   </Button>
                 ) : null}
               </div>
