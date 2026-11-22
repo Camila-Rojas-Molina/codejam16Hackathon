@@ -59,6 +59,10 @@ const THEME_NAMES: Record<string, string> = {
   art: 'Art',
   retro: 'Retro',
   montreal: 'Montréal',
+  abstract: 'Patterns',
+  sea: 'By the sea',
+  space: 'Space',
+  royal: 'Royal',
 }
 
 export function themeLabel(theme: string): string {

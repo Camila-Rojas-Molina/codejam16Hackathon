@@ -110,7 +110,6 @@ export const NIGHT_SCENES: Record<string, SceneDef> = {
         <rect width="100" height="100" fill={SPACE_2} />
         <Stars seed={5} n={60} y1={100} sparkles={8} twinkle fill="#f6efd8" />
         {/* ringed planet */}
-        <path d="M60 30 Q78 16 98 18" fill="none" stroke={D.sheet} strokeWidth="1.6" strokeOpacity="0.6" transform="rotate(-12 78 24)" />
         <ellipse cx="78" cy="24" rx="22" ry="5" fill="none" stroke={D.saffronSoft} strokeWidth="2.2" transform="rotate(-16 78 24)" />
         <circle cx="78" cy="24" r="12" fill={D.sandy} />
         <g clipPath={`url(#${u('ringed')})`}>
@@ -262,7 +261,7 @@ export const NIGHT_SCENES: Record<string, SceneDef> = {
           </g>
           {/* neon signs */}
           {glow('M4 58 Q4 64 10 64 H14 Q20 64 20 58 Q20 52 14 52 H10 Q4 52 4 58Z', NEON_PINK, 1, { className: 'mbd-flicker' })}
-          {glow('M8 55 V61 M8 55 H10.6 Q12 55 12 56.6 Q12 58 10.6 58 H8 M15 55 V61 L17 55', NEON_PINK, 0.7, { className: 'mbd-flicker' })}
+          {glow('M12 61.4 L8.6 58 Q7.4 56.6 8.4 55.4 Q9.6 54.2 11 55.2 L12 56.2 L13 55.2 Q14.4 54.2 15.6 55.4 Q16.6 56.6 15.4 58Z', NEON_YELLOW, 0.6, { className: 'mbd-flicker' })}
           {glow('M84 58 L90 66 L96 58Z M90 66 V72 M87 72 H93', NEON_TEAL, 0.9, { className: 'mbd-glow' })}
           <circle cx="91.6" cy="60" r="1" fill={NEON_YELLOW} />
           {glow('M6 30 L12 26 L18 30 M6 30 V40 H18 V30', NEON_YELLOW, 0.7)}

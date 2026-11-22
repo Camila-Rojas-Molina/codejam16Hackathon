@@ -21,13 +21,11 @@ export function Hatch({ id, s = 2, w = 0.5, fill = D.ink, o = 1, angle = -45 }: 
 
 /** Horizontal flat colour bands, top to bottom: [colour, until y]. */
 export function Bands({ bands, from = 0 }: { bands: [string, number][]; from?: number }) {
-  let y = from
   return (
     <g>
       {bands.map(([fill, to], i) => {
-        const el = <rect key={i} x="0" y={y} width="100" height={fx(to - y + 0.2)} fill={fill} />
-        y = to
-        return el
+        const y = i === 0 ? from : bands[i - 1][1]
+        return <rect key={i} x="0" y={y} width="100" height={fx(to - y + 0.2)} fill={fill} />
       })}
     </g>
   )

@@ -66,8 +66,7 @@ $$;
 create or replace function economy_text_array(j jsonb) returns text[]
 language sql immutable as $$
   select case when jsonb_typeof(j) = 'array'
-              then coalesce(array(select x from jsonb_array_elements(j) e(x0), lateral (select e.x0 #>> '{}' as x) s
-                                   where jsonb_typeof(e.x0) = 'string'), '{}')
+              then array(select e #>> '{}' from jsonb_array_elements(j) e where jsonb_typeof(e) = 'string')
               else '{}'::text[] end
 $$;
 
@@ -187,7 +186,6 @@ create table if not exists app_visits (
   last_at     timestamptz not null default now(),
   primary key (profile_id, page)
 );
-alter table app_visits add column if not exists last_at timestamptz not null default now();
 
 -- When the server first saw each city (by placeId) in the person's "Where have you explored?" list.
 -- addedAt inside the record is written by the browser, so a "new city this week" also needs the
@@ -400,9 +398,9 @@ begin
   elsif v_type = 'profile' then
     case p_cond ->> 'check'
       when 'questionnaire_complete' then
-        return (jsonb_typeof(p_rec -> 'universal') = 'object'
+        return coalesce(jsonb_typeof(p_rec -> 'universal') = 'object'
                 and jsonb_typeof(p_rec -> 'universalCompletedAt') = 'number'
-                and coalesce(btrim(p_rec #>> '{universal,homeCity}'), '') <> '')::int;
+                and coalesce(btrim(p_rec #>> '{universal,homeCity}'), '') <> '', false)::int;
       when 'home_city_pinned' then
         return (coalesce(nullif(btrim(p_rec #>> '{universal,homeCityPlace,placeId}'), ''),
                          nullif(btrim(p_rec #>> '{local,homeCityPlace,placeId}'), '')) is not null)::int;
@@ -410,13 +408,13 @@ begin
         -- An avatar id from lib/avatars.ts (old emoji avatars don't count).
         return coalesce((select avatar ~ '^[a-z0-9]+(-[a-z0-9]+)*$' from profiles where id = p_profile_id), false)::int;
       when 'first_city' then
-        return (jsonb_typeof(p_rec #> '{universal,citiesDiscovered}') = 'array'
-                and jsonb_array_length(p_rec #> '{universal,citiesDiscovered}') > 0)::int;
+        return coalesce(jsonb_typeof(p_rec #> '{universal,citiesDiscovered}') = 'array'
+                        and jsonb_array_length(p_rec #> '{universal,citiesDiscovered}') > 0, false)::int;
       when 'both_modes_ready' then
         -- Same as isModeReady() for both modes (features/profile/model.ts).
         v_trip := economy_active_trip(p_rec);
         v_local := p_rec -> 'local';
-        return (
+        return coalesce(
           v_trip is not null
           and coalesce(btrim(v_trip ->> 'destination'), '') <> ''
           and v_trip ->> 'companions' is not null
@@ -430,15 +428,15 @@ begin
           and cardinality(economy_text_array(v_local -> 'languages')) > 0
           and cardinality(economy_text_array(v_local -> 'activities')) > 0
           and cardinality(economy_text_array(v_local -> 'availability')) > 0
-          and v_local ->> 'duration' is not null)::int;
+          and v_local ->> 'duration' is not null, false)::int;
       else
         return 0;
     end case;
 
   elsif v_type = 'visit' then
-    return exists (select 1 from app_visits v
-                    where v.profile_id = p_profile_id and v.page = p_cond ->> 'page'
-                      and v.last_at >= v_from and v.first_at < v_to)::int;
+    return (exists (select 1 from app_visits v
+                     where v.profile_id = p_profile_id and v.page = p_cond ->> 'page'
+                       and v.last_at >= v_from and v.first_at < v_to))::int;
 
   elsif v_type = 'quests_completed' then
     select count(*) into v_n
@@ -612,7 +610,7 @@ begin
           or (category = 'adventure' and period_key < v_adv));
 
   -- Weekly: one, not one used in the last 4 weeks.
-  v_b := economy_period_bounds(v_week, v_tz);
+  select * into v_b from economy_period_bounds(v_week, v_tz);
   if v_b.ends_at > v_now
      and not exists (select 1 from quest_assignments where profile_id = p_profile_id and period_key = v_week and slot = 1) then
     v_picked := economy_pick(p_profile_id, v_rec, 'weekly', 1,
@@ -626,7 +624,7 @@ begin
   end if;
 
   -- Dailies: three different ones, not yesterday's (= the previous day this person had dailies).
-  v_b := economy_period_bounds(v_day, v_tz);
+  select * into v_b from economy_period_bounds(v_day, v_tz);
   v_missing := array(select s from generate_series(1, 3) s
                       where not exists (select 1 from quest_assignments
                                          where profile_id = p_profile_id and period_key = v_day and slot = s));
@@ -645,7 +643,7 @@ begin
   end if;
 
   -- Adventures: three personalised ones, none shown in the previous 3 weeks.
-  v_b := economy_period_bounds(v_adv, v_tz);
+  select * into v_b from economy_period_bounds(v_adv, v_tz);
   v_missing := array(select s from generate_series(1, 3) s
                       where not exists (select 1 from quest_assignments
                                          where profile_id = p_profile_id and period_key = v_adv and slot = s));
@@ -693,7 +691,7 @@ begin
     v_prog := v_target;
     select amount into v_paid from points_ledger where id = a.ledger_id;
   elsif a.status = 'active' then
-    v_prog := least(v_target, greatest(0, economy_progress(a.profile_id, p_rec, d.condition, a.starts_at, a.expires_at, a.id)));
+    v_prog := least(v_target, greatest(0, coalesce(economy_progress(a.profile_id, p_rec, d.condition, a.starts_at, a.expires_at, a.id), 0)));
   end if;
   return jsonb_build_object(
     'id', a.id,
@@ -733,8 +731,9 @@ begin
     'earnedTotal', v_earn,
     'spentTotal', v_spent,
     'recent', coalesce((select jsonb_agg(economy_ledger_json(l) order by l.created_at desc, l.id)
-                          from (select * from points_ledger where profile_id = p_profile_id
-                                 order by created_at desc, id limit 50) l), '[]'::jsonb),
+                          from points_ledger l
+                         where l.id in (select id from points_ledger where profile_id = p_profile_id
+                                         order by created_at desc, id limit 50)), '[]'::jsonb),
     'owned', coalesce((select jsonb_agg(item_id order by acquired_at, item_id)
                          from inventory where profile_id = p_profile_id), '[]'::jsonb),
     -- An item whose catalogue slot changed since it was equipped isn't reported in the old slot.
@@ -752,9 +751,10 @@ begin
                                          or a.period_key in (p_keys ->> 'day', p_keys ->> 'week', p_keys ->> 'adventure'))))),
                        '[]'::jsonb),
     'history', coalesce((select jsonb_agg(economy_assignment_json(h, v_rec) order by h.completed_at desc, h.id)
-                           from (select * from quest_assignments
-                                  where profile_id = p_profile_id and status = 'completed'
-                                  order by completed_at desc, id limit 50) h), '[]'::jsonb),
+                           from quest_assignments h
+                          where h.id in (select id from quest_assignments
+                                          where profile_id = p_profile_id and status = 'completed'
+                                          order by completed_at desc, id limit 50)), '[]'::jsonb),
     'dailyRefreshAvailable',
       not exists (select 1 from daily_refreshes where profile_id = p_profile_id and period_key = p_keys ->> 'day')
       and exists (select 1 from quest_assignments where profile_id = p_profile_id and category = 'daily'
@@ -976,7 +976,7 @@ begin
     raise exception 'This quest has expired' using errcode = 'P0001', hint = 'expired';
   end if;
   select * into d from quest_defs where id = a.def_id;
-  if economy_progress(p_profile_id, economy_record(p_profile_id), d.condition, a.starts_at, a.expires_at, a.id)
+  if coalesce(economy_progress(p_profile_id, economy_record(p_profile_id), d.condition, a.starts_at, a.expires_at, a.id), 0)
      < economy_target(d.condition) then
     raise exception 'Not finished yet' using errcode = 'P0001', hint = 'not_finished';
   end if;
@@ -1022,7 +1022,7 @@ begin
     raise exception 'This challenge has expired' using errcode = 'P0001', hint = 'expired';
   end if;
   select * into d from quest_defs where id = a.def_id;
-  if economy_progress(p_profile_id, v_rec, d.condition, a.starts_at, a.expires_at, a.id) >= economy_target(d.condition) then
+  if coalesce(economy_progress(p_profile_id, v_rec, d.condition, a.starts_at, a.expires_at, a.id), 0) >= economy_target(d.condition) then
     raise exception 'This challenge is done: claim it instead' using errcode = 'P0001', hint = 'claimable';
   end if;
 
@@ -1160,7 +1160,7 @@ begin
   update profiles set timezone = p_tz, timezone_changed_at = v_now where id = p_profile_id;
   for a in select id, period_key from quest_assignments
             where profile_id = p_profile_id and status = 'active' and category <> 'starter' loop
-    v_b := economy_period_bounds(a.period_key, p_tz);
+    select * into v_b from economy_period_bounds(a.period_key, p_tz);
     update quest_assignments set starts_at = v_b.starts_at, expires_at = v_b.ends_at where id = a.id;
   end loop;
 end;

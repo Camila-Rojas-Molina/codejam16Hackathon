@@ -126,7 +126,7 @@ export const ABSTRACT_SCENES: Record<string, SceneDef> = {
   'backdrop-bauhaus': {
     draw: () => {
       // 4×4 cells of quarter circles; the middle cells are soft tints so the avatar stays clear.
-      type Cell = { bg: string; fg: string; kind: 'q0' | 'q1' | 'q2' | 'q3' | 'half' | 'disc' | 'none' }
+      type Cell = { bg: string; fg: string; kind: 'q0' | 'q1' | 'q2' | 'q3' | 'half' | 'disc' }
       const bold = [D.sienna, D.teal, D.saffron, D.ink, D.sandy]
       const soft = [D.siennaSoft, D.tealSoft, D.saffronSoft, D.sandySoft, D.paper]
       const kinds: Cell['kind'][] = ['q0', 'half', 'disc', 'q2', 'q1', 'q3', 'half', 'q0', 'disc', 'q3', 'q2', 'half', 'q1', 'disc', 'q0', 'q2']
@@ -151,7 +151,7 @@ export const ABSTRACT_SCENES: Record<string, SceneDef> = {
             else if (c.kind === 'half') shape = <path d={`M${x} ${y + s} A${s / 2} ${s / 2} 0 0 1 ${x + s} ${y + s}Z`} fill={c.fg} />
             else {
               const corner = { q0: [x, y], q1: [x + s, y], q2: [x + s, y + s], q3: [x, y + s] }[c.kind]
-              shape = <circle cx={corner[0]} cy={corner[1]} r={s} fill={c.fg} clipPath="none" />
+              shape = <circle cx={corner[0]} cy={corner[1]} r={s} fill={c.fg} />
             }
             return (
               <g key={i}>

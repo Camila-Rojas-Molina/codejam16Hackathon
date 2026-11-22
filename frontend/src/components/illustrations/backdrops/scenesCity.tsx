@@ -19,6 +19,7 @@ const COBBLE = '#d9cdb5'
 const COBBLE_LINE = '#bfae90'
 const FACADE_L = '#f1dfc0'
 const FACADE_R = '#e8c9b5'
+const WARM_GLASS = '#f7dfa6'
 const WINTER_SKY = '#b9cde0'
 const WINTER_SKY_2 = '#cddbe8'
 const SNOW = '#f4f7f8'
@@ -78,12 +79,15 @@ export const CITY_SCENES: Record<string, SceneDef> = {
 
   'backdrop-montreal': {
     draw: (u) => {
+      // A Plateau outdoor staircase: an iron S-curve of treads between two rails.
       const stair = (x: number, y0: number, flip = false) => {
         const s = flip ? -1 : 1
+        const d = `M${x} ${y0} C${x + 7 * s} ${y0 + 2} ${x + 7 * s} ${y0 + 8} ${x + 1.5 * s} ${y0 + 10} C${x - 3 * s} ${y0 + 11.6} ${x - 2.4 * s} ${y0 + 16} ${x + 3 * s} ${y0 + 18}`
         return (
-          <g fill="none" stroke={IRON} strokeWidth="0.55" strokeLinecap="round">
-            <path d={`M${x} ${y0} q${4 * s} 1 ${4 * s} 4 q0 3 ${-4 * s} 4 q${-4 * s} 1 ${-4 * s} 4 q0 3 ${4 * s} 4 q${4 * s} 1 ${4 * s} 4`} />
-            <path d={`M${x + 0.8 * s} ${y0 + 1.6} q${3 * s} 1 ${3 * s} 2.6 M${x - 2.4 * s} ${y0 + 8.4} q${-1.4 * s} 1 ${-1.4 * s} 2.4 M${x + 0.8 * s} ${y0 + 13.6} q${3 * s} 1 ${3 * s} 2.6`} strokeWidth="0.35" />
+          <g fill="none" stroke={IRON} strokeLinecap="round">
+            <path d={d} strokeWidth="2.2" strokeDasharray="0.35 0.85" strokeLinecap="butt" />
+            <path d={d} strokeWidth="0.45" transform="translate(-1.1 0)" />
+            <path d={d} strokeWidth="0.45" transform="translate(1.1 0)" />
           </g>
         )
       }
@@ -107,7 +111,8 @@ export const CITY_SCENES: Record<string, SceneDef> = {
           <path d="M16 20 V34 M13 24.4 H19" stroke={D.ink} strokeWidth="0.25" strokeOpacity="0.4" />
           {/* distant roofs */}
           <path d="M0 60 H100 V66 H0Z" fill={GREYSTONE_DEEP} />
-          <path d="M30 60 V54 H40 V60 M58 60 V52 L62 48 L66 52 V60" fill={GREYSTONE_DEEP} />
+          <path d="M28 60 V55 H36 V57 H44 V54 H50 V60Z M56 60 V53 H60 V50 H61 V53 H64 V60Z M64 60 V56 H72 V60Z" fill={GREYSTONE_DEEP} />
+          <path d="M33 55 V52.6 H34.4 V55 M47 54 V51.8 H48.2 V54" fill={BRICK_DEEP} />
           {/* left: brick triplex */}
           <rect x="-2" y="44" width="30" height="58" fill={BRICK} />
           <rect x="-2" y="44" width="30" height="58" fill={`url(#${u('brick')})`} />
@@ -199,8 +204,10 @@ export const CITY_SCENES: Record<string, SceneDef> = {
             <circle cx="19" cy="31" r="1" />
             <circle cx="25" cy="31" r="1" />
           </g>
-          <rect x="0" y="50" width="28" height="30" fill={D.ink} fillOpacity="0.85" />
-          <rect x="2" y="54" width="24" height="24" fill="#f6d79a" fillOpacity="0.55" />
+          <rect x="0" y="50" width="28" height="30" fill={D.ink} />
+          <rect x="2" y="54" width="24" height="24" fill={WARM_GLASS} />
+          <path d="M14 54 V78 M2 66 H26" stroke={D.ink} strokeWidth="0.8" />
+          <path d="M4 56 L8 56 L4 60Z" fill={D.sheet} fillOpacity="0.6" />
           {awning(-2, 44, 32, D.sienna, D.sheet, 8)}
           {/* right facade */}
           <path d="M70 100 V0 H102 V100Z" fill={FACADE_R} />
@@ -209,7 +216,9 @@ export const CITY_SCENES: Record<string, SceneDef> = {
           <rect x="75" y="32" width="10" height="2" fill={D.sienna} />
           <rect x="89" y="32" width="10" height="2" fill={D.sienna} />
           <rect x="72" y="50" width="30" height="30" fill={D.tealDeep} />
-          <rect x="74" y="54" width="26" height="24" fill="#f6d79a" fillOpacity="0.55" />
+          <rect x="74" y="54" width="26" height="24" fill={WARM_GLASS} />
+          <path d="M87 54 V78 M74 66 H100" stroke={D.tealDeep} strokeWidth="0.8" />
+          <path d="M76 56 L80 56 L76 60Z" fill={D.sheet} fillOpacity="0.6" />
           {awning(70, 44, 32, D.teal, D.sheet, 8)}
           {/* cobbles */}
           <path d="M0 80 H100 V100 H0Z" fill={`url(#${u('cobble')})`} />

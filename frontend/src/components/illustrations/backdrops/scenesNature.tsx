@@ -321,11 +321,15 @@ export const NATURE_SCENES: Record<string, SceneDef> = {
 
   'backdrop-greenhouse': {
     draw: (u) => {
-      const monstera = (x: number, y: number, s: number, r: number, fill: string) => (
-        <g transform={`translate(${x} ${y}) rotate(${r}) scale(${s})`}>
-          <path d="M0 0 C-8 -2 -12 -12 -6 -18 C-2 -22 4 -21 6 -16 C10 -10 6 -2 0 0Z" fill={fill} />
-          <path d="M0 0 Q-2 -10 1 -18" fill="none" stroke={LEAF_DEEP} strokeWidth="0.5" />
-          <path d="M-7.6 -8 L-3 -9 M-8 -13 L-2 -13 M4.8 -9 L1.2 -10" stroke={GLASS} strokeWidth="1" strokeLinecap="round" />
+      // A split monstera leaf on a stem from the pot rim at (x, y), the leaf tip at angle r.
+      const monstera = (x: number, y: number, len: number, r: number, fill: string) => (
+        <g transform={`translate(${x} ${y}) rotate(${r})`}>
+          <path d={`M0 0 Q${fx(len * 0.1)} ${fx(-len * 0.5)} 0 ${fx(-len * 0.62)}`} fill="none" stroke={LEAF_DEEP} strokeWidth="0.8" />
+          <g transform={`translate(0 ${fx(-len * 0.62)}) scale(${fx(len / 22)})`}>
+            <path d="M0 2 C-7 2 -10 -5 -8 -10 C-6 -15 -1 -16 0 -13 C1 -16 6 -15 8 -10 C10 -5 7 2 0 2Z" fill={fill} />
+            <path d="M0 1.6 V-12.4" stroke={LEAF_DEEP} strokeWidth="0.45" />
+            <path d="M-9.4 -4 L-4 -3.4 M-8.6 -9 L-3.6 -7.6 M9.4 -4 L4 -3.4 M8.6 -9 L3.6 -7.6" stroke={GLASS} strokeWidth="0.9" strokeLinecap="round" />
+          </g>
         </g>
       )
       const fern = (x: number, y: number, len: number, r: number) => (
@@ -375,9 +379,9 @@ export const NATURE_SCENES: Record<string, SceneDef> = {
             ))}
           </g>
           {/* left pot + monstera */}
-          {monstera(10, 84, 1.25, -40, LEAF)}
-          {monstera(12, 84, 1.05, 10, LEAF_DEEP)}
-          {monstera(8, 84, 0.9, -80, LEAF_DEEP)}
+          {monstera(8, 82, 30, -28, LEAF_DEEP)}
+          {monstera(12, 82, 24, 22, LEAF)}
+          {monstera(10, 82, 18, -62, LEAF)}
           <path d="M2 82 H20 L18 98 H4Z" fill={D.sienna} />
           <rect x="1" y="80.5" width="20" height="3" fill={D.siennaDeep} />
           {/* right pot + ferns */}
