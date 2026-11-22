@@ -15,15 +15,14 @@ export default function UniversalSummary({ universal, onEdit, sections = ['you',
   const rows = summaryRows(universal)
   return (
     <div className="space-y-5">
-      {sections.map((section, i) => (
+      {sections.map((section) => (
         <SummaryList
           key={section}
           title={SECTIONS[section].title}
-          tilt={i % 2 === 0 ? 'left' : 'right'}
           onEdit={onEdit}
           items={rows
             .filter((r) => r.section === section)
-            .map((r) => ({ id: r.stepId, label: r.label, value: r.value, visibility: r.visibility }))}
+            .map((r) => ({ id: r.stepId, label: r.label, value: r.value, visibility: r.visibility, icon: r.icon }))}
         />
       ))}
     </div>

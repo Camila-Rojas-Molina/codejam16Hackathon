@@ -8,6 +8,7 @@ import type {
   UniversalProfile,
 } from '../features/profile/types'
 import type { Person, Thread } from '../features/chat/types'
+import type { PlacePick } from '../features/places/types'
 import type { HuntResult, ScoreBreakdown, User } from '../lib/types'
 import type { AppState } from './state'
 
@@ -35,7 +36,7 @@ export type StoreValue = AppState & {
   deleteAccount: () => Promise<void>
 
   // Cities discovered (universal profile)
-  addCity: (name: string) => Promise<ProfileRecord>
+  addCity: (place: PlacePick) => Promise<ProfileRecord>
   removeCity: (cityId: string) => Promise<ProfileRecord>
 
   // Points, challenges & shop

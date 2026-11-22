@@ -1,7 +1,8 @@
 // Budget level cards plus an optional "about how much per outing" range.
 import { useId } from 'react'
 import Choices from '../../../components/ui/Choices'
-import { fieldLabel } from '../../../components/ui/Fields'
+import { ErrorText, fieldLabel, inputBase } from '../../../components/ui/Fields'
+import { cn } from '../../../lib/cn'
 import { BUDGET_OPTIONS, CURRENCIES, SPEND_MAX } from '../options'
 import { rangeError } from '../model'
 import type { Budget, Currency, SpendRange } from '../types'
@@ -15,8 +16,7 @@ type BudgetFieldsProps = {
   defaultCurrency?: Currency
 }
 
-const numberInput =
-  'min-h-12 w-full min-w-0 rounded-full border-[3px] border-navy bg-paper px-4 text-lg text-navy placeholder:text-navy/60 aria-invalid:border-dashed aria-invalid:border-red'
+const numberInput = cn(inputBase, 'min-h-12 min-w-0 px-3 text-lg')
 
 function parseAmount(raw: string): number | null {
   if (raw.trim() === '') return null
@@ -47,9 +47,9 @@ export default function BudgetFields({ value, onChange, legend, hideLegend, defa
       />
 
       {value.level && value.level !== 'free' && (
-        <fieldset className="rounded-[1.3rem_1.1rem_1.4rem_1rem] border-[3px] border-dashed border-navy p-4" aria-describedby={`${id}-hint`}>
+        <fieldset className="border-2 border-dashed border-ink p-4" aria-describedby={`${id}-hint`}>
           <legend className={`${fieldLabel} px-1`}>
-            Roughly per outing <span className="normal-case opacity-80">(optional)</span>
+            Roughly per outing <span className="font-medium tracking-normal normal-case">(optional)</span>
           </legend>
           <p id={`${id}-hint`} className="-mt-1 mb-3 text-sm">
             Just a ballpark. It helps us suggest things that fit, and it’s never shown to anyone.
@@ -72,7 +72,7 @@ export default function BudgetFields({ value, onChange, legend, hideLegend, defa
                 className={numberInput}
               />
             </div>
-            <span className="pb-3 font-type" aria-hidden>
+            <span className="pb-3 font-bold" aria-hidden>
               –
             </span>
             <div className="flex-1">
@@ -100,7 +100,7 @@ export default function BudgetFields({ value, onChange, legend, hideLegend, defa
                 id={`${id}-cur`}
                 value={range.currency}
                 onChange={(e) => setRange({ currency: e.target.value as Currency })}
-                className="min-h-12 w-full rounded-full border-[3px] border-navy bg-paper px-3 text-navy"
+                className={cn(inputBase, 'min-h-12 px-2')}
               >
                 {CURRENCIES.map((c) => (
                   <option key={c} value={c}>
@@ -110,11 +110,7 @@ export default function BudgetFields({ value, onChange, legend, hideLegend, defa
               </select>
             </div>
           </div>
-          {error && (
-            <p role="alert" className="mt-3 inline-block rounded-lg border-2 border-navy bg-sun px-2 py-0.5 text-sm text-ink">
-              {error}
-            </p>
-          )}
+          <ErrorText>{error}</ErrorText>
         </fieldset>
       )}
     </div>

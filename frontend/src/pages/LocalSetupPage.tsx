@@ -4,7 +4,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router'
 import { MascotSays } from '../components/illustrations/Mascot'
 import SetupFlow, { type SetupStep } from '../components/layout/SetupFlow'
 import Choices from '../components/ui/Choices'
-import { TagInput, TextArea, TextField } from '../components/ui/Fields'
+import { PrivacyNote, TagInput, TextArea, TextField } from '../components/ui/Fields'
 import LanguageFields from '../features/profile/components/LanguageFields'
 import SummaryList from '../features/profile/components/SummaryList'
 import { localItems, stepIdOf } from '../features/profile/contextSummary'
@@ -48,7 +48,7 @@ const STEPS: SetupStep<LocalContext>[] = [
           onChange={(neighbourhood) => update((x) => ({ ...x, neighbourhood }))}
           maxLength={CITY_MAX_LENGTH}
           placeholder="e.g. Plateau-Mont-Royal"
-          hint="🔒 Private. Only used to suggest nearby meeting spots."
+          hint={<PrivacyNote kind="private">Only used to suggest nearby meeting spots.</PrivacyNote>}
         />
       </>
     ),
@@ -86,7 +86,7 @@ const STEPS: SetupStep<LocalContext>[] = [
           placeholder="The bakery with no sign, the rooftop with the best sunset…"
           value={l.hiddenGems}
           onChange={(hiddenGems) => update((x) => ({ ...x, hiddenGems }))}
-          hint="🔒 Private. MIGO uses these to plan hunts with your visitors."
+          hint={<PrivacyNote kind="private">MIGO uses these to plan hunts with your visitors.</PrivacyNote>}
         />
       </>
     ),
@@ -183,8 +183,8 @@ export default function LocalSetupPage() {
       initial={existing ? structuredClone(existing) : newLocal(profile.universal)}
       startAtReview={!!existing}
       intro={
-        <MascotSays fill="var(--color-bubble)" className="mb-6">
-          <p>A local! 📍 Visitors are going to love you. A few quick things about your city and how you like to host.</p>
+        <MascotSays pose="curious" className="mb-6">
+          <p>A local! Visitors are going to love you. A few quick things about your city and how you like to host.</p>
         </MascotSays>
       }
       reviewTitle={existing ? 'Your local profile' : 'Ready to host!'}

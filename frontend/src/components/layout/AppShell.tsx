@@ -6,7 +6,7 @@ export default function AppShell() {
   return (
     <div className="flex min-h-full flex-col">
       <Navigation />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-4 pb-24 md:pt-8 md:pb-8">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-4 pb-32 sm:pb-24 md:pt-8 md:pb-8">
         <Outlet />
       </main>
     </div>

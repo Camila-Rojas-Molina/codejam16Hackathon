@@ -1,10 +1,13 @@
 // Structured, mode-aware input for compatibility scoring. Deliberately simple: each dimension is
 // a 0–1 score, dimensions with missing data are skipped, and the total is a weighted average.
 // A smarter matcher can replace compatibility() later without changing what we collect.
+import { DIMENSION_WEIGHTS, UNINFERABLE_QUALITIES, rankWeight } from './matchingConfig'
 import { activeTrip, dogsOf } from './model'
 import type {
   AccessibilityNeed,
   BudgetLevel,
+  CompanionQuality,
+  DecisionStyle,
   DogSociability,
   DogStance,
   ExploreMode,
@@ -30,6 +33,11 @@ export type MatchProfile = {
   city?: string
   /** Dog stance, plus how an owner's dog gets on with other dogs. */
   dogs?: MatchDogs
+  /** What they value most in an exploring buddy, most important first. */
+  qualities?: CompanionQuality[]
+  decisions?: DecisionStyle | null
+  /** Conversation topics (a sign of curiosity). */
+  topicsCount?: number
 }
 
 export type MatchDogs = { stance: DogStance | null; goodWithDogs?: DogSociability | null }
@@ -49,6 +57,9 @@ export function toMatchProfile(record: ProfileRecord | null): MatchProfile | nul
     languages: u.languages.preferred.length > 0 ? u.languages.preferred : u.languages.spoken,
     accessibilityNeeds: u.accessibility.needs,
     dogs: { stance: dogsOf(u).stance, goodWithDogs: dogsOf(u).dog.goodWithDogs },
+    qualities: u.companion.qualities,
+    decisions: u.personality.decisions,
+    topicsCount: u.companion.topics.length,
   }
   if (record.activeMode === 'tourist') {
     const trip = activeTrip(record)
@@ -65,17 +76,9 @@ export function toMatchProfile(record: ProfileRecord | null): MatchProfile | nul
   return base
 }
 
-export type Dimension = 'interests' | 'languages' | 'energy' | 'planning' | 'pace' | 'budget' | 'group'
+export type Dimension = keyof typeof DIMENSION_WEIGHTS
 
-const WEIGHTS: Record<Dimension, number> = {
-  interests: 3,
-  languages: 3,
-  pace: 2,
-  budget: 2,
-  energy: 1,
-  planning: 1,
-  group: 1,
-}
+const WEIGHTS: Record<Dimension, number> = DIMENSION_WEIGHTS
 
 const ORDER = {
   energy: ['introvert', 'ambivert', 'extrovert'],
@@ -109,6 +112,54 @@ function groupScore(a?: GroupSize | null, b?: GroupSize | null) {
   if (!a || !b) return undefined
   if (a === 'no-preference' || b === 'no-preference' || a === b) return 1
   return a === 'large-group' || b === 'large-group' ? 0.25 : 0.5
+}
+
+// ---- Ranked "great exploring buddy" qualities ------------------------------------------------------
+
+type Signal = (p: Partial<MatchProfile>) => number | undefined
+const pick = <K extends string>(v: K | null | undefined, table: Record<K, number>) => (v ? table[v] : undefined)
+const avg = (...xs: (number | undefined)[]) => {
+  const v = xs.filter((x): x is number => x !== undefined)
+  return v.length ? v.reduce((a, b) => a + b, 0) / v.length : undefined
+}
+
+/**
+ * How strongly someone shows each quality, read from their own answers (0–1, or undefined when
+ * their answers don't say). Deliberately simple and explainable.
+ */
+export const QUALITY_SIGNALS: Record<CompanionQuality, Signal> = {
+  chatty: (p) => pick(p.energy, { extrovert: 1, ambivert: 0.6, introvert: 0.2 }),
+  calm: (p) => avg(pick(p.energy, { introvert: 1, ambivert: 0.7, extrovert: 0.35 }), pick(p.pace, { relaxed: 1, balanced: 0.7, spontaneous: 0.4, fast: 0.2 })),
+  'good-listener': (p) => avg(pick(p.energy, { introvert: 0.9, ambivert: 0.7, extrovert: 0.5 }), pick(p.decisions, { together: 0.9, follow: 0.8, lead: 0.5 })),
+  punctual: (p) => pick(p.planning, { planner: 1, 'loose-plan': 0.6, spontaneous: 0.2 }),
+  adventurous: (p) => avg(pick(p.pace, { fast: 1, spontaneous: 0.9, balanced: 0.5, relaxed: 0.25 }), pick(p.planning, { spontaneous: 1, 'loose-plan': 0.7, planner: 0.35 })),
+  easygoing: (p) =>
+    avg(pick(p.planning, { 'loose-plan': 0.9, spontaneous: 0.8, planner: 0.4 }), pick(p.groupSize, { 'no-preference': 1, 'small-group': 0.7, 'one-on-one': 0.6, 'large-group': 0.7 }), pick(p.decisions, { together: 0.9, follow: 0.9, lead: 0.5 })),
+  curious: (p) => (p.interests?.length || p.topicsCount ? Math.min(1, ((p.interests?.length ?? 0) + (p.topicsCount ?? 0)) / 8) : undefined),
+  // Locals know their city; otherwise we can't tell.
+  knowledgeable: (p) => (p.mode === 'local' ? 1 : undefined),
+  funny: () => undefined,
+  respectful: () => undefined,
+}
+
+/**
+ * How well `other` fits what `seeker` ranked as most important, 0–1 (undefined if nothing to go on).
+ * Each ranked quality counts with its rank weight (matchingConfig.ts), so the first choice dominates.
+ * Qualities we can't infer count only when the other person values them too (a shared value).
+ */
+export function qualityFit(seeker: Partial<MatchProfile>, other: Partial<MatchProfile>): number | undefined {
+  const ranked = seeker.qualities ?? []
+  let sum = 0
+  let weight = 0
+  ranked.forEach((q, i) => {
+    let score = QUALITY_SIGNALS[q]?.(other)
+    if (score === undefined && UNINFERABLE_QUALITIES.includes(q) && other.qualities?.includes(q)) score = 1
+    if (score === undefined) return
+    const w = rankWeight(i)
+    sum += score * w
+    weight += w
+  })
+  return weight > 0 ? sum / weight : undefined
 }
 
 // ---- Dogs: a hard filter plus a bonus on top of the weighted dimensions above --------------------
@@ -158,6 +209,8 @@ export function compatibility(a: Partial<MatchProfile>, b: Partial<MatchProfile>
     pace: ordinal(ORDER.pace, a.pace, b.pace),
     budget: ordinal(ORDER.budget, a.budget, b.budget),
     group: groupScore(a.groupSize, b.groupSize),
+    // Both directions: how well each fits what the other ranked highest.
+    qualities: avg(qualityFit(a, b), qualityFit(b, a)),
   }
 
   let sum = 0

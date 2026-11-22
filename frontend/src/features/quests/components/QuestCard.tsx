@@ -1,14 +1,18 @@
 // One challenge: what to do, progress, reward and its state (in progress → claim → done).
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { PointsIcon } from '../../../components/illustrations/Icons'
+import Icon from '../../../components/icons/Icon'
+import { Mascot } from '../../../components/illustrations/Mascot'
 import Badge from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
-import { buttonClasses } from '../../../components/ui/buttonStyles'
+import { ErrorText } from '../../../components/ui/Fields'
+import { arrowLabel, arrowRowClasses } from '../../../components/ui/buttonStyles'
+import { ArrowCell } from '../../../components/ui/Button'
 import { cn } from '../../../lib/cn'
 import { useStore } from '../../../store/useStore'
 import { CADENCE_LABELS, type ChallengeState } from '../challenges'
 
+/** Ruled progress bar: saffron fill over hatching, with the count printed on top. */
 export function QuestProgress({ state, className }: { state: ChallengeState; className?: string }) {
   const { progress, challenge: c } = state
   const pct = Math.round((progress / c.target) * 100)
@@ -21,11 +25,13 @@ export function QuestProgress({ state, className }: { state: ChallengeState; cla
         aria-valuemax={c.target}
         aria-valuenow={progress}
         aria-valuetext={`${progress} of ${c.target}`}
-        className="relative h-6 overflow-hidden rounded-full border-[3px] border-navy bg-paper"
+        className="hatch-soft relative h-7 overflow-hidden border-2 border-ink bg-sheet"
       >
-        <div className="h-full bg-sun transition-[width] duration-500 ease-spring" style={{ width: `${pct}%` }} />
-        <span className="absolute inset-0 grid place-items-center font-type text-xs text-ink">
-          {progress} / {c.target}
+        <div className="absolute inset-y-0 left-0 bg-saffron transition-[width] duration-500 ease-spring" style={{ width: `${pct}%` }} />
+        <span className="absolute inset-0 grid place-items-center">
+          <span className="bg-sheet px-2 text-xs font-bold tabular-nums">
+            {progress} / {c.target}
+          </span>
         </span>
       </div>
     </div>
@@ -34,8 +40,8 @@ export function QuestProgress({ state, className }: { state: ChallengeState; cla
 
 export function RewardChip({ points, className }: { points: number; className?: string }) {
   return (
-    <span className={cn('inline-flex items-center gap-1 rounded-full border-2 border-navy bg-sun py-0.5 pr-2.5 pl-1 font-type text-xs text-ink', className)}>
-      <PointsIcon className="size-5" />+{points}
+    <span className={cn('inline-flex items-center gap-1 border-2 border-ink bg-saffron py-0.5 pr-2 pl-1 text-xs font-bold text-ink', className)}>
+      <Icon name="coin" accent="sheet" className="size-5" />+{points}
       <span className="sr-only"> points</span>
     </span>
   )
@@ -45,6 +51,7 @@ export default function QuestCard({ state, highlight = false }: { state: Challen
   const { claimChallenge } = useStore()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [justClaimed, setJustClaimed] = useState(false)
   const { challenge: c, status } = state
 
   async function claim() {
@@ -52,6 +59,7 @@ export default function QuestCard({ state, highlight = false }: { state: Challen
     setError(null)
     try {
       await claimChallenge(c.id)
+      setJustClaimed(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Couldn’t claim that. Try again.')
     } finally {
@@ -64,52 +72,61 @@ export default function QuestCard({ state, highlight = false }: { state: Challen
       id={`quest-${c.id}`}
       aria-labelledby={`quest-${c.id}-title`}
       className={cn(
-        'relative scroll-mt-24 rounded-[1.5rem_1.3rem_1.6rem_1.2rem] border-[3px] border-navy p-4 transition-shadow sm:p-5',
-        status === 'claimed' ? 'bg-bubble-light' : 'bg-paper',
-        highlight && 'shadow-[0_0_0_4px_var(--color-sun),0_0_0_7px_var(--color-navy)]',
+        'relative scroll-mt-24 border-2 border-ink',
+        status === 'claimed' ? 'bg-teal-soft' : 'sheet-grain',
+        highlight && 'shadow-block outline-4 outline-offset-4 outline-saffron',
       )}
     >
-      <div className="flex items-start gap-3 sm:gap-4">
-        <span className="grid size-14 shrink-0 place-items-center rounded-2xl border-[3px] border-navy bg-bubble text-3xl" aria-hidden>
-          {c.icon}
+      <div className="flex items-stretch border-b-2 border-ink">
+        <span className="grid w-20 shrink-0 place-items-center border-r-2 border-ink bg-saffron-soft" aria-hidden>
+          <Icon name={c.icon} className="size-10" />
         </span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 p-4">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge tone="navy">{CADENCE_LABELS[c.cadence]}</Badge>
+            <Badge tone="ink">{CADENCE_LABELS[c.cadence]}</Badge>
             <RewardChip points={c.reward} />
           </div>
-          <h3 id={`quest-${c.id}-title`} className="mt-2 text-2xl leading-tight">
+          <h3 id={`quest-${c.id}-title`} className="mt-2 text-2xl">
             {c.title}
           </h3>
-          <p className="mt-1">{c.description}</p>
-          <p className="mt-2 text-sm font-semibold">🎯 {c.objective}</p>
         </div>
         {status === 'claimed' && (
-          <Badge stamp className="absolute top-3 right-3 bg-paper">
-            Done ✓
+          <Badge stamp className="absolute top-3 right-3 bg-sheet">
+            Done
           </Badge>
         )}
       </div>
 
-      <QuestProgress state={state} className="mt-4" />
+      <div className="space-y-4 p-4">
+        <p>{c.description}</p>
+        <p className="flex items-center gap-2 text-sm font-bold">
+          <Icon name="flag" accent="sienna" className="size-5" />
+          {c.objective}
+        </p>
+        <QuestProgress state={state} />
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        {status === 'ready' && (
-          <Button variant="sun" onClick={claim} disabled={busy}>
-            {busy ? 'Claiming…' : `Claim ${c.reward} points`}
-          </Button>
-        )}
-        {status === 'in-progress' && (
-          <Link to={c.action.to} className={buttonClasses({ variant: 'secondary' })}>
-            {c.action.label} →
-          </Link>
-        )}
-        {status === 'claimed' && <p className="font-semibold">+{c.reward} points earned. Nice!</p>}
-        {error && (
-          <p role="alert" className="text-sm font-semibold">
-            {error}
-          </p>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {status === 'ready' && (
+            <Button onClick={claim} disabled={busy} icon="coin">
+              {busy ? 'Claiming…' : `Claim ${c.reward} points`}
+            </Button>
+          )}
+          {status === 'in-progress' && (
+            <Link to={c.action.to} className={arrowRowClasses}>
+              <span className={arrowLabel}>{c.action.label}</span>
+              <ArrowCell />
+            </Link>
+          )}
+          {status === 'claimed' && (
+            <p className="flex items-center gap-3 font-bold">
+              {justClaimed && <Mascot pose="leap" className="h-20" label="Migo leaping for joy" />}
+              <span className="flex items-center gap-2">
+                <Icon name="check" accent="none" strokeWidth={2.6} className="size-5 text-teal-deep" />+{c.reward} points earned. Nice!
+              </span>
+            </p>
+          )}
+        </div>
+        <ErrorText>{error}</ErrorText>
       </div>
     </article>
   )

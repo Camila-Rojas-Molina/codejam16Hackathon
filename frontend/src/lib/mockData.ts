@@ -87,33 +87,34 @@ export const HUNTS: Hunt[] = [
   },
 ]
 
-// The pool partners are matched from: 4 tourists, 4 locals.
+// The pool partners are matched from: 4 tourists, 4 locals. `traits` are the answers matching reads
+// (social energy, planning, pace, group size, decisions and ranked buddy qualities).
 export const USERS: User[] = [
-  { id: 'u-ana', name: 'Ana', avatar: '🦜', role: 'tourist', funFact: 'Flew in from Lisbon and has never seen snow.', interests: ['food', 'architecture', 'photography'], languages: ['Portuguese', 'English', 'Spanish'] },
-  { id: 'u-kenji', name: 'Kenji', avatar: '🐙', role: 'tourist', funFact: 'Collects a postcard from every city he visits.', interests: ['art', 'history', 'technology'], languages: ['Japanese', 'English'] },
-  { id: 'u-priya', name: 'Priya', avatar: '🦒', role: 'tourist', funFact: 'Is here for one weekend and wants to see everything.', interests: ['nightlife', 'music', 'shopping', 'food'], languages: ['English', 'Hindi'] },
-  { id: 'u-marc', name: 'Marc', avatar: '🦫', role: 'local', funFact: 'Knows every bagel shop in Mile End by smell.', interests: ['food', 'traditions', 'music'], languages: ['French', 'English'] },
-  { id: 'u-sophie', name: 'Sophie', avatar: '🐿️', role: 'local', funFact: 'Has climbed Mount Royal more than 200 times.', interests: ['nature', 'photography', 'sports'], languages: ['French', 'English', 'Spanish'] },
-  { id: 'u-yasmine', name: 'Yasmine', avatar: '🦔', role: 'local', funFact: 'Plays drums at the Tam-Tams most Sundays.', interests: ['music', 'art', 'nightlife', 'history'], languages: ['Arabic', 'French', 'English'] },
+  { id: 'u-ana', name: 'Ana', avatar: 'flower', role: 'tourist', funFact: 'Flew in from Lisbon and has never seen snow.', interests: ['food', 'architecture', 'photography'], languages: ['Portuguese', 'English', 'Spanish'], traits: { energy: 'extrovert', planning: 'loose-plan', pace: 'balanced', groupSize: 'one-on-one', decisions: 'together', qualities: ['funny', 'curious', 'easygoing'] } },
+  { id: 'u-kenji', name: 'Kenji', avatar: 'star', role: 'tourist', funFact: 'Collects a postcard from every city he visits.', interests: ['art', 'history', 'technology'], languages: ['Japanese', 'English'], traits: { energy: 'introvert', planning: 'planner', pace: 'relaxed', groupSize: 'one-on-one', decisions: 'follow', qualities: ['knowledgeable', 'punctual', 'calm'] } },
+  { id: 'u-priya', name: 'Priya', avatar: 'disco-ball', role: 'tourist', funFact: 'Is here for one weekend and wants to see everything.', interests: ['nightlife', 'music', 'shopping', 'food'], languages: ['English', 'Hindi'], traits: { energy: 'extrovert', planning: 'spontaneous', pace: 'fast', groupSize: 'large-group', decisions: 'lead', qualities: ['adventurous', 'chatty', 'funny'] } },
+  { id: 'u-marc', name: 'Marc', avatar: 'banana', role: 'local', funFact: 'Knows every bagel shop in Mile End by smell.', interests: ['food', 'traditions', 'music'], languages: ['French', 'English'], traits: { energy: 'ambivert', planning: 'loose-plan', pace: 'balanced', groupSize: 'small-group', decisions: 'lead', qualities: ['funny', 'curious', 'respectful'] } },
+  { id: 'u-sophie', name: 'Sophie', avatar: 'sunburst', role: 'local', funFact: 'Has climbed Mount Royal more than 200 times.', interests: ['nature', 'photography', 'sports'], languages: ['French', 'English', 'Spanish'], traits: { energy: 'introvert', planning: 'planner', pace: 'relaxed', groupSize: 'one-on-one', decisions: 'together', qualities: ['calm', 'good-listener', 'punctual'] } },
+  { id: 'u-yasmine', name: 'Yasmine', avatar: 'heart', role: 'local', funFact: 'Plays drums at the Tam-Tams most Sundays.', interests: ['music', 'art', 'nightlife', 'history'], languages: ['Arabic', 'French', 'English'], traits: { energy: 'extrovert', planning: 'spontaneous', pace: 'fast', groupSize: 'small-group', decisions: 'lead', qualities: ['adventurous', 'chatty', 'curious'] } },
   // Dog owners (one per mode), so the dog filter, bonus and "Dog duo" badge can be demoed.
   {
     id: 'u-liam',
     name: 'Liam',
-    avatar: '🐶',
+    avatar: 'running-heart',
     role: 'tourist',
     funFact: 'Road-tripped from Boston with his dog in the back seat.',
     interests: ['nature', 'food', 'photography'],
-    languages: ['English'],
+    languages: ['English'], traits: { energy: 'ambivert', planning: 'loose-plan', pace: 'balanced', groupSize: 'one-on-one', decisions: 'together', qualities: ['easygoing', 'adventurous'] },
     dogs: { stance: 'has-dog', dog: { name: 'Maple', size: 'large', vibe: 'playful', goodWithDogs: 'yes', photo: null } },
   },
   {
     id: 'u-chloe',
     name: 'Chloé',
-    avatar: '🐕',
+    avatar: 'strawberry',
     role: 'local',
     funFact: 'Knows every dog park between the Plateau and the Old Port.',
     interests: ['nature', 'history', 'food'],
-    languages: ['French', 'English'],
+    languages: ['French', 'English'], traits: { energy: 'introvert', planning: 'planner', pace: 'relaxed', groupSize: 'small-group', decisions: 'together', qualities: ['calm', 'punctual', 'knowledgeable'] },
     dogs: { stance: 'has-dog', dog: { name: 'Poutine', size: 'small', vibe: 'chill', goodWithDogs: 'yes', photo: null } },
   },
 ]
@@ -125,35 +126,35 @@ export const TEAMS: Team[] = [
   {
     id: 't-bagels',
     name: 'Bagel Bandits',
-    members: [person('m1', 'Léa', '🥯', 'local'), person('m2', 'Tom', '🐻', 'tourist')],
+    members: [person('m1', 'Léa', 'banana', 'local'), person('m2', 'Tom', 'star', 'tourist')],
     points: 820,
     completedHuntIds: ['roddick-gates', 'three-bares', 'kondiaronk', 'place-des-arts'],
   },
   {
     id: 't-poutine',
     name: 'Poutine Patrol',
-    members: [person('m3', 'Olivier', '🦆', 'local'), person('m4', 'Mia', '🐨', 'tourist')],
+    members: [person('m3', 'Olivier', 'sunburst', 'local'), person('m4', 'Mia', 'heart', 'tourist')],
     points: 610,
     completedHuntIds: ['leonard-cohen-mural', 'cartier-monument', 'roddick-gates'],
   },
   {
     id: 't-mountain',
     name: 'Mountain Goats',
-    members: [person('m5', 'Camille', '🐐', 'local'), person('m6', 'Diego', '🦩', 'tourist')],
+    members: [person('m5', 'Camille', 'flower', 'local'), person('m6', 'Diego', 'strawberry', 'tourist')],
     points: 455,
     completedHuntIds: ['kondiaronk', 'three-bares'],
   },
   {
     id: 't-metro',
     name: 'Metro Gnomes',
-    members: [person('m7', 'Nadia', '🍄', 'local'), person('m8', 'Sam', '🐢', 'tourist')],
+    members: [person('m7', 'Nadia', 'disco-ball', 'local'), person('m8', 'Sam', 'running-heart', 'tourist')],
     points: 240,
     completedHuntIds: ['place-des-arts'],
   },
   {
     id: 't-maple',
     name: 'Maple Mavericks',
-    members: [person('m9', 'Félix', '🍁', 'local'), person('m10', 'Hana', '🐧', 'tourist')],
+    members: [person('m9', 'Félix', 'star', 'local'), person('m10', 'Hana', 'sunburst', 'tourist')],
     points: 130,
     completedHuntIds: ['roddick-gates'],
   },

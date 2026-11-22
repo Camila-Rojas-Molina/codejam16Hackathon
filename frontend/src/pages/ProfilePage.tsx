@@ -1,27 +1,28 @@
 // PROFILE: one person, one account, two ways to explore.
-//   Overview       your card, home city, cities discovered, both modes, points
+//   Overview       your card, cities discovered (atlas), both modes, points
 //   My answers     the questionnaire (each answer editable)
 //   Avatar & Migo  name, avatar and Migo's wardrobe
+// Every profile box is straight-edged: ruled cells, square corners.
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router'
-import { PointsIcon } from '../components/illustrations/Icons'
+import Icon, { type IconName } from '../components/icons/Icon'
 import { Mascot } from '../components/illustrations/Mascot'
 import Avatar from '../components/ui/Avatar'
 import Badge from '../components/ui/Badge'
-import Button from '../components/ui/Button'
-import { buttonClasses } from '../components/ui/buttonStyles'
+import Button, { ArrowCell } from '../components/ui/Button'
+import { arrowLabel, arrowRowClasses, buttonClasses } from '../components/ui/buttonStyles'
 import Card from '../components/ui/Card'
 import { TextField } from '../components/ui/Fields'
 import { NAME_MAX_LENGTH, modeMeta } from '../features/onboarding/options'
+import CityCollection from '../features/places/components/CityCollection'
 import SummaryList from '../features/profile/components/SummaryList'
 import UniversalSummary from '../features/profile/components/UniversalSummary'
 import { localItems, stepIdOf } from '../features/profile/contextSummary'
 import { hasUniversalProfile, type SetupNavState } from '../features/profile/flow'
-import { activeTrip, formatTripDates, pointsBalance, pointsEarned } from '../features/profile/model'
+import { activeTrip, cityLabel, formatTripDates, pointsBalance, pointsEarned } from '../features/profile/model'
 import {
   ACCESSIBILITY_OPTIONS,
   ATTRACTION_OPTIONS,
-  CITY_MAX_LENGTH,
   ENERGY_OPTIONS,
   INTEREST_OPTIONS,
   PACE_OPTIONS,
@@ -31,27 +32,34 @@ import {
 } from '../features/profile/options'
 import { publicProfile } from '../features/profile/privacy'
 import { SHOP_ITEMS, SLOT_LABELS } from '../features/rewards/shop'
-import { AVATAR_LIST } from '../lib/avatars'
+import { AVATAR_LIST, resolveAvatar } from '../lib/avatars'
 import { cn } from '../lib/cn'
 import { useStore } from '../store/useStore'
 
 type Tab = 'overview' | 'answers' | 'style'
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'answers', label: 'My answers' },
-  { id: 'style', label: 'Avatar & Migo' },
+const TABS: { id: Tab; label: string; icon: IconName }[] = [
+  { id: 'overview', label: 'Overview', icon: 'id' },
+  { id: 'answers', label: 'My answers', icon: 'clipboard' },
+  { id: 'style', label: 'Avatar & Migo', icon: 'smile' },
 ]
 
-const sectionTitle = 'mb-3 text-3xl text-navy'
+function SectionTitle({ id, icon, children }: { id: string; icon: IconName; children: string }) {
+  return (
+    <h2 id={id} className="mb-4 flex items-center gap-3 text-3xl">
+      <Icon name={icon} className="size-8" />
+      {children}
+    </h2>
+  )
+}
 
 function ChipList({ items, label }: { items: string[]; label: string }) {
   if (items.length === 0) return null
   return (
     <div>
-      <p className="font-type text-xs tracking-wider uppercase">{label}</p>
-      <ul className="mt-1 flex flex-wrap gap-1.5">
+      <p className="eyebrow">{label}</p>
+      <ul className="mt-1.5 flex flex-wrap gap-1.5">
         {items.map((x) => (
-          <li key={x} className="rounded-full border-2 border-navy bg-paper px-2.5 py-0.5 text-sm">
+          <li key={x} className="border-2 border-ink bg-sheet px-2 py-0.5 text-sm font-semibold">
             {x}
           </li>
         ))}
@@ -62,88 +70,8 @@ function ChipList({ items, label }: { items: string[]; label: string }) {
 
 // ---- Overview -----------------------------------------------------------------------------------
 
-function CitiesDiscovered() {
-  const { profile, addCity, removeCity } = useStore()
-  const [name, setName] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState('')
-  const cities = profile?.universal?.citiesDiscovered ?? []
-
-  async function add(e: FormEvent) {
-    e.preventDefault()
-    const clean = name.trim()
-    if (!clean || busy) return
-    setBusy(true)
-    try {
-      const before = cities.length
-      const next = await addCity(clean)
-      setMessage((next.universal?.citiesDiscovered.length ?? 0) > before ? `Added ${clean}.` : `${clean} is already in your passport.`)
-      setName('')
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Couldn’t add that city.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <section id="cities" aria-labelledby="cities-title" className="scroll-mt-24">
-      <h2 id="cities-title" className={sectionTitle}>
-        Cities discovered
-      </h2>
-      <Card className="space-y-4">
-        {cities.length === 0 ? (
-          <p>No stamps yet. Add the cities you’ve explored. They show on your profile and help matches find common ground.</p>
-        ) : (
-          <ul className="flex flex-wrap gap-3" aria-label="Your cities">
-            {cities.map((c, i) => (
-              <li
-                key={c.id}
-                className={cn(
-                  'group flex items-center gap-2 rounded-xl border-4 border-double border-navy bg-bubble-light py-1.5 pr-1.5 pl-3',
-                  i % 3 === 0 ? '-rotate-2' : i % 3 === 1 ? 'rotate-1' : '-rotate-1',
-                )}
-              >
-                <span className="font-display text-lg uppercase">{c.name}</span>
-                {c.source !== 'manual' && <span className="text-xs">({c.source === 'trip' ? 'from a trip' : 'from a quest'})</span>}
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await removeCity(c.id)
-                    setMessage(`Removed ${c.name}.`)
-                  }}
-                  aria-label={`Remove ${c.name}`}
-                  className="grid size-8 place-items-center rounded-full font-type text-lg hover:bg-paper"
-                >
-                  <span aria-hidden>×</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <form onSubmit={add} className="flex items-end gap-2">
-          <TextField
-            label="Add a city"
-            value={name}
-            onChange={setName}
-            maxLength={CITY_MAX_LENGTH}
-            placeholder="e.g. Lisbon"
-            className="min-w-0 flex-1"
-          />
-          <Button type="submit" disabled={!name.trim() || busy} className="min-h-14">
-            Add
-          </Button>
-        </form>
-        <p className="text-sm" aria-live="polite">
-          {message || '👀 Public. Shown on your profile card.'}
-        </p>
-      </Card>
-    </section>
-  )
-}
-
 function Overview() {
-  const { account, profile, clearLocal } = useStore()
+  const { account, profile, addCity, removeCity, clearLocal } = useStore()
   const navigate = useNavigate()
   const [confirmLocal, setConfirmLocal] = useState(false)
   if (!account || !profile?.universal) return null
@@ -155,12 +83,14 @@ function Overview() {
   const pace = optionFor(PACE_OPTIONS, view.pace)
   const editLocal: SetupNavState = { activate: false, returnTo: '/profile' }
   const ledger = [...profile.rewards.ledger].reverse().slice(0, 5)
+  const mode = view.mode ? modeMeta(view.mode) : null
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-12">
       {!universal.homeCity.trim() && (
-        <Card tone="sun" className="flex flex-wrap items-center gap-3">
-          <p className="flex-1">🏠 Where do you live? Add your home city so visitors can find you as a local.</p>
+        <Card tone="saffron-soft" className="flex flex-wrap items-center gap-4">
+          <Icon name="house" className="size-8" />
+          <p className="flex-1 font-semibold">Where do you live? Add your home city so visitors can find you as a local.</p>
           <Link to="/onboarding/questions?step=home" className={buttonClasses()}>
             Add home city
           </Link>
@@ -169,78 +99,112 @@ function Overview() {
 
       {/* What other people see */}
       <section aria-labelledby="public-card">
-        <h2 id="public-card" className={sectionTitle}>
+        <SectionTitle id="public-card" icon="eye">
           What matches see
-        </h2>
-        <Card tone="bubble-light" tilt="right" className="space-y-3">
-          <div className="flex items-center gap-3">
-            <Avatar avatar={view.avatar} size="lg" />
-            <div className="min-w-0">
+        </SectionTitle>
+        <article className="sheet-grain border-2 border-ink shadow-block">
+          <header className="flex items-stretch border-b-2 border-ink">
+            <div className="grid w-28 shrink-0 place-items-center border-r-2 border-ink bg-saffron-soft p-2">
+              <Avatar avatar={view.avatar} size="lg" className="border-0 bg-transparent" />
+            </div>
+            <div className="min-w-0 flex-1 p-4">
               <p className="truncate font-display text-3xl uppercase">{view.name}</p>
-              <div className="flex flex-wrap gap-1.5">
-                {view.mode && <Badge tone="navy">{`${modeMeta(view.mode).emoji} ${modeMeta(view.mode).title} mode`}</Badge>}
-                {view.homeCity && <Badge tone="outline">🏠 {view.homeCity}</Badge>}
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {mode && (
+                  <Badge tone={view.mode === 'local' ? 'teal' : 'saffron'} icon={mode.icon}>
+                    {mode.title} mode
+                  </Badge>
+                )}
+                {view.homeCity && (
+                  <Badge tone="outline" icon="house">
+                    {view.homeCity}
+                  </Badge>
+                )}
               </div>
             </div>
+          </header>
+          <div className="space-y-4 p-5">
+            {view.tourist && (
+              <p className="flex items-center gap-2 font-semibold">
+                <Icon name="plane" className="size-5" />
+                Visiting {view.tourist.destination}
+                {view.tourist.when && ` · ${view.tourist.when}`}
+              </p>
+            )}
+            {view.local && (
+              <p className="flex items-center gap-2 font-semibold">
+                <Icon name="pin" accent="teal" className="size-5" />
+                Local in {view.local.homeCity}
+                {view.local.knownAreas.length > 0 && ` · knows ${view.local.knownAreas.join(', ')}`}
+              </p>
+            )}
+            {(energy || pace) && (
+              <p className="flex flex-wrap items-center gap-x-4 gap-y-1 font-semibold">
+                {energy && (
+                  <span className="inline-flex items-center gap-1.5">
+                    {energy.icon && <Icon name={energy.icon} className="size-5" />}
+                    {energy.label}
+                  </span>
+                )}
+                {pace && (
+                  <span className="inline-flex items-center gap-1.5">
+                    {pace.icon && <Icon name={pace.icon} className="size-5" />}
+                    {pace.label} pace
+                  </span>
+                )}
+              </p>
+            )}
+            <ChipList label="Into" items={labelsFor(INTEREST_OPTIONS, view.tourist?.interests ?? view.interests)} />
+            <ChipList label="Loves visiting" items={labelsFor(ATTRACTION_OPTIONS, view.tourist?.activities ?? view.attractions)} />
+            <ChipList label="Chat topics" items={labelsFor(TOPIC_OPTIONS, view.topics)} />
+            <ChipList label="Speaks" items={view.languages} />
+            <ChipList label="Cities discovered" items={view.citiesDiscovered} />
+            {view.dogStance && (
+              <p className="flex items-center gap-2 font-semibold">
+                <Icon name={view.dog ? 'dog' : 'paw'} className="size-5" />
+                {view.dog ? `Exploring with ${view.dog.name || 'their dog'}` : view.dogStance === 'loves-dogs' ? 'Loves dogs' : 'Fine with dogs'}
+              </p>
+            )}
+            {view.idealAdventureNote && <p className="font-serif text-xl leading-snug">“{view.idealAdventureNote}”</p>}
+            {view.accessibilityNeeds && <ChipList label="Access needs (shared)" items={labelsFor(ACCESSIBILITY_OPTIONS, view.accessibilityNeeds)} />}
           </div>
-          {view.tourist && (
-            <p>
-              Visiting <strong>{view.tourist.destination}</strong>
-              {view.tourist.when && ` · ${view.tourist.when}`}
-            </p>
-          )}
-          {view.local && (
-            <p>
-              Local in <strong>{view.local.homeCity}</strong>
-              {view.local.knownAreas.length > 0 && ` · knows ${view.local.knownAreas.join(', ')}`}
-            </p>
-          )}
-          {(energy || pace) && (
-            <p>
-              {energy && `${energy.emoji} ${energy.label}`}
-              {energy && pace && ' · '}
-              {pace && `${pace.emoji} ${pace.label} pace`}
-            </p>
-          )}
-          <ChipList label="Into" items={labelsFor(INTEREST_OPTIONS, view.tourist?.interests ?? view.interests)} />
-          <ChipList label="Loves visiting" items={labelsFor(ATTRACTION_OPTIONS, view.tourist?.activities ?? view.attractions)} />
-          <ChipList label="Chat topics" items={labelsFor(TOPIC_OPTIONS, view.topics)} />
-          <ChipList label="Speaks" items={view.languages} />
-          <ChipList label="Cities discovered" items={view.citiesDiscovered} />
-          {view.dogStance && (
-            <p>
-              {view.dog ? `🐕 Exploring with ${view.dog.name || 'their dog'}` : view.dogStance === 'loves-dogs' ? '🦴 Loves dogs' : '🐾 Fine with dogs'}
-            </p>
-          )}
-          {view.idealAdventureNote && <p className="italic">“{view.idealAdventureNote}”</p>}
-          {view.accessibilityNeeds && <ChipList label="Access needs (shared)" items={labelsFor(ACCESSIBILITY_OPTIONS, view.accessibilityNeeds)} />}
-          <p className="border-t-[3px] border-dashed border-navy pt-2 text-sm">
-            🔒 Budget, food, transport, your neighbourhood and private notes are never shown.
+          <p className="flex items-center gap-2 border-t-2 border-ink px-5 py-3 text-sm">
+            <Icon name="lock" className="size-4" />
+            Budget, food, transport, your neighbourhood and private notes are never shown.
           </p>
-        </Card>
+        </article>
       </section>
 
-      <CitiesDiscovered />
+      {/* Cities discovered */}
+      <section id="cities" aria-labelledby="cities-title" className="scroll-mt-24">
+        <SectionTitle id="cities-title" icon="globe">
+          Cities discovered
+        </SectionTitle>
+        <p className="mb-4">Pin every city you’ve explored. They’re public, so matches can find common ground.</p>
+        <CityCollection cities={universal.citiesDiscovered} onAdd={addCity} onRemove={removeCity} />
+      </section>
 
       {/* Both modes */}
       <section aria-labelledby="modes-title">
-        <h2 id="modes-title" className={sectionTitle}>
+        <SectionTitle id="modes-title" icon="shuffle">
           Your two modes
-        </h2>
-        <div className="grid gap-4 xl:grid-cols-2">
-          <Card tone="sun" tilt="left">
-            <p className="font-type text-xs tracking-wider uppercase">🧳 Tourist mode</p>
+        </SectionTitle>
+        <div className="grid border-2 border-ink xl:grid-cols-2">
+          <div className="bg-saffron-soft p-5">
+            <p className="eyebrow flex items-center gap-2">
+              <Icon name="suitcase" className="size-5" />
+              Tourist mode
+            </p>
             {trip ? (
               <>
-                <p className="mt-1 font-display text-3xl break-words uppercase">{trip.destination}</p>
-                <p>{formatTripDates(trip)}</p>
+                <p className="mt-2 font-display text-3xl break-words uppercase">{trip.destination}</p>
+                <p className="font-semibold">{formatTripDates(trip)}</p>
                 <p className="mt-2 text-sm">
-                  {profile.tourist.trips.length} {profile.tourist.trips.length === 1 ? 'trip' : 'trips'} saved, each with its own
-                  budget, interests and needs.
+                  {profile.tourist.trips.length} {profile.tourist.trips.length === 1 ? 'trip' : 'trips'} saved, each with its own budget, interests and needs.
                 </p>
               </>
             ) : (
-              <p className="mt-1">No trips yet. Visiting somewhere? Set one up and MIGO will find you a local.</p>
+              <p className="mt-2">No trips yet. Visiting somewhere? Set one up and MIGO will find you a local.</p>
             )}
             <div className="mt-4 flex flex-wrap gap-2">
               {trip && (
@@ -249,26 +213,31 @@ function Overview() {
                 </Link>
               )}
               <Link to="/mode/tourist" state={{ activate: false, returnTo: '/profile' } satisfies SetupNavState} className={buttonClasses()}>
+                <Icon name="plus" accent="none" strokeWidth={2.4} className="size-4" />
                 {trip ? 'Plan another' : 'Plan a trip'}
               </Link>
             </div>
-          </Card>
+          </div>
 
-          <Card tone="bubble" tilt="right">
-            <p className="font-type text-xs tracking-wider uppercase">📍 Local mode</p>
+          <div className="border-t-2 border-ink bg-teal-soft p-5 xl:border-t-0 xl:border-l-2">
+            <p className="eyebrow flex items-center gap-2">
+              <Icon name="pin" accent="teal" className="size-5" />
+              Local mode
+            </p>
             {profile.local ? (
               <>
-                <p className="mt-1 font-display text-3xl break-words uppercase">{profile.local.homeCity}</p>
-                <p className="text-sm">Hosting visitors · {profile.local.knownAreas.join(', ') || 'all over town'}</p>
+                <p className="mt-2 font-display text-3xl break-words uppercase">{profile.local.homeCity}</p>
+                <p className="text-sm font-semibold">Hosting visitors · {profile.local.knownAreas.join(', ') || 'all over town'}</p>
               </>
             ) : (
-              <p className="mt-1">At home? Set up Local mode to show visitors your favourite spots. It takes about a minute.</p>
+              <p className="mt-2">At home? Set up Local mode to show visitors your favourite spots. It takes about a minute.</p>
             )}
             {confirmLocal ? (
-              <div className="mt-4 rounded-2xl border-[3px] border-dashed border-navy p-3" role="alertdialog" aria-label="Remove local profile?">
+              <div className="mt-4 border-2 border-dashed border-ink bg-sheet p-3" role="alertdialog" aria-label="Remove local profile?">
                 <p className="font-semibold">Remove your local profile? Your general profile and trips stay.</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button
+                    variant="danger"
                     onClick={async () => {
                       await clearLocal()
                       setConfirmLocal(false)
@@ -293,52 +262,52 @@ function Overview() {
                 )}
               </div>
             )}
-          </Card>
+          </div>
         </div>
         {profile.local && (
-          <SummaryList
-            className="mt-4"
-            title={`Hosting in ${profile.local.homeCity}`}
-            items={localItems(profile.local)}
-            onEdit={() => navigate('/mode/local', { state: editLocal })}
-          />
+          <SummaryList className="mt-6" title={`Hosting in ${profile.local.homeCity}`} items={localItems(profile.local)} onEdit={() => navigate('/mode/local', { state: editLocal })} />
         )}
       </section>
 
       {/* Points */}
       <section id="points" aria-labelledby="points-title" className="scroll-mt-24">
-        <h2 id="points-title" className={sectionTitle}>
+        <SectionTitle id="points-title" icon="coin">
           Points
-        </h2>
-        <Card className="space-y-3">
-          <div className="flex items-center gap-3">
-            <PointsIcon className="size-12" />
+        </SectionTitle>
+        <div className="sheet-grain border-2 border-ink">
+          <div className="flex items-center gap-4 border-b-2 border-ink bg-saffron p-5">
+            <Icon name="coin" accent="sheet" className="size-14" />
             <div>
-              <p className="font-display text-4xl leading-none">{pointsBalance(profile.rewards).toLocaleString()}</p>
-              <p className="text-sm">to spend · {pointsEarned(profile.rewards).toLocaleString()} earned in total</p>
+              <p className="font-display text-5xl leading-none">{pointsBalance(profile.rewards).toLocaleString()}</p>
+              <p className="text-sm font-semibold">to spend · {pointsEarned(profile.rewards).toLocaleString()} earned in total</p>
             </div>
           </div>
           {ledger.length > 0 ? (
-            <ul className="divide-y-2 divide-dashed divide-navy/40" aria-label="Recent points activity">
-              {ledger.map((e) => (
-                <li key={e.id} className="flex justify-between gap-3 py-2">
-                  <span>{e.reason === 'purchase' ? `🛍️ Bought ${e.label}` : `🏅 ${e.label}`}</span>
-                  <span className="font-type tabular-nums">{e.amount > 0 ? `+${e.amount}` : e.amount}</span>
+            <ul aria-label="Recent points activity">
+              {ledger.map((e, i) => (
+                <li key={e.id} className={cn('flex items-center justify-between gap-3 px-5 py-3', i > 0 && 'border-t-2 border-ink')}>
+                  <span className="flex items-center gap-2 font-semibold">
+                    <Icon name={e.reason === 'purchase' ? 'bag' : 'trophy'} className="size-5" />
+                    {e.reason === 'purchase' ? `Bought ${e.label}` : e.label}
+                  </span>
+                  <span className="font-display text-lg tabular-nums">{e.amount > 0 ? `+${e.amount}` : e.amount}</span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p>Complete quests to earn your first points.</p>
+            <p className="px-5 py-4">Complete quests to earn your first points.</p>
           )}
-          <div className="flex flex-wrap gap-2">
-            <Link to="/quests" className={buttonClasses({ variant: 'secondary' })}>
-              Quests
+          <div className="grid grid-cols-2 border-t-2 border-ink">
+            <Link to="/quests" className={cn(arrowRowClasses, 'border-0 border-r-2')}>
+              <span className={arrowLabel}>Quests</span>
+              <ArrowCell />
             </Link>
-            <Link to="/shop" className={buttonClasses({ variant: 'secondary' })}>
-              Shop
+            <Link to="/shop" className={cn(arrowRowClasses, 'border-0')}>
+              <span className={arrowLabel}>Shop</span>
+              <ArrowCell />
             </Link>
           </div>
-        </Card>
+        </div>
       </section>
     </div>
   )
@@ -349,13 +318,14 @@ function Overview() {
 function Style() {
   const { account, profile, updateAccount, setEquipped } = useStore()
   const [name, setName] = useState(account?.name ?? '')
-  const [avatar, setAvatar] = useState(account?.avatar ?? '')
+  // Old emoji avatars show as the default picture, so one is always selected.
+  const [avatar, setAvatar] = useState<string>(resolveAvatar(account?.avatar))
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   if (!account || !profile) return null
 
   const owned = SHOP_ITEMS.filter((i) => profile.rewards.owned.includes(i.id))
-  const dirty = name.trim() !== account.name || avatar !== account.avatar
+  const dirty = name.trim() !== account.name || avatar !== resolveAvatar(account.avatar)
 
   async function save(e: FormEvent) {
     e.preventDefault()
@@ -372,25 +342,28 @@ function Style() {
   }
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-12">
       <section aria-labelledby="you-title">
-        <h2 id="you-title" className={sectionTitle}>
+        <SectionTitle id="you-title" icon="user">
           Name & avatar
-        </h2>
+        </SectionTitle>
         <Card>
-          <form onSubmit={save} className="space-y-5">
+          <form onSubmit={save} className="space-y-6">
             <TextField label="Name" value={name} onChange={setName} maxLength={NAME_MAX_LENGTH} autoComplete="given-name" />
             <fieldset>
-              <legend className="mb-2 font-type text-sm tracking-wider uppercase">Avatar</legend>
-              <div className="grid grid-cols-4 gap-3 sm:grid-cols-8 lg:grid-cols-4 xl:grid-cols-8">
+              <legend className="eyebrow mb-2">Avatar</legend>
+              <div className="grid grid-cols-4 border-t-2 border-l-2 border-ink sm:grid-cols-8 lg:grid-cols-4 xl:grid-cols-8">
                 {AVATAR_LIST.map((a) => (
                   <label
                     key={a.id}
-                    className="relative grid cursor-pointer place-items-center rounded-2xl border-[3px] border-transparent p-1 transition-transform active:scale-95 has-checked:border-navy has-checked:bg-sun has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-navy"
+                    className="relative grid cursor-pointer place-items-center border-r-2 border-b-2 border-ink p-1.5 transition-colors hover:bg-saffron-soft has-checked:bg-saffron has-focus-visible:outline-3 has-focus-visible:-outline-offset-[6px] has-focus-visible:outline-ink"
                   >
-                    <input type="radio" name="avatar" value={a.id} checked={avatar === a.id} onChange={() => setAvatar(a.id)} className="sr-only" />
+                    <input type="radio" name="avatar" value={a.id} checked={avatar === a.id} onChange={() => setAvatar(a.id)} className="peer sr-only" />
                     <img src={a.src} alt="" className="aspect-square w-full object-contain" />
                     <span className="sr-only">{a.alt}</span>
+                    <span className="absolute top-1 right-1 hidden size-5 place-items-center bg-ink text-saffron peer-checked:grid" aria-hidden>
+                      <Icon name="check" accent="none" strokeWidth={3.2} className="size-4" />
+                    </span>
                   </label>
                 ))}
               </div>
@@ -399,34 +372,36 @@ function Style() {
               <Button type="submit" disabled={!dirty || !name.trim() || busy}>
                 {busy ? 'Saving…' : 'Save'}
               </Button>
-              <p aria-live="polite">{message}</p>
+              <p aria-live="polite" className="font-semibold">
+                {message}
+              </p>
             </div>
           </form>
         </Card>
       </section>
 
       <section aria-labelledby="wardrobe-title">
-        <h2 id="wardrobe-title" className={sectionTitle}>
+        <SectionTitle id="wardrobe-title" icon="shop">
           Migo’s wardrobe
-        </h2>
-        <Card className="grid gap-5 sm:grid-cols-[auto_1fr]">
-          <div className="grid place-items-center rounded-[1.4rem] border-[3px] border-navy bg-bubble-light p-4">
-            <Mascot mood="cheer" accessories={profile.rewards.equipped} className="h-40" label="Migo wearing your accessories" />
+        </SectionTitle>
+        <div className="sheet-grain grid border-2 border-ink sm:grid-cols-[auto_1fr]">
+          <div className="grid place-items-center border-b-2 border-ink bg-teal-soft p-6 sm:border-r-2 sm:border-b-0">
+            <Mascot pose="cheer" accessories={profile.rewards.equipped} className="h-52" label="Migo wearing your accessories" />
           </div>
-          <div>
+          <div className="p-5">
             {owned.length === 0 ? (
               <p>Migo’s wardrobe is empty. Earn points from quests and pick something out in the shop.</p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="border-t-2 border-l-2 border-ink">
                 {owned.map((item) => {
                   const wearing = profile.rewards.equipped[item.slot] === item.id
                   return (
-                    <li key={item.id} className="flex items-center gap-3 rounded-2xl border-2 border-navy/40 px-3 py-2">
+                    <li key={item.id} className={cn('flex items-center gap-3 border-r-2 border-b-2 border-ink px-3 py-2', wearing && 'bg-saffron-soft')}>
                       <span className="min-w-0 flex-1">
-                        <span className="block font-semibold">{item.name}</span>
-                        <span className="text-xs">{SLOT_LABELS[item.slot]}</span>
+                        <span className="block font-bold">{item.name}</span>
+                        <span className="text-xs font-semibold">{SLOT_LABELS[item.slot]}</span>
                       </span>
-                      <Button size="md" variant={wearing ? 'secondary' : 'sun'} onClick={() => setEquipped(item.id, !wearing)} aria-label={`${wearing ? 'Take off' : 'Put on'} ${item.name}`}>
+                      <Button size="sm" variant={wearing ? 'secondary' : 'primary'} onClick={() => setEquipped(item.id, !wearing)} aria-label={`${wearing ? 'Take off' : 'Put on'} ${item.name}`}>
                         {wearing ? 'Take off' : 'Put on'}
                       </Button>
                     </li>
@@ -434,11 +409,12 @@ function Style() {
                 })}
               </ul>
             )}
-            <Link to="/shop" className={buttonClasses({ className: 'mt-4' })}>
-              Visit the shop
+            <Link to="/shop" className={cn(arrowRowClasses, 'mt-4 w-full')}>
+              <span className={arrowLabel}>Visit the shop</span>
+              <ArrowCell />
             </Link>
           </div>
-        </Card>
+        </div>
       </section>
     </div>
   )
@@ -452,7 +428,7 @@ export default function ProfilePage() {
   const { hash, state } = useLocation()
   const [params] = useSearchParams()
   const saved = (state as { saved?: string } | null)?.saved
-  const tab: Tab = (TABS.find((t) => t.id === params.get('tab'))?.id ?? 'overview') as Tab
+  const tab: Tab = TABS.find((t) => t.id === params.get('tab'))?.id ?? 'overview'
 
   useEffect(() => {
     if (hash) document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' })
@@ -461,50 +437,77 @@ export default function ProfilePage() {
   if (!account) return <Navigate to="/onboarding" replace />
   if (!profile || !hasUniversalProfile(profile) || !profile.universal) return <Navigate to="/onboarding/questions" replace />
 
+  const cities = profile.universal.citiesDiscovered
+
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
-      <header className="flex items-center gap-4">
-        <Avatar avatar={account.avatar} size="xl" />
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-4xl text-navy sm:text-5xl">{account.name}</h1>
-          <p className="mt-1 flex flex-wrap gap-x-3">
-            {profile.universal.homeCity && <span>🏠 {profile.universal.homeCity}</span>}
-            <span>🗺️ {profile.universal.citiesDiscovered.length} cities</span>
-            <span>⭐ {pointsBalance(profile.rewards).toLocaleString()} points</span>
+    <div className="mx-auto w-full max-w-4xl space-y-8">
+      <header className="sheet-grain flex items-stretch border-2 border-ink">
+        <div className="grid shrink-0 place-items-center border-r-2 border-ink bg-saffron-soft p-3">
+          <Avatar avatar={account.avatar} size="xl" className="border-0 bg-transparent" />
+        </div>
+        <div className="min-w-0 flex-1 p-5">
+          <p className="eyebrow">Your profile</p>
+          <h1 className="mt-1 truncate text-4xl sm:text-5xl">{account.name}</h1>
+          <p className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm font-semibold">
+            {profile.universal.homeCity && (
+              <span className="inline-flex items-center gap-1.5">
+                <Icon name="house" className="size-5" />
+                {profile.universal.homeCity}
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1.5" title={cities.map(cityLabel).join(' · ')}>
+              <Icon name="globe" className="size-5" />
+              {cities.length} {cities.length === 1 ? 'city' : 'cities'}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Icon name="coin" className="size-5" />
+              {pointsBalance(profile.rewards).toLocaleString()} points
+            </span>
           </p>
         </div>
-        <Mascot mood="wave" accessories={profile.rewards.equipped} className="hidden h-28 sm:block" />
+        <div className="relative hidden w-40 shrink-0 place-items-center overflow-hidden border-l-2 border-ink bg-teal-soft sm:grid">
+          <Mascot pose="cheer" accessories={profile.rewards.equipped} className="h-32" />
+        </div>
       </header>
 
       {saved && (
-        <p className="rounded-2xl border-[3px] border-navy bg-sun px-4 py-2 text-ink" role="status">
-          ✓ {saved}
+        <p className="flex items-center gap-2 border-2 border-ink bg-teal-soft px-4 py-2 font-semibold" role="status">
+          <Icon name="check" accent="none" strokeWidth={2.6} className="size-5" />
+          {saved}
         </p>
       )}
 
-      <nav aria-label="Profile sections" className="flex gap-1.5 overflow-x-auto rounded-full border-[3px] border-navy bg-paper p-1.5">
-        {TABS.map((t) => (
-          <Link
-            key={t.id}
-            to={t.id === 'overview' ? '/profile' : `/profile?tab=${t.id}`}
-            aria-current={tab === t.id ? 'page' : undefined}
-            className={cn(
-              'flex min-h-12 flex-1 items-center justify-center rounded-full border-[3px] px-3 font-type text-xs tracking-wider whitespace-nowrap uppercase transition-transform active:scale-95 sm:text-sm',
-              tab === t.id ? 'border-navy bg-sun text-ink' : 'border-transparent text-navy hover:bg-bubble-light',
-            )}
-          >
-            {t.label}
-          </Link>
-        ))}
-      </nav>
+      <div>
+        <nav aria-label="Profile sections" className="sheet-grain grid grid-cols-3 border-2 border-b-0 border-ink">
+          {TABS.map((t, i) => (
+            <Link
+              key={t.id}
+              to={t.id === 'overview' ? '/profile' : `/profile?tab=${t.id}`}
+              aria-current={tab === t.id ? 'page' : undefined}
+              className={cn(
+                'flex min-h-12 min-w-0 items-center justify-center gap-2 px-2 py-1.5 text-center text-[0.7rem] leading-tight font-bold tracking-[0.08em] uppercase transition-colors sm:px-3 sm:text-sm sm:tracking-[0.1em]',
+                i > 0 && 'border-l-2 border-ink',
+                tab === t.id ? 'bg-saffron' : 'hover:bg-saffron-soft',
+              )}
+            >
+              <Icon name={t.icon} accent={tab === t.id ? 'sheet' : 'saffron'} className="hidden size-5 sm:block" />
+              {t.label}
+            </Link>
+          ))}
+        </nav>
+        <div className="hatch-band border-x-2 border-ink" aria-hidden />
+      </div>
 
       {tab === 'overview' && <Overview />}
       {tab === 'answers' && (
-        <section aria-labelledby="answers-title" className="space-y-4">
-          <h2 id="answers-title" className={sectionTitle}>
+        <section aria-labelledby="answers-title" className="space-y-5">
+          <SectionTitle id="answers-title" icon="clipboard">
             You, everywhere
-          </h2>
-          <p>Your personality and general preferences. Both modes use these as defaults, and switching modes never changes them.</p>
+          </SectionTitle>
+          <div className="flex items-end gap-4">
+            <p className="flex-1">Your personality and general preferences. Both modes use these as defaults, and switching modes never changes them.</p>
+            <Mascot pose="read" className="hidden h-24 sm:block" />
+          </div>
           <UniversalSummary universal={profile.universal} onEdit={(stepId) => navigate(`/onboarding/questions?step=${stepIdOf(stepId)}`)} />
         </section>
       )}

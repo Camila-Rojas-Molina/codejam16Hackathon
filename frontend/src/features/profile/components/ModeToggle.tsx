@@ -1,6 +1,7 @@
 // Compact Tourist ⇄ Local toggle for the dashboard status bar. Same behaviour as ModeSwitch:
 // switches instantly if the mode is set up, otherwise opens its short setup first.
 import { Link, useLocation } from 'react-router'
+import Icon from '../../../components/icons/Icon'
 import { cn } from '../../../lib/cn'
 import { useStore } from '../../../store/useStore'
 import { MODE_OPTIONS } from '../../onboarding/options'
@@ -19,12 +20,10 @@ export default function ModeToggle({ compact = false, showContext = false, class
   const { profile } = useStore()
   const { pathname } = useLocation()
   const { choose, pending, message, activeMode } = useModeSwitcher()
-  const trip = activeTrip(profile)
-
   return (
     <div className={className}>
-      <div role="group" aria-label="Exploring mode" className="flex gap-1 rounded-full border-[3px] border-navy bg-paper p-1">
-        {MODE_OPTIONS.map((m) => {
+      <div role="group" aria-label="Exploring mode" className="sheet-grain flex border-2 border-ink">
+        {MODE_OPTIONS.map((m, i) => {
           const active = activeMode === m.mode
           const ready = isModeReady(profile, m.mode)
           return (
@@ -37,42 +36,56 @@ export default function ModeToggle({ compact = false, showContext = false, class
               title={`${m.title} mode`}
               onClick={() => choose(m.mode, { returnTo: pathname })}
               className={cn(
-                'relative flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-full border-2 font-type text-xs tracking-wider uppercase transition-[transform,background-color] duration-150 active:scale-95',
-                compact ? 'min-w-11 px-2' : 'px-3',
-                active ? cn('border-navy', m.activeClass) : 'border-transparent text-navy hover:bg-bubble-light',
+                'relative flex min-h-11 flex-1 items-center justify-center gap-1.5 text-xs font-bold tracking-[0.1em] uppercase transition-colors',
+                i > 0 && 'border-l-2 border-ink',
+                compact ? 'min-w-12 px-2' : 'px-3',
+                active ? m.activeClass : 'text-ink hover:bg-saffron-soft',
               )}
             >
-              <span aria-hidden className="text-base leading-none">
-                {m.emoji}
-              </span>
+              <Icon name={m.icon} accent={m.accent} className="size-5" />
               {!compact && <span>{m.title}</span>}
               {!ready && !compact && <span className="sr-only">(needs a quick setup)</span>}
-              {!ready && <span className="absolute -top-1 -right-0.5 size-2.5 rounded-full border-2 border-navy bg-bubble-light" aria-hidden />}
+              {/* Not set up yet: a small sienna corner flag. */}
+              {!ready && <span className="absolute top-0 right-0 size-0 border-t-[10px] border-l-[10px] border-t-sienna border-l-transparent" aria-hidden />}
             </button>
           )
         })}
       </div>
-      {showContext && (
-        <p className="mt-1.5 truncate text-center text-xs">
-          {activeMode === 'tourist' && trip && (
-            <>
-              ✈️ Exploring <strong>{trip.destination}</strong> ·{' '}
-              <Link to="/trips" className="font-semibold underline underline-offset-2">
-                trips
-              </Link>
-            </>
-          )}
-          {activeMode === 'local' && profile?.local && (
-            <>
-              🏠 Hosting in <strong>{profile.local.homeCity}</strong>
-            </>
-          )}
-          {!activeMode && 'Pick a mode to start exploring'}
-        </p>
-      )}
+      {showContext && <ModeContext className="mt-2 justify-center" />}
       <p className="sr-only" aria-live="polite">
         {message}
       </p>
     </div>
+  )
+}
+
+/** One line saying what the current mode is pointed at (trip or home city), with a shortcut. */
+export function ModeContext({ className }: { className?: string }) {
+  const { profile } = useStore()
+  const activeMode = profile?.activeMode ?? null
+  const trip = activeTrip(profile)
+  return (
+    <p className={cn('flex min-w-0 items-center gap-1.5 text-xs font-semibold', className)}>
+      {activeMode === 'tourist' && trip && (
+        <>
+          <Icon name="plane" className="size-4" />
+          <span className="truncate">
+            Exploring <strong className="font-bold">{trip.destination}</strong>
+          </span>
+          <Link to="/trips" className="shrink-0 underline decoration-2 underline-offset-2">
+            Trips
+          </Link>
+        </>
+      )}
+      {activeMode === 'local' && profile?.local && (
+        <>
+          <Icon name="house" accent="teal" className="size-4" />
+          <span className="truncate">
+            Hosting in <strong className="font-bold">{profile.local.homeCity}</strong>
+          </span>
+        </>
+      )}
+      {!activeMode && 'Pick a mode to start exploring'}
+    </p>
   )
 }

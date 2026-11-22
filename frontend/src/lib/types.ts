@@ -1,5 +1,15 @@
 // Shared data types (PRD section 6). Screens import types from here, never from mockData.
-import type { DogDetails, DogStance, Interest } from '../features/profile/types'
+import type {
+  CompanionQuality,
+  DecisionStyle,
+  DogDetails,
+  DogStance,
+  GroupSize,
+  Interest,
+  Pace,
+  PlanningStyle,
+  SocialEnergy,
+} from '../features/profile/types'
 
 export type Role = 'tourist' | 'local'
 
@@ -15,6 +25,16 @@ export type User = {
   languages?: string[]
   /** A sample profile from the demo partner pool (not a real person yet). */
   demo?: boolean
+  /** Answers compatibility scoring reads (see features/profile/matching.ts). */
+  traits?: {
+    energy?: SocialEnergy
+    planning?: PlanningStyle
+    pace?: Pace
+    groupSize?: GroupSize
+    decisions?: DecisionStyle
+    /** Most important first. */
+    qualities?: CompanionQuality[]
+  }
   /** Public dog answer. `dog` only when stance is 'has-dog'. */
   dogs?: { stance: DogStance; dog?: DogDetails }
 }

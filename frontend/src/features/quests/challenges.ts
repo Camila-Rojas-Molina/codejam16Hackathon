@@ -3,6 +3,7 @@
 //
 // Kept deliberately small for now. To add one: give it a stable id, a cadence and a progress()
 // function over ChallengeContext. Rewards can be claimed once per period (see periodKey()).
+import type { IconName } from '../../components/icons/Icon'
 import { hasUniversalProfile } from '../profile/flow'
 import { isModeReady } from '../profile/model'
 import type { ProfileRecord } from '../profile/types'
@@ -30,7 +31,7 @@ export type ChallengeContext = {
 export type Challenge = {
   id: string
   cadence: Cadence
-  icon: string
+  icon: IconName
   title: string
   description: string
   /** "Complete 1 photo hunt" */
@@ -52,7 +53,7 @@ export const CHALLENGES: Challenge[] = [
   {
     id: 'daily-hunt',
     cadence: 'daily',
-    icon: '📸',
+    icon: 'camera',
     title: 'Hunt of the day',
     description: 'Team up with someone new and find a mystery spot together.',
     objective: 'Complete a photo hunt today',
@@ -64,7 +65,7 @@ export const CHALLENGES: Challenge[] = [
   {
     id: 'starter-profile',
     cadence: 'starter',
-    icon: '🪪',
+    icon: 'id',
     title: 'Hello, explorer',
     description: 'Tell MIGO who you are and how you like to explore.',
     objective: 'Complete your profile questionnaire',
@@ -76,7 +77,7 @@ export const CHALLENGES: Challenge[] = [
   {
     id: 'starter-two-modes',
     cadence: 'starter',
-    icon: '🔁',
+    icon: 'shuffle',
     title: 'Two ways to explore',
     description: 'Plan a trip as a tourist and set up your city as a local.',
     objective: 'Set up Tourist mode and Local mode',
@@ -88,7 +89,7 @@ export const CHALLENGES: Challenge[] = [
   {
     id: 'starter-passport',
     cadence: 'starter',
-    icon: '🗺️',
+    icon: 'stamp',
     title: 'Passport stamps',
     description: 'Show off where you’ve been. It helps matches find common ground.',
     objective: 'Add 3 cities you’ve discovered',

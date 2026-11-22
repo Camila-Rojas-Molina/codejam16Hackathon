@@ -1,4 +1,5 @@
 // Pure helpers for the profile model: blank values, defaults, validation, normalising stored data.
+import type { PlacePick } from '../places/types'
 import type {
   Budget,
   DiscoveredCity,
@@ -235,9 +236,18 @@ function normBudget(v: unknown): Budget {
 function normCity(v: unknown): DiscoveredCity | null {
   if (!isObj(v) || typeof v.name !== 'string' || !v.name.trim()) return null
   const source = v.source === 'trip' || v.source === 'quest' ? v.source : 'manual'
+  const lat = numOrNull(v.lat)
+  const lng = numOrNull(v.lng)
+  const pinned = lat !== null && lng !== null && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
   return {
     id: typeof v.id === 'string' ? v.id : `city-${v.name.trim().toLowerCase()}`,
     name: v.name.trim(),
+    country: str(v.country),
+    countryCode: str(v.countryCode),
+    region: typeof v.region === 'string' && v.region ? v.region : undefined,
+    lat: pinned ? lat : null,
+    lng: pinned ? lng : null,
+    placeId: typeof v.placeId === 'string' && v.placeId ? v.placeId : null,
     source,
     refId: typeof v.refId === 'string' ? v.refId : undefined,
     addedAt: numOrNull(v.addedAt) ?? Date.now(),
@@ -372,22 +382,49 @@ export function normalizeRecord(v: unknown, accountId: string): ProfileRecord {
 
 // ---- Cities & points --------------------------------------------------------------------------
 
-export const cityKey = (name: string) => name.trim().replace(/\s+/g, ' ').toLowerCase()
+/** Compare city names ignoring case, spacing and accents ("Reykjavik" = "Reykjavík"). */
+export const cityKey = (name: string) =>
+  name
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
 
-/** Adds a city unless it's already there (case-insensitive). Returns the same list if nothing changed. */
-export function addCity(cities: DiscoveredCity[], name: string, source: DiscoveredCity['source'] = 'manual', refId?: string) {
-  const clean = name.trim().replace(/\s+/g, ' ')
-  if (!clean || cities.some((c) => cityKey(c.name) === cityKey(clean))) return cities
-  const city: DiscoveredCity = { id: `city-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, name: clean, source, refId, addedAt: Date.now() }
+/** "Lisbon, Portugal" (or just the name for older entries without a country). */
+export const cityLabel = (c: Pick<DiscoveredCity, 'name' | 'country' | 'region'>) =>
+  [c.name, c.region, c.country].filter(Boolean).join(', ')
+
+/** True once a city is a confirmed real place with a pin. */
+export const isPinned = (c: DiscoveredCity) => c.placeId !== null && c.lat !== null && c.lng !== null
+
+/**
+ * Adds a real place unless it's already there (same place id, or same name and country). An older
+ * free-text entry with the same name is upgraded in place, keeping when it was first added.
+ * Returns the same list if nothing changed.
+ */
+export function addCity(cities: DiscoveredCity[], place: PlacePick, source: DiscoveredCity['source'] = 'manual', refId?: string): DiscoveredCity[] {
+  const same = (c: DiscoveredCity) =>
+    c.placeId === place.placeId || (cityKey(c.name) === cityKey(place.name) && c.countryCode.toUpperCase() === place.countryCode.toUpperCase())
+  if (cities.some(same)) return cities
+  const city: DiscoveredCity = {
+    id: `city-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    name: place.name,
+    country: place.country,
+    countryCode: place.countryCode.toUpperCase(),
+    region: place.region,
+    lat: place.lat,
+    lng: place.lng,
+    placeId: place.placeId,
+    source,
+    refId,
+    addedAt: Date.now(),
+  }
+  const legacy = cities.findIndex((c) => !isPinned(c) && cityKey(c.name) === cityKey(place.name))
+  if (legacy >= 0) return cities.map((c, i) => (i === legacy ? { ...city, id: c.id, addedAt: c.addedAt } : c))
   return [...cities, city]
 }
 
 export const pointsBalance = (rewards: Rewards | null | undefined) => (rewards?.ledger ?? []).reduce((sum, e) => sum + e.amount, 0)
 export const pointsEarned = (rewards: Rewards | null | undefined) =>
   (rewards?.ledger ?? []).filter((e) => e.amount > 0).reduce((sum, e) => sum + e.amount, 0)
-
-/** Rebuilds a city list from names (e.g. a tag input), keeping existing entries and their metadata. */
-export function citiesFromNames(existing: DiscoveredCity[], names: string[]): DiscoveredCity[] {
-  const kept = existing.filter((c) => names.some((n) => cityKey(n) === cityKey(c.name)))
-  return names.reduce((list, n) => addCity(list, n), kept)
-}

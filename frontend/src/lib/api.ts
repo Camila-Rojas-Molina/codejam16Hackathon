@@ -1,6 +1,8 @@
 // The only data-access module screens use. Hunts, partners and the leaderboard are still mock data
 // (backend.ts has the Supabase versions ready to swap in). Accounts and profiles save to Supabase
 // when it's configured, and to this device otherwise. Screens must not import mockData.
+import { DEFAULT_AVATAR } from './avatars'
+import type { PlacePick } from '../features/places/types'
 import { MESSAGE_MAX_LENGTH, type Message, type Person, type Thread } from '../features/chat/types'
 import { addCity, pointsBalance, tidyDogs } from '../features/profile/model'
 import { compatibility, type Compatibility, type MatchDogs, type MatchProfile } from '../features/profile/matching'
@@ -49,6 +51,15 @@ export async function getHunt(id: string): Promise<Hunt | null> {
 export const matchDogs = (u: Pick<User, 'dogs'>): MatchDogs | undefined =>
   u.dogs ? { stance: u.dogs.stance, goodWithDogs: u.dogs.dog?.goodWithDogs ?? null } : undefined
 
+/** A candidate's public answers in the shape compatibility() expects. */
+export const asMatchProfile = (u: User): Partial<MatchProfile> => ({
+  mode: u.role,
+  interests: u.interests,
+  languages: u.languages,
+  dogs: matchDogs(u),
+  ...u.traits,
+})
+
 /**
  * Picks a partner in the opposite mode. With a profile, candidates are ranked by compatibility
  * (shared interests, languages, …) and one of the best is chosen; without one it's random.
@@ -61,7 +72,7 @@ export async function findPartner(role: Role, me?: MatchProfile | null): Promise
   const sample = (u: User): User => ({ ...clone(u), demo: true })
   if (!me) return sample(pool[Math.floor(Math.random() * pool.length)])
   const scored = pool
-    .map((u) => ({ u, match: compatibility(me, { interests: u.interests, languages: u.languages, dogs: matchDogs(u) }) }))
+    .map((u) => ({ u, match: compatibility(me, asMatchProfile(u)) }))
     // Hard filter: "prefers no dogs" is never paired with a dog owner.
     .filter((s) => !s.match.blocked)
     .map((s) => ({ u: s.u, score: s.match.total ?? 0 }))
@@ -132,17 +143,22 @@ export async function saveUniversalProfile(accountId: string, universal: Univers
   }))
 }
 
-/** Adds a discovered city to the universal profile (ignored if it's already there). */
+/**
+ * Adds a real place (picked from city search) to the universal profile's discovered cities.
+ * Duplicates are ignored; an older free-text entry with the same name is upgraded to the real place.
+ * `source`/`refId` let quests and trips add cities automatically later.
+ */
 export async function addDiscoveredCity(
   accountId: string,
-  name: string,
+  place: PlacePick,
   source: DiscoveredCity['source'] = 'manual',
   refId?: string,
 ): Promise<ProfileRecord> {
   await delay(120)
+  if (!place.placeId || !Number.isFinite(place.lat) || !Number.isFinite(place.lng)) throw new Error('Pick a city from the suggestions.')
   return updateRecord(accountId, (r) => {
     if (!r.universal) throw new Error('Finish your profile first.')
-    return { ...r, universal: { ...r.universal, citiesDiscovered: addCity(r.universal.citiesDiscovered, name, source, refId) } }
+    return { ...r, universal: { ...r.universal, citiesDiscovered: addCity(r.universal.citiesDiscovered, place, source, refId) } }
   })
 }
 
@@ -274,7 +290,7 @@ export async function getPeopleToDiscover(me: MatchProfile | null): Promise<{ pe
   return USERS.filter((u) => !wanted || u.role === wanted)
     .map((u) => {
       const person: Person = { id: u.id, name: u.name, avatar: u.avatar, mode: u.role, interests: u.interests ?? [], languages: u.languages ?? [], funFact: u.funFact, demo: true }
-      return { person, match: compatibility(me ?? {}, { interests: person.interests, languages: person.languages, dogs: matchDogs(u) }) }
+      return { person, match: compatibility(me ?? {}, asMatchProfile(u)) }
     })
     // Same hard filter as matching: "prefers no dogs" never sees dog owners (and vice versa).
     .filter(({ match }) => !match.blocked)
@@ -306,7 +322,7 @@ function normThread(v: unknown): Thread | null {
     person: {
       id: p.id,
       name: p.name,
-      avatar: typeof p.avatar === 'string' ? p.avatar : '🙂',
+      avatar: typeof p.avatar === 'string' ? p.avatar : DEFAULT_AVATAR,
       mode: p.mode === 'local' ? 'local' : 'tourist',
       interests: Array.isArray(p.interests) ? p.interests : [],
       languages: Array.isArray(p.languages) ? p.languages : [],

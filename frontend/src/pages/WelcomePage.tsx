@@ -1,17 +1,22 @@
+// "/" Welcome: a printed masthead. Migo strolls in from one side and leaps on the other, the logo
+// and tagline sit in the middle cell, and three numbered cells explain the idea.
 import { Link, Navigate } from 'react-router'
+import Icon, { type IconName } from '../components/icons/Icon'
+import { Mascot } from '../components/illustrations/Mascot'
+import { Sparkle, Starburst } from '../components/illustrations/Stickers'
 import Screen from '../components/layout/Screen'
-import { Squiggle, Star } from '../components/illustrations/Stickers'
-import { buttonClasses } from '../components/ui/buttonStyles'
-import Card from '../components/ui/Card'
+import { ArrowCell } from '../components/ui/Button'
+import { arrowLabel, arrowRowClasses } from '../components/ui/buttonStyles'
 import Logo from '../components/ui/Logo'
 import { hasUniversalProfile } from '../features/profile/flow'
 import { TAGLINE } from '../lib/config'
+import { cn } from '../lib/cn'
 import { useStore } from '../store/useStore'
 
-const steps = [
-  { n: '1', text: 'Be a tourist or a local. Switch any time.' },
-  { n: '2', text: 'Get matched and a photo of a mystery spot.' },
-  { n: '3', text: 'Find it together. Phone away. Selfie. Points.' },
+const steps: { n: string; title: string; text: string; icon: IconName }[] = [
+  { n: '1', title: 'Pick a mode', text: 'Be a tourist or a local. Switch any time.', icon: 'suitcase' },
+  { n: '2', title: 'Get matched', text: 'Meet your teammate and a photo of a mystery spot.', icon: 'people2' },
+  { n: '3', title: 'Go find it', text: 'Explore together, phone away, then a selfie for points.', icon: 'camera' },
 ]
 
 export default function WelcomePage() {
@@ -21,33 +26,57 @@ export default function WelcomePage() {
   if (account) return <Navigate to={hasUniversalProfile(profile) ? '/map' : '/onboarding/questions'} replace />
 
   return (
-    <Screen className="justify-between gap-8">
-      <section className="relative pt-10 text-center">
-        <Star className="absolute top-0 left-2 size-12 -rotate-12 motion-safe:animate-wiggle" />
-        <Star className="absolute top-24 right-0 size-8 rotate-12" fill="var(--color-bubble-light)" />
-        <Logo className="mx-auto" />
-        <Squiggle className="mx-auto mt-3" />
-        {/* Navy on sky = 5.1:1 */}
-        <h1 className="mt-5 text-3xl leading-tight text-navy">{TAGLINE}</h1>
-      </section>
-
-      <Card tilt="left">
-        <h2 className="mb-3 text-xl">How it works</h2>
-        <ol className="space-y-2">
-          {steps.map((s) => (
-            <li key={s.n} className="flex items-center gap-3">
-              <span className="grid size-8 shrink-0 place-items-center rounded-full border-[3px] border-navy bg-sun font-type text-ink">
+    <Screen className="gap-6 md:max-w-4xl">
+      {/* Masthead */}
+      <section className="border-2 border-ink">
+        <div className="grid md:grid-cols-[1fr_2fr_1fr]">
+          <div className="relative hidden place-items-center overflow-hidden border-r-2 border-ink p-4 md:grid">
+            <Starburst tone="teal-soft" className="absolute size-44 motion-safe:animate-spin-slow" />
+            <Mascot pose="hello" className="relative h-40" label />
+          </div>
+          <div className="relative flex flex-col items-center justify-center gap-4 px-5 py-8 text-center">
+            <Sparkle className="absolute top-4 left-5 size-7 motion-safe:animate-wiggle" />
+            <Sparkle tone="teal-soft" className="absolute right-6 bottom-6 size-5" />
+            <p className="eyebrow">Travel · Friends · Hunts</p>
+            <Logo size="lg" className="mx-auto h-20 sm:h-24" />
+            <h1 className="title-retro font-display text-3xl leading-[1.05] tracking-wide sm:text-4xl">{TAGLINE}</h1>
+          </div>
+          <div className="relative hidden place-items-center overflow-hidden border-l-2 border-ink p-4 md:grid">
+            <Starburst tone="sienna" className="absolute size-44 opacity-90 motion-safe:animate-spin-slow" />
+            <Mascot pose="leap" className="relative h-40" label />
+          </div>
+        </div>
+        {/* Phones: the two mascots side by side under the title */}
+        <div className="relative flex items-end justify-center gap-6 overflow-hidden border-t-2 border-ink py-4 md:hidden">
+          <Starburst tone="teal-soft" className="absolute -left-10 size-40" />
+          <Starburst tone="sienna" className="absolute -right-10 size-40 opacity-90" />
+          <Mascot pose="hello" className="relative h-32" label />
+          <Mascot pose="leap" className="relative h-32" label />
+        </div>
+        <div className="hatch-band" aria-hidden />
+        <ol className="grid md:grid-cols-3">
+          {steps.map((s, i) => (
+            <li key={s.n} className={cn('flex gap-4 p-5', i > 0 && 'border-t-2 border-ink md:border-t-0 md:border-l-2')}>
+              <span className="font-display text-5xl leading-none text-sienna-deep" aria-hidden>
                 {s.n}
               </span>
-              <span>{s.text}</span>
+              <div>
+                <h2 className="flex items-center gap-2 text-xl">
+                  <Icon name={s.icon} className="size-6" />
+                  {s.title}
+                </h2>
+                <p className="mt-1 text-sm">{s.text}</p>
+              </div>
             </li>
           ))}
         </ol>
-      </Card>
+      </section>
 
-      <Link to="/onboarding" className={buttonClasses({ size: 'lg', fullWidth: true })}>
-        Start a quest
+      <Link to="/onboarding" className={cn(arrowRowClasses, 'min-h-16 w-full text-base')}>
+        <span className={arrowLabel}>Start exploring</span>
+        <ArrowCell />
       </Link>
+      <p className="text-center font-serif text-lg">One account, two ways to explore. It takes about four minutes to set up.</p>
     </Screen>
   )
 }

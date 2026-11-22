@@ -5,15 +5,19 @@
 import { useEffect, useEffectEvent, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { MascotSays } from '../components/illustrations/Mascot'
+import Icon from '../components/icons/Icon'
+import { Mascot } from '../components/illustrations/Mascot'
 import Avatar from '../components/ui/Avatar'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import { buttonClasses } from '../components/ui/buttonStyles'
 import Card from '../components/ui/Card'
+import { inputBase } from '../components/ui/Fields'
+import PageHeader from '../components/ui/PageHeader'
 import PersonCard from '../features/chat/components/PersonCard'
 import { MESSAGE_MAX_LENGTH, type Conversation, type Person } from '../features/chat/types'
 import { canMessage, useConversations } from '../features/chat/useConversations'
-import { roleLabel } from '../features/onboarding/options'
+import { modeMeta, roleLabel } from '../features/onboarding/options'
 import { toMatchProfile, type Compatibility } from '../features/profile/matching'
 import { getPeopleToDiscover } from '../lib/api'
 import { cn } from '../lib/cn'
@@ -27,16 +31,18 @@ function Tabs({ tab }: { tab: 'messages' | 'discover' }) {
   const unread = useConversations().reduce((n, c) => n + c.unread, 0)
   const cls = (on: boolean) =>
     cn(
-      'flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full border-[3px] font-type text-sm tracking-wider uppercase transition-transform active:scale-95',
-      on ? 'border-navy bg-sun text-ink' : 'border-transparent text-navy hover:bg-bubble-light',
+      'flex min-h-12 flex-1 items-center justify-center gap-2 text-sm font-bold tracking-[0.1em] uppercase transition-colors',
+      on ? 'bg-saffron' : 'hover:bg-saffron-soft',
     )
   return (
-    <nav aria-label="Chat sections" className="flex gap-1.5 rounded-full border-[3px] border-navy bg-paper p-1.5">
+    <nav aria-label="Chat sections" className="sheet-grain grid grid-cols-2 border-2 border-ink">
       <Link to="/chat" aria-current={tab === 'messages' ? 'page' : undefined} className={cls(tab === 'messages')}>
         Messages
-        {unread > 0 && <span className="rounded-full border-2 border-navy bg-red px-1.5 text-xs text-white">{unread}</span>}
+        <Icon name="chats" accent={tab === 'messages' ? 'sheet' : 'saffron'} className="size-5" />
+        {unread > 0 && <span className="border-2 border-ink bg-ink px-1.5 text-xs text-sheet">{unread}</span>}
       </Link>
-      <Link to="/chat?tab=discover" aria-current={tab === 'discover' ? 'page' : undefined} className={cls(tab === 'discover')}>
+      <Link to="/chat?tab=discover" aria-current={tab === 'discover' ? 'page' : undefined} className={cn(cls(tab === 'discover'), 'border-l-2 border-ink')}>
+        <Icon name="search" accent={tab === 'discover' ? 'sheet' : 'saffron'} className="size-5" />
         Discover
       </Link>
     </nav>
@@ -47,7 +53,7 @@ function ConversationList({ conversations }: { conversations: Conversation[] }) 
   if (conversations.length === 0) {
     return (
       <div className="space-y-4">
-        <MascotSays mood="think">
+        <MascotSays pose="ponder">
           <p>No chats yet! Team up with someone on a hunt and you’ll be able to message them here.</p>
         </MascotSays>
         <div className="flex flex-wrap gap-2">
@@ -62,30 +68,32 @@ function ConversationList({ conversations }: { conversations: Conversation[] }) 
     )
   }
   return (
-    <ul className="space-y-3">
+    <ul className="border-t-2 border-l-2 border-ink">
       {conversations.map(({ person, last, unread }) => (
         <li key={person.id}>
           <Link
             to={`/chat/${encodeURIComponent(person.id)}`}
             className={cn(
-              'flex items-center gap-3 rounded-[1.4rem_1.2rem_1.5rem_1.1rem] border-[3px] border-navy p-3 transition-transform active:scale-[0.98]',
-              unread > 0 ? 'bg-sun text-ink' : 'bg-paper hover:bg-bubble-light',
+              'flex items-center gap-3 border-r-2 border-b-2 border-ink p-3 transition-colors',
+              unread > 0 ? 'bg-saffron' : 'sheet-grain hover:bg-saffron-soft',
             )}
           >
-            <Avatar avatar={person.avatar} size="md" className="bg-bubble-light" />
+            <Avatar avatar={person.avatar} size="md" />
             <div className="min-w-0 flex-1">
               <p className="flex items-center gap-2">
-                <span className="truncate text-lg font-semibold">{person.name}</span>
-                <span className="text-xs">{roleLabel(person.mode)}</span>
+                <span className="truncate text-lg font-bold">{person.name}</span>
+                <Badge tone={person.mode === 'local' ? 'teal' : 'saffron'} icon={modeMeta(person.mode).icon}>
+                  {roleLabel(person.mode)}
+                </Badge>
               </p>
               <p className="truncate text-sm">
-                {last ? `${last.from === 'me' ? 'You: ' : ''}${last.text}` : 'Teammates! Say hi 👋'}
+                {last ? `${last.from === 'me' ? 'You: ' : ''}${last.text}` : 'Teammates! Say hi.'}
               </p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
-              {last && <span className="text-xs">{when(last.at)}</span>}
+              {last && <span className="text-xs font-semibold">{when(last.at)}</span>}
               {unread > 0 && (
-                <span className="rounded-full border-2 border-navy bg-red px-2 font-type text-xs text-white">
+                <span className="border-2 border-ink bg-ink px-2 text-xs font-bold text-sheet">
                   {unread}
                   <span className="sr-only"> unread</span>
                 </span>
@@ -130,7 +138,8 @@ function Discover() {
 
   return (
     <div className="space-y-4">
-      <Card tone="bubble-light">
+      <Card tone="teal-soft" className="flex items-end gap-4">
+        <div className="min-w-0 flex-1">
         <p>
           {mode === 'tourist'
             ? 'Locals who share your vibe, ranked by what you have in common.'
@@ -142,6 +151,8 @@ function Discover() {
           <strong>Preview:</strong> these are sample travellers from MIGO’s demo pool. Real people appear here once live
           discovery is switched on.
         </p>
+        </div>
+        <Mascot pose="curious" className="hidden h-24 shrink-0 sm:block" />
       </Card>
       {error && <p role="alert">{error}</p>}
       {!people && !error && <p aria-live="polite">Finding people…</p>}
@@ -182,8 +193,8 @@ function Thread({ personId }: { personId: string }) {
   if (!conversation) {
     return (
       <div className="space-y-4">
-        <Button variant="ghost" className="px-0" onClick={() => navigate('/chat')}>
-          ← Messages
+        <Button variant="ghost" icon="arrow-left" className="px-0" onClick={() => navigate('/chat')}>
+          Messages
         </Button>
         <Card>
           <h1 className="text-2xl">Can’t message them yet</h1>
@@ -213,45 +224,53 @@ function Thread({ personId }: { personId: string }) {
   return (
     <div className="flex flex-1 flex-col gap-4">
       <header className="flex items-center gap-3">
-        <Link to="/chat" aria-label="Back to messages" className="grid size-12 shrink-0 place-items-center rounded-full border-[3px] border-navy bg-paper font-type text-xl">
-          <span aria-hidden>←</span>
+        <Link to="/chat" aria-label="Back to messages" className="grid size-12 shrink-0 place-items-center border-2 border-ink bg-sheet transition-colors hover:bg-saffron">
+          <Icon name="arrow-left" accent="none" strokeWidth={2.4} className="size-5" />
         </Link>
-        <Avatar avatar={person.avatar} size="md" className="bg-bubble-light" />
+        <Avatar avatar={person.avatar} size="md" />
         <div className="min-w-0">
-          <h1 className="truncate text-3xl leading-none text-navy">{person.name}</h1>
-          <Badge tone="navy" className="mt-1">
+          <h1 className="truncate text-3xl leading-none">{person.name}</h1>
+          <Badge tone={person.mode === 'local' ? 'teal' : 'saffron'} icon={modeMeta(person.mode).icon} className="mt-1">
             {roleLabel(person.mode)}
           </Badge>
         </div>
       </header>
 
-      <p className="rounded-2xl border-2 border-dashed border-navy px-3 py-2 text-sm">
+      <p className="flex items-start gap-2 border-2 border-dashed border-ink px-3 py-2 text-sm">
+        <Icon name="info" accent="sheet" className="size-5" />
+        <span>
         {person.demo
           ? `${person.name} is a sample traveller from the demo pool, so they won’t reply. `
           : ''}
         Messages are saved on this device until MIGO messaging goes live.
+        </span>
       </p>
 
-      <ol aria-label={`Conversation with ${person.name}`} aria-live="polite" className="flex flex-1 flex-col gap-2 rounded-[1.5rem] border-[3px] border-navy bg-paper p-4">
-        {messages.length === 0 && <li className="m-auto text-center">You’re teammates! Say hi to {person.name} 👋</li>}
+      <ol aria-label={`Conversation with ${person.name}`} aria-live="polite" className="sheet-grain flex min-h-72 flex-1 flex-col gap-3 border-2 border-ink p-4">
+        {messages.length === 0 && (
+          <li className="m-auto flex flex-col items-center gap-2 text-center font-serif text-lg">
+            <Mascot pose="hello" className="h-24" />
+            You’re teammates! Say hi to {person.name}.
+          </li>
+        )}
         {messages.map((m) => (
           <li key={m.id} className={cn('flex', m.from === 'me' ? 'justify-end' : 'justify-start')}>
             <div
               className={cn(
-                'max-w-[80%] rounded-[1.2rem] border-[3px] border-navy px-3 py-2',
-                m.from === 'me' ? 'rounded-br-md bg-bubble text-navy' : 'rounded-bl-md bg-sun text-ink',
+                'max-w-[80%] rounded-[1.1rem] border-2 border-ink px-3.5 py-2',
+                m.from === 'me' ? 'rounded-br-none bg-teal-soft' : 'rounded-bl-none bg-saffron',
               )}
             >
               <p className="sr-only">{m.from === 'me' ? 'You' : person.name}:</p>
               <p className="break-words whitespace-pre-wrap">{m.text}</p>
-              <p className="mt-0.5 text-right text-xs">{when(m.at)}</p>
+              <p className="mt-0.5 text-right text-xs font-semibold">{when(m.at)}</p>
             </div>
           </li>
         ))}
         <li ref={endRef} aria-hidden />
       </ol>
 
-      <form onSubmit={send} className="sticky bottom-24 flex items-end gap-2 md:bottom-4">
+      <form onSubmit={send} className="sticky bottom-20 flex items-stretch md:bottom-4">
         <label htmlFor="composer" className="sr-only">
           Message {person.name}
         </label>
@@ -268,9 +287,10 @@ function Thread({ personId }: { personId: string }) {
             }
           }}
           placeholder={`Message ${person.name}…`}
-          className="min-h-14 flex-1 resize-none rounded-[1.4rem] border-[3px] border-navy bg-paper px-4 py-3 text-navy placeholder:text-navy/60"
+          className={cn(inputBase, 'min-h-14 flex-1 resize-none px-4 py-3')}
         />
-        <Button type="submit" size="md" disabled={!text.trim() || busy} className="min-h-14">
+        <Button type="submit" size="md" disabled={!text.trim() || busy} className="-ml-[2px] min-h-14">
+          <Icon name="plane" accent="sheet" className="size-5" />
           Send
         </Button>
       </form>
@@ -287,10 +307,7 @@ export default function ChatPage() {
   const tab = params.get('tab') === 'discover' ? 'discover' : 'messages'
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6">
-      <header>
-        <h1 className="text-4xl text-navy sm:text-5xl">Chat</h1>
-        <p className="mt-1">Find your kind of people, then plan something together.</p>
-      </header>
+      <PageHeader eyebrow="People" title="Chat" description="Find your kind of people, then plan something together." />
       <Tabs tab={tab} />
       {tab === 'messages' ? <ConversationList conversations={conversations} /> : <Discover />}
     </div>

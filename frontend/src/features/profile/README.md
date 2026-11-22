@@ -14,11 +14,32 @@ Nobody is permanently a tourist or a local. Every account has one universal prof
 | `Rewards` | points ledger (balance = sum), owned shop items, what Migo is wearing | quests and the shop |
 | `ProfileRecord` | all of the above, plus `activeMode`, `activeTripId`, `likes` and `universalCompletedAt` | |
 
-Home city and cities discovered belong to the universal profile, so no mode can overwrite them. Each
-discovered city records its `source` (`manual` today; `trip` or `quest` when they're added
-automatically later) and an optional `refId`, so automatic additions can be traced and de-duplicated.
+Home city and cities discovered belong to the universal profile, so no mode can overwrite them.
 Local mode's hosting city starts as the home city but is stored separately. Older saved profiles
 without these fields still load (`normalizeRecord`); the profile page nudges people to add a home city.
+
+### Cities discovered
+
+Each city is a real place picked from search, never free text:
+`{ id, name, country, countryCode, region?, lat, lng, placeId, source, refId?, addedAt }`.
+`placeId` is the GeoNames id (`geonames:2267057`), so the same city is never added twice
+(`addCity` in `model.ts` also treats the same name in the same country as a duplicate, ignoring
+case and accents). `source` is `manual` today; `trip` or `quest` when they're added automatically
+later, with `refId` pointing at the trip or quest.
+
+Cities typed in before city search existed are kept with `lat`/`lng`/`placeId` set to `null`. They
+show on the profile with a **Find it** button; picking the real place upgrades that entry in place.
+
+Search (`features/places/`): `citySearch.ts` looks in the bundled list first (`src/data/cities.json`,
+loaded only when the search opens, so it works offline), then adds smaller towns from Open-Meteo's
+free geocoding API (GeoNames ids, no key). If that's unreachable, the bundled list is all you see.
+`RetroAtlas.tsx` draws the pins on a pre-projected Natural Earth outline: plain SVG, no map library.
+
+### Ranked exploring-buddy qualities
+
+`companion.qualities` is an **ordered** list (most important first, up to 5), picked and ranked
+with `components/ui/RankedChoices.tsx` (tap to pick; drag the handle, or use the up and down
+buttons, to reorder). Old saved lists simply count in the order they were saved.
 
 - New trips and the local profile are **pre-filled by copying** from the universal profile. Editing a trip
   or the local profile never changes the universal profile, and editing the universal profile never
@@ -36,6 +57,16 @@ without these fields still load (`normalizeRecord`); the profile page nudges peo
 - `matching.ts`: `toMatchProfile()` gives the effective, mode-aware preferences (trip overrides the
   defaults), and `compatibility()` is a simple weighted score per dimension. It's deliberately basic:
   swap it out later without changing what we collect.
+- `matchingConfig.ts`: all the tunable numbers in one place.
+  - `DIMENSION_WEIGHTS`: how much each dimension counts (qualities count as much as interests and
+    languages).
+  - `QUALITY_RANK_WEIGHTS = [1, 0.55, 0.3, 0.15, 0.08]`: how much each ranked quality counts. The
+    first choice outweighs the second and third together.
+  - The qualities score asks "how well does this person fit what I ranked highest?" in both directions
+    and averages the two. How strongly someone shows a quality is read from their own answers
+    (`QUALITY_SIGNALS`: e.g. *Chatty* from social energy, *On time* from planning style, *Knows their
+    stuff* from Local mode). *Funny* and *Respects boundaries* can't be read from answers, so they
+    only count when both people ranked them. Unranked means the dimension is skipped, not scored as 0.
 
 ## Persistence
 
@@ -54,3 +85,5 @@ Everything goes through `src/lib/api.ts`, which saves accounts and profile recor
 | Mutual interest | Likes are saved; matching likes isn't checked yet (messaging opens for teammates) | `setLiked` in `api.ts`, `canMessage` in `features/chat/useConversations.ts` |
 | Server-checked points | Rewards/purchases are validated in `api.ts` but stored in the client-sent record | "Points, challenges & shop" in `api.ts` |
 | More challenges | One daily + three starter challenges | `features/quests/challenges.ts` |
+| Online city search | Works where Open-Meteo is reachable; otherwise only the bundled 7,680 larger cities show (the search says so) | `searchRemote` in `features/places/citySearch.ts` |
+| Cities added automatically | `source: 'trip' / 'quest'` and `refId` are in the model, but nothing adds cities yet | `addCity(cities, place, source, refId)` in `model.ts` |

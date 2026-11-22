@@ -1,4 +1,5 @@
 import PageHeader from '../components/ui/PageHeader'
+import { Mascot } from '../components/illustrations/Mascot'
 import Card from '../components/ui/Card'
 
 export default function TeamPage() {
@@ -6,7 +7,10 @@ export default function TeamPage() {
     <>
       <PageHeader title="Team" description="Your team, members and score." />
       <Card>
-        <p className="text-navy">Coming soon.</p>
+        <div className="flex items-center gap-4">
+          <Mascot pose="ponder" className="h-20" />
+          <p className="font-semibold">Coming soon.</p>
+        </div>
       </Card>
     </>
   )

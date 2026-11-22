@@ -5,7 +5,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router'
 import { MascotSays } from '../components/illustrations/Mascot'
 import StepScreen, { type ProgressSegment } from '../components/layout/StepScreen'
+import Icon from '../components/icons/Icon'
 import Card from '../components/ui/Card'
+import { VisibilityTag } from '../features/profile/components/SummaryList'
 import { SECTIONS, questionsIn, type QuestionStep, type SectionId } from '../features/onboarding/questionnaire'
 import UniversalSummary from '../features/profile/components/UniversalSummary'
 import { hasUniversalProfile } from '../features/profile/flow'
@@ -149,7 +151,7 @@ export default function QuestionnairePage() {
         onContinue={next}
         continueLabel={first ? 'Let’s go' : 'Keep going'}
         hero={
-          <MascotSays mood={first ? 'wave' : 'cheer'} className="mb-6">
+          <MascotSays pose={first ? 'hello' : 'glide'} className="mb-6">
             {first ? (
               <p>
                 Hi <strong>{account.name}</strong>! I’m Migo, your exploring sidekick. {section.intro}
@@ -161,15 +163,26 @@ export default function QuestionnairePage() {
         }
       >
         {first && (
-          <Card tone="bubble-light" tilt="right">
-            <h2 className="text-xl">One account, two ways to explore</h2>
+          <Card tone="saffron-soft" lifted>
+            <h2 className="text-2xl">One account, two ways to explore</h2>
             <p className="mt-2">
-              Be a <strong>🧳 Tourist</strong> when you’re visiting somewhere, and a <strong>📍 Local</strong> when
+              Be a{' '}
+              <strong className="inline-flex items-center gap-1 align-middle">
+                <Icon name="suitcase" className="size-5" />
+                Tourist
+              </strong>{' '}
+              when you’re visiting somewhere, and a{' '}
+              <strong className="inline-flex items-center gap-1 align-middle">
+                <Icon name="pin" accent="teal" className="size-5" />
+                Local
+              </strong>{' '}
+              when
               you’re showing someone your city. Switch whenever you like. These answers work for both.
             </p>
           </Card>
         )}
-        <p className="font-type text-sm tracking-wider uppercase">
+        <p className="eyebrow flex items-center gap-2">
+          <Icon name="clock" className="size-5" />
           {count} quick questions · {section.minutes}
         </p>
       </StepScreen>
@@ -187,20 +200,20 @@ export default function QuestionnairePage() {
         continueLabel={editing ? 'Save changes' : 'Save my profile'}
         hero={
           !editing && (
-            <MascotSays mood="cheer" className="mb-6">
+            <MascotSays pose="read" className="mb-6">
               <p>Looking good, {account.name}! This is what I’ll use to find your people.</p>
             </MascotSays>
           )
         }
       >
-        <Card tone="bubble-light">
-          <h2 className="text-xl">Who sees what</h2>
-          <ul className="mt-2 space-y-1">
+        <Card tone="teal-soft">
+          <h2 className="text-2xl">Who sees what</h2>
+          <ul className="mt-3 space-y-2">
             <li>
-              <strong>👀 Public</strong> answers appear on your profile card for people you match with.
+              <VisibilityTag visibility="public" /> answers appear on your profile card for people you match with.
             </li>
             <li>
-              <strong>🔒 Private</strong> answers only help MIGO choose places and partners. Nobody else sees them.
+              <VisibilityTag visibility="private" /> answers only help MIGO choose places and partners. Nobody else sees them.
             </li>
           </ul>
         </Card>

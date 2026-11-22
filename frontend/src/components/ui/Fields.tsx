@@ -1,11 +1,14 @@
-// Form fields in the MIGO style: paper fill, thick navy outline, typewriter labels.
+// Form fields in the MIGO print style: square ruled boxes on paper, small-caps labels, and plain
+// Montserrat for whatever you type (the most legible face in the system).
 import { useId, useState, type InputHTMLAttributes, type KeyboardEvent, type ReactNode } from 'react'
 import { cn } from '../../lib/cn'
+import Icon from '../icons/Icon'
 
-export const fieldLabel = 'mb-2 block font-type text-sm tracking-wider uppercase'
-const inputBase =
-  'w-full border-[3px] border-navy bg-paper text-navy placeholder:text-navy/60 ' +
-  'aria-invalid:border-red aria-invalid:border-dashed'
+export const fieldLabel = 'eyebrow mb-2 block'
+export const inputBase =
+  'w-full border-2 border-ink sheet-grain text-ink placeholder:text-ink/55 transition-shadow ' +
+  'focus:shadow-block-sm focus:outline-none focus-visible:outline-none ' +
+  'aria-invalid:border-sienna-deep aria-invalid:border-dashed'
 
 function Hint({ id, children }: { id: string; children?: ReactNode }) {
   if (!children) return null
@@ -16,14 +19,19 @@ function Hint({ id, children }: { id: string; children?: ReactNode }) {
   )
 }
 
-function ErrorText({ id, children }: { id: string; children?: ReactNode }) {
-  // Navy on a sun chip, so the error reads clearly on any background (13.9:1 ink on sun).
+/** Inline error: sienna rule, soft tint, alert icon, ink text (7.3:1). */
+export function ErrorText({ id, children, className }: { id?: string; children?: ReactNode; className?: string }) {
   if (!children) return null
   return (
-    <p id={id} role="alert" className="mt-2 inline-block rounded-lg border-2 border-navy bg-sun px-2 py-0.5 text-sm text-ink">
-      {children}
+    <p id={id} role="alert" className={cn('mt-2 flex items-start gap-2 border-2 border-sienna-deep bg-sienna-soft px-3 py-1.5 text-sm font-semibold text-ink', className)}>
+      <Icon name="alert" accent="sienna" className="mt-px size-5" />
+      <span>{children}</span>
     </p>
   )
+}
+
+function Optional() {
+  return <span className="ml-2 font-medium tracking-normal normal-case">(optional)</span>
 }
 
 type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> & {
@@ -42,7 +50,7 @@ export function TextField({ label, value, onChange, hint, error, optional, class
     <div className={className}>
       <label htmlFor={id} className={fieldLabel}>
         {label}
-        {optional && <span className="ml-2 normal-case opacity-80">(optional)</span>}
+        {optional && <Optional />}
       </label>
       <input
         id={id}
@@ -50,7 +58,7 @@ export function TextField({ label, value, onChange, hint, error, optional, class
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy}
-        className={cn(inputBase, 'min-h-14 rounded-full px-5 text-lg')}
+        className={cn(inputBase, 'min-h-14 px-4 text-lg')}
         {...rest}
       />
       <Hint id={`${id}-hint`}>{hint}</Hint>
@@ -77,7 +85,7 @@ export function TextArea({ label, value, onChange, maxLength, placeholder, hint,
     <div className={className}>
       <label htmlFor={id} className={fieldLabel}>
         {label}
-        {optional && <span className="ml-2 normal-case opacity-80">(optional)</span>}
+        {optional && <Optional />}
       </label>
       <textarea
         id={id}
@@ -87,11 +95,11 @@ export function TextArea({ label, value, onChange, maxLength, placeholder, hint,
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         aria-describedby={hint ? `${id}-hint` : undefined}
-        className={cn(inputBase, 'rounded-[1.3rem_1.1rem_1.4rem_1rem] px-4 py-3 text-base')}
+        className={cn(inputBase, 'px-4 py-3 text-base')}
       />
       <div className="flex justify-between gap-3">
         <Hint id={`${id}-hint`}>{hint}</Hint>
-        <span className="mt-1.5 ml-auto shrink-0 font-type text-xs" aria-hidden>
+        <span className="mt-1.5 ml-auto shrink-0 text-xs font-semibold tabular-nums" aria-hidden>
           {value.length}/{maxLength}
         </span>
       </div>
@@ -107,11 +115,11 @@ type ToggleProps = {
   className?: string
 }
 
-/** On/off switch. A real checkbox with role="switch" so it's announced as on/off. */
+/** On/off switch: a real checkbox with role="switch", drawn as a ruled slider with a square knob. */
 export function Toggle({ label, description, checked, onChange, className }: ToggleProps) {
   const id = useId()
   return (
-    <div className={cn('flex items-start gap-3', className)}>
+    <div className={cn('flex items-start gap-4', className)}>
       <input
         id={id}
         type="checkbox"
@@ -124,21 +132,23 @@ export function Toggle({ label, description, checked, onChange, className }: Tog
       <label
         htmlFor={id}
         className={cn(
-          'relative mt-0.5 inline-flex h-8 w-14 shrink-0 cursor-pointer items-center rounded-full border-[3px] border-navy transition-colors',
-          'peer-focus-visible:outline-3 peer-focus-visible:outline-offset-3 peer-focus-visible:outline-navy',
-          checked ? 'bg-navy' : 'bg-paper',
+          'relative mt-0.5 inline-flex h-8 w-15 shrink-0 cursor-pointer items-center border-2 border-ink transition-colors',
+          'peer-focus-visible:outline-3 peer-focus-visible:outline-offset-3 peer-focus-visible:outline-ink',
+          checked ? 'bg-teal' : 'bg-sheet',
         )}
         aria-hidden
       >
         <span
           className={cn(
-            'absolute size-5 rounded-full border-2 border-navy transition-transform duration-200 ease-spring',
-            checked ? 'translate-x-7 bg-sun' : 'translate-x-1 bg-bubble-light',
+            'absolute grid size-6 place-items-center border-2 border-ink transition-transform duration-200 ease-spring',
+            checked ? 'translate-x-7 bg-saffron' : 'translate-x-0.5 bg-paper',
           )}
-        />
+        >
+          {checked && <Icon name="check" accent="none" strokeWidth={3} className="size-4" />}
+        </span>
       </label>
       <div className="min-w-0">
-        <label htmlFor={id} className="block cursor-pointer font-semibold">
+        <label htmlFor={id} className="block cursor-pointer font-bold">
           {label}
         </label>
         {description && (
@@ -163,22 +173,22 @@ type StepperProps = {
 export function Stepper({ label, value, onChange, min, max, unit }: StepperProps) {
   const id = useId()
   const set = (n: number) => onChange(Math.min(max, Math.max(min, n)))
-  const btn =
-    'grid size-12 place-items-center rounded-full border-[3px] border-navy bg-paper font-type text-2xl text-navy transition-transform active:scale-90 disabled:opacity-40'
+  const btn = 'grid size-12 place-items-center border-2 border-ink bg-saffron text-ink transition-colors hover:bg-ink hover:text-saffron disabled:opacity-40 disabled:hover:bg-saffron disabled:hover:text-ink'
   return (
     <div role="group" aria-labelledby={id}>
       <p id={id} className={fieldLabel}>
         {label}
       </p>
-      <div className="flex items-center gap-4">
-        <button type="button" className={btn} onClick={() => set(value - 1)} disabled={value <= min} aria-label="One fewer">
-          −
+      <div className="inline-flex items-stretch border-2 border-ink">
+        <button type="button" className={cn(btn, 'border-0 border-r-2')} onClick={() => set(value - 1)} disabled={value <= min} aria-label="One fewer">
+          <Icon name="minus" accent="none" strokeWidth={2.6} className="size-5" />
         </button>
-        <output aria-live="polite" className="min-w-28 text-center font-display text-3xl">
-          {value} <span className="font-sans text-base normal-case">{unit(value)}</span>
+        <output aria-live="polite" className="sheet-grain flex min-w-32 items-center justify-center gap-2 px-3">
+          <span className="font-display text-3xl leading-none">{value}</span>
+          <span className="text-sm font-semibold">{unit(value)}</span>
         </output>
-        <button type="button" className={btn} onClick={() => set(value + 1)} disabled={value >= max} aria-label="One more">
-          +
+        <button type="button" className={cn(btn, 'border-0 border-l-2')} onClick={() => set(value + 1)} disabled={value >= max} aria-label="One more">
+          <Icon name="plus" accent="none" strokeWidth={2.6} className="size-5" />
         </button>
       </div>
     </div>
@@ -222,7 +232,7 @@ export function TagInput({ label, values, onChange, placeholder, maxLength, max,
       <label htmlFor={id} className={fieldLabel}>
         {label}
       </label>
-      <div className="flex gap-2">
+      <div className="flex">
         <input
           id={id}
           value={draft}
@@ -232,14 +242,15 @@ export function TagInput({ label, values, onChange, placeholder, maxLength, max,
           placeholder={full ? `That’s ${max}, nice!` : placeholder}
           disabled={full}
           aria-describedby={hint ? `${id}-hint` : undefined}
-          className={cn(inputBase, 'min-h-12 min-w-0 flex-1 rounded-full px-4 disabled:opacity-60')}
+          className={cn(inputBase, 'min-h-12 min-w-0 flex-1 px-4 disabled:opacity-60')}
         />
         <button
           type="button"
           onClick={add}
           disabled={!draft.trim() || full}
-          className="min-h-12 shrink-0 rounded-full border-[3px] border-navy bg-bubble px-4 font-type text-sm tracking-wider text-navy uppercase transition-transform active:scale-95 disabled:opacity-50"
+          className="-ml-[2px] inline-flex min-h-12 shrink-0 items-center gap-1 border-2 border-ink bg-saffron px-4 text-sm font-bold tracking-[0.08em] text-ink uppercase transition-colors hover:bg-ink hover:text-saffron disabled:opacity-50 disabled:hover:bg-saffron disabled:hover:text-ink"
         >
+          <Icon name="plus" accent="none" strokeWidth={2.4} className="size-4" />
           {addLabel}
         </button>
       </div>
@@ -251,18 +262,28 @@ export function TagInput({ label, values, onChange, placeholder, maxLength, max,
               <button
                 type="button"
                 onClick={() => onChange(values.filter((x) => x !== v))}
-                className="inline-flex min-h-11 items-center gap-2 rounded-full border-[3px] border-navy bg-sun px-4 text-sm font-medium text-ink transition-transform active:scale-95"
+                className="inline-flex min-h-10 items-center gap-2 border-2 border-ink bg-saffron-soft pr-2 pl-3 text-sm font-semibold text-ink transition-colors hover:bg-sienna-soft"
                 aria-label={`Remove ${v}`}
               >
                 {v}
-                <span aria-hidden className="font-type">
-                  ×
-                </span>
+                <Icon name="close" accent="none" strokeWidth={2.4} className="size-4" />
               </button>
             </li>
           ))}
         </ul>
       )}
     </div>
+  )
+}
+
+/** A one-line privacy note for hints: lock for private answers, eye for public ones. */
+export function PrivacyNote({ kind, children }: { kind: 'private' | 'public'; children: ReactNode }) {
+  return (
+    <span className="inline-flex items-start gap-1.5">
+      <Icon name={kind === 'private' ? 'lock' : 'eye'} accent={kind === 'private' ? 'saffron' : 'teal'} className="mt-0.5 size-4" />
+      <span>
+        <strong className="font-bold">{kind === 'private' ? 'Private.' : 'Public.'}</strong> {children}
+      </span>
+    </span>
   )
 }

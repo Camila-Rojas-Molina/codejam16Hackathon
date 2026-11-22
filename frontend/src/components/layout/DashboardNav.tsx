@@ -1,32 +1,33 @@
-// MIGO's main navigation: a left column on desktop, an icon rail on tablets, a tab bar on phones.
-import type { ReactNode } from 'react'
+// MIGO's main navigation: a ruled left column on desktop, an icon rail on tablets, a tab bar on
+// phones. Each item is a cell divided by ink rules; the current one is filled saffron.
 import { NavLink } from 'react-router'
 import { useConversations } from '../../features/chat/useConversations'
 import { useChallenges } from '../../features/quests/useChallenges'
 import { cn } from '../../lib/cn'
-import { ChatIcon, MapIcon, ProfileIcon, QuestIcon, ShopIcon } from '../illustrations/Icons'
+import Icon, { type IconName } from '../icons/Icon'
 import Logo from '../ui/Logo'
 
-type Item = { to: string; label: string; icon: ReactNode; badge?: number; badgeLabel?: string }
+type Item = { to: string; label: string; icon: IconName; badge?: number; badgeLabel?: string }
 
 function useNavItems(includeShop: boolean): Item[] {
   const { readyCount } = useChallenges()
   const unread = useConversations().reduce((n, c) => n + c.unread, 0)
   const items: Item[] = [
-    { to: '/map', label: 'Map', icon: <MapIcon /> },
-    { to: '/quests', label: 'Quests', icon: <QuestIcon />, badge: readyCount, badgeLabel: `${readyCount} reward${readyCount === 1 ? '' : 's'} to claim` },
-    { to: '/chat', label: 'Chat', icon: <ChatIcon />, badge: unread, badgeLabel: `${unread} unread` },
-    { to: '/profile', label: 'Profile', icon: <ProfileIcon /> },
+    { to: '/map', label: 'Map', icon: 'globe' },
+    { to: '/quests', label: 'Quests', icon: 'quest', badge: readyCount, badgeLabel: `${readyCount} reward${readyCount === 1 ? '' : 's'} to claim` },
+    { to: '/chat', label: 'Chat', icon: 'chats', badge: unread, badgeLabel: `${unread} unread` },
+    { to: '/profile', label: 'Profile', icon: 'smile' },
   ]
-  if (includeShop) items.push({ to: '/shop', label: 'Shop', icon: <ShopIcon /> })
+  if (includeShop) items.push({ to: '/shop', label: 'Shop', icon: 'shop' })
   return items
 }
 
-function Badge({ count, label, className }: { count?: number; label?: string; className?: string }) {
+/** Count badge: ink square, paper digits (9.3:1), with a sienna corner. */
+function CountBadge({ count, label, className }: { count?: number; label?: string; className?: string }) {
   if (!count) return null
   return (
     <>
-      <span className={cn('grid min-w-6 place-items-center rounded-full border-2 border-navy bg-red px-1.5 font-type text-xs text-white', className)} aria-hidden>
+      <span className={cn('grid min-w-6 place-items-center border-2 border-ink bg-ink px-1 text-xs font-bold text-sheet shadow-[2px_2px_0_var(--color-sienna)]', className)} aria-hidden>
         {count}
       </span>
       <span className="sr-only">, {label}</span>
@@ -38,28 +39,33 @@ function Badge({ count, label, className }: { count?: number; label?: string; cl
 export function SideNav() {
   const items = useNavItems(false)
   return (
-    <nav aria-label="Main" className="sticky top-0 hidden h-dvh flex-col border-r-[3px] border-navy/25 px-3 py-6 md:flex lg:px-5">
-      <NavLink to="/map" className="mb-8 flex justify-center lg:justify-start lg:px-3" aria-label="MIGO home">
+    <nav aria-label="Main" className="sheet-grain sticky top-0 hidden h-dvh flex-col border-r-2 border-ink md:flex">
+      <NavLink to="/map" className="grid h-24 place-items-center px-4 lg:h-28" aria-label="MIGO home">
         <Logo size="md" className="hidden lg:block" />
         <Logo size="md" variant="icon" className="lg:hidden" />
       </NavLink>
-      <ul className="flex flex-col gap-2">
+      <div className="hatch-band" aria-hidden />
+      <ul className="flex flex-col">
         {items.map((item) => (
-          <li key={item.to}>
+          <li key={item.to} className="border-b-2 border-ink">
             <NavLink
               to={item.to}
               className={({ isActive }) =>
                 cn(
-                  'group relative flex min-h-14 items-center gap-4 rounded-2xl border-[3px] px-3 font-type tracking-wider uppercase transition-[transform,background-color] duration-150 active:scale-[0.97]',
-                  'flex-col justify-center gap-1 text-[0.65rem] lg:flex-row lg:justify-start lg:text-base',
-                  isActive ? 'border-navy bg-paper text-navy shadow-[3px_3px_0_var(--color-navy)]' : 'border-transparent text-navy hover:bg-bubble-light/70',
+                  'group relative flex min-h-16 items-center gap-4 px-3 font-bold tracking-[0.12em] uppercase transition-colors',
+                  'flex-col justify-center gap-1 text-[0.62rem] lg:flex-row lg:justify-start lg:px-6 lg:text-sm',
+                  isActive ? 'bg-saffron' : 'hover:bg-saffron-soft',
                 )
               }
             >
-              <span className="transition-transform group-hover:-rotate-6 [&_svg]:size-8">{item.icon}</span>
-              <span className="lg:flex-1">{item.label}</span>
-              {/* Count beside the label on desktop; pinned to the icon on the tablet rail. */}
-              <Badge count={item.badge} label={item.badgeLabel} className="absolute top-1 right-2 lg:static" />
+              {({ isActive }) => (
+                <>
+                  <Icon name={item.icon} accent={isActive ? 'sheet' : 'saffron'} className="size-8 transition-transform group-hover:-rotate-6" />
+                  <span className="lg:flex-1">{item.label}</span>
+                  <CountBadge count={item.badge} label={item.badgeLabel} className="absolute top-2 right-2 lg:static" />
+                  {isActive && <Icon name="arrow-right" accent="none" strokeWidth={2.4} className="hidden size-5 lg:block" />}
+                </>
+              )}
             </NavLink>
           </li>
         ))}
@@ -68,30 +74,30 @@ export function SideNav() {
   )
 }
 
-/** Phones (< md): a tab bar along the bottom. Shop gets a tab here because the sidebar is gone. */
+/** Phones (< md): a ruled tab bar along the bottom. Shop gets a tab here because the sidebar is gone. */
 export function MobileTabBar() {
   const items = useNavItems(true)
   return (
-    <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:hidden">
-      <ul className="mx-auto flex max-w-lg gap-1 rounded-[1.6rem] border-[3px] border-navy bg-paper p-1.5">
-        {items.map((item) => (
-          <li key={item.to} className="flex-1">
+    <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 md:hidden">
+      <ul className="sheet-grain flex border-t-2 border-ink pb-[env(safe-area-inset-bottom)]">
+        {items.map((item, i) => (
+          <li key={item.to} className={cn('flex-1', i > 0 && 'border-l-2 border-ink')}>
             <NavLink
               to={item.to}
               className={({ isActive }) =>
                 cn(
-                  'relative flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl border-2 font-type text-[0.6rem] tracking-wider uppercase transition-transform active:scale-95',
-                  isActive ? 'border-navy bg-sun text-ink' : 'border-transparent text-navy',
+                  'relative flex min-h-16 flex-col items-center justify-center gap-0.5 text-[0.58rem] font-bold tracking-[0.1em] uppercase transition-colors',
+                  isActive ? 'bg-saffron' : 'hover:bg-saffron-soft',
                 )
               }
             >
-              <span className="[&_svg]:size-6">{item.icon}</span>
-              {item.label}
-              {item.badge ? (
-                <span className="absolute top-0.5 right-1.5">
-                  <Badge count={item.badge} label={item.badgeLabel} />
-                </span>
-              ) : null}
+              {({ isActive }) => (
+                <>
+                  <Icon name={item.icon} accent={isActive ? 'sheet' : 'saffron'} className="size-6" />
+                  {item.label}
+                  <CountBadge count={item.badge} label={item.badgeLabel} className="absolute top-1 right-1 min-w-5 text-[0.6rem]" />
+                </>
+              )}
             </NavLink>
           </li>
         ))}

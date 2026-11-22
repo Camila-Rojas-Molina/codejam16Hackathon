@@ -106,8 +106,18 @@ export type CitySource = 'manual' | 'trip' | 'quest'
 
 export type DiscoveredCity = {
   id: string
-  /** As typed, e.g. "Lisbon" or "Mexico City". */
+  /** City name, e.g. "Lisbon". */
   name: string
+  /** English country name and ISO code. Empty on cities typed in before city search existed. */
+  country: string
+  countryCode: string
+  /** First-level region when it tells places apart (e.g. "OR"). */
+  region?: string
+  /** Coordinates for the atlas pin. Null on older free-text entries until they're confirmed. */
+  lat: number | null
+  lng: number | null
+  /** Provider id, e.g. "geonames:2267057". Null on older free-text entries. */
+  placeId: string | null
   source: CitySource
   /** Trip or quest id when added automatically. */
   refId?: string

@@ -1,4 +1,6 @@
-// A paper card of answers, each tagged Public or Private, with optional Change buttons.
+// A ruled table of answers, each tagged Public or Private, with optional Change buttons.
+// Square cells throughout: profile boxes are always straight-edged.
+import Icon, { type IconName } from '../../../components/icons/Icon'
 import Badge from '../../../components/ui/Badge'
 import { cn } from '../../../lib/cn'
 
@@ -9,16 +11,17 @@ export type SummaryItem = {
   label: string
   value: string
   visibility: Visibility
+  icon?: IconName
 }
 
 export function VisibilityTag({ visibility }: { visibility: Visibility }) {
   return visibility === 'public' ? (
-    <Badge tone="bubble" className="shrink-0">
-      <span aria-hidden>👀</span> Public
+    <Badge tone="teal" icon="eye" className="shrink-0">
+      Public
     </Badge>
   ) : (
-    <Badge tone="navy" className="shrink-0">
-      <span aria-hidden>🔒</span> Private
+    <Badge tone="ink" icon="lock" className="shrink-0">
+      Private
     </Badge>
   )
 }
@@ -27,38 +30,39 @@ type SummaryListProps = {
   title: string
   items: SummaryItem[]
   onEdit?: (id: string) => void
-  tilt?: 'left' | 'right' | 'none'
+  /** Solid offset shadow. */
+  lifted?: boolean
   className?: string
 }
 
-export default function SummaryList({ title, items, onEdit, tilt = 'none', className }: SummaryListProps) {
+export default function SummaryList({ title, items, onEdit, lifted = false, className }: SummaryListProps) {
   return (
-    <section
-      className={cn(
-        'rounded-[1.6rem_1.4rem_1.7rem_1.3rem] border-[3px] border-navy bg-paper text-navy',
-        tilt === 'left' && '-rotate-[0.5deg]',
-        tilt === 'right' && 'rotate-[0.5deg]',
-        className,
-      )}
-    >
-      <h2 className="border-b-[3px] border-navy px-5 pt-4 pb-3 text-2xl">{title}</h2>
-      <dl className="divide-y-2 divide-dashed divide-navy/40">
-        {items.map((item) => (
-          <div key={item.id} className="flex items-start gap-3 px-5 py-3">
-            <div className="min-w-0 flex-1">
-              <dt className="flex flex-wrap items-center gap-2 font-type text-xs tracking-wider uppercase">
+    <section className={cn('sheet-grain border-2 border-ink text-ink', lifted && 'shadow-block', className)}>
+      <h2 className="bg-saffron px-5 pt-4 pb-3 text-2xl">{title}</h2>
+      <div className="hatch-band" aria-hidden />
+      <dl>
+        {items.map((item, i) => (
+          <div key={item.id} className={cn('flex items-stretch', i > 0 && 'border-t-2 border-ink')}>
+            {item.icon && (
+              <span className="hidden w-14 shrink-0 place-items-center border-r-2 border-ink bg-saffron-soft sm:grid" aria-hidden>
+                <Icon name={item.icon} className="size-7" />
+              </span>
+            )}
+            <div className="min-w-0 flex-1 px-4 py-3">
+              <dt className="flex flex-wrap items-center gap-2 eyebrow">
                 {item.label}
                 <VisibilityTag visibility={item.visibility} />
               </dt>
-              <dd className="mt-1 break-words">{item.value}</dd>
+              <dd className="mt-1 font-semibold break-words">{item.value}</dd>
             </div>
             {onEdit && (
               <button
                 type="button"
                 onClick={() => onEdit(item.id)}
-                className="min-h-11 shrink-0 rounded-full border-[3px] border-navy bg-bubble-light px-3 font-type text-xs tracking-wider uppercase transition-transform active:scale-95"
+                className="flex w-20 shrink-0 flex-col items-center justify-center gap-1 border-l-2 sm:w-24 sm:flex-row border-ink text-xs font-bold tracking-[0.1em] uppercase transition-colors hover:bg-saffron"
                 aria-label={`Change ${item.label}`}
               >
+                <Icon name="pencil" className="size-4" />
                 Change
               </button>
             )}

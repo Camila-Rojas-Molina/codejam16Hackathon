@@ -12,7 +12,7 @@ import { useRef } from 'react'
 export default function MapWorkspace() {
   const mapRootRef = useRef<HTMLDivElement>(null)
   return (
-    <section aria-label="Map" className="relative flex min-h-80 flex-1 overflow-hidden rounded-[1.8rem_1.6rem_1.9rem_1.5rem] border-[3px] border-navy bg-bubble-light">
+    <section aria-label="Map" className="relative flex min-h-80 flex-1 overflow-hidden border-2 border-ink bg-teal-soft">
       <div ref={mapRootRef} data-map-root className="absolute inset-0" />
     </section>
   )
