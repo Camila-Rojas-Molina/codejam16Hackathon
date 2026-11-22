@@ -9,7 +9,6 @@ import CityCollection from '../places/components/CityCollection'
 import BudgetFields from '../profile/components/BudgetFields'
 import DogPhotoField from '../profile/components/DogPhotoField'
 import LanguageFields from '../profile/components/LanguageFields'
-import { QUALITY_RANK_WEIGHTS } from '../profile/matchingConfig'
 import { addCity, cityLabel, dogDetailsError, dogsOf, rangeError } from '../profile/model'
 import {
   ACCESSIBILITY_OPTIONS,
@@ -191,15 +190,15 @@ export const QUESTIONS: QuestionStep[] = [
     id: 'qualities',
     section: 'you',
     title: 'What makes someone a great exploring buddy?',
-    subtitle: `Pick up to ${MAX_QUALITIES} and rank them. Your top choice carries the most weight when we match you.`,
+    subtitle: `Pick up to ${MAX_QUALITIES}, then drag your favourite to the top.`,
     optional: true,
     isValid: () => true,
     isAnswered: (d) => d.companion.qualities.length > 0,
     render: (d, update) => (
       <RankedChoices
         legend="Qualities you value in a companion"
+        hideLegend
         max={MAX_QUALITIES}
-        weights={QUALITY_RANK_WEIGHTS}
         options={QUALITY_OPTIONS}
         values={d.companion.qualities}
         onChange={(qualities) => companion(update, { qualities })}

@@ -16,10 +16,12 @@ export const DIMENSION_WEIGHTS = {
 } as const
 
 /**
- * Influence of each ranked "great exploring buddy" quality, by position (1st, 2nd, 3rd…).
- * The first choice should matter far more than the rest. Positions beyond the list use the last value.
+ * Influence of each ranked "great exploring buddy" quality, by position (1st, 2nd, 3rd…). Internal
+ * only: people see their order, never these numbers. The first choice counts twice as much as the
+ * second and more than all the others together (0.5 + 0.25 + 0.15 + 0.08 = 0.98 < 1), so it
+ * dominates. Keep it that way when tuning. Positions beyond the list use the last value.
  */
-export const QUALITY_RANK_WEIGHTS = [1, 0.55, 0.3, 0.15, 0.08] as const
+export const QUALITY_RANK_WEIGHTS = [1, 0.5, 0.25, 0.15, 0.08] as const
 
 export const rankWeight = (index: number) => QUALITY_RANK_WEIGHTS[Math.min(index, QUALITY_RANK_WEIGHTS.length - 1)]
 

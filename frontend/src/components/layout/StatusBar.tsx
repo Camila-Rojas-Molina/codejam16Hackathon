@@ -1,7 +1,7 @@
-// The account status row: current mode and points. Shown at the top of the right sidebar on
-// desktop, and as a sticky top bar (with messages + settings shortcuts) on smaller screens.
+// The account status: current mode, what it's pointed at, and the points balance (which opens the
+// shop). Shown at the top of the right sidebar on wide desktops, and as a sticky top bar on
+// everything narrower.
 import { Link } from 'react-router'
-import { useConversations } from '../../features/chat/useConversations'
 import ModeToggle, { ModeContext } from '../../features/profile/components/ModeToggle'
 import PointsBadge from '../../features/rewards/PointsBadge'
 import { cn } from '../../lib/cn'
@@ -19,40 +19,41 @@ export function SettingsButton({ className }: { className?: string }) {
   )
 }
 
-/** Desktop: the mode toggle across the top, then what it's pointed at and the points balance. */
+/** Wide desktop sidebar: the mode toggle across the top, what it's pointed at, then the balance. */
 export function AccountStatus() {
   return (
     <div className="space-y-3">
       <ModeToggle />
-      <div className="flex items-center justify-between gap-3">
-        <ModeContext />
-        <PointsBadge />
-      </div>
+      <ModeContext />
+      <PointsBadge className="w-full" />
     </div>
   )
 }
 
-/** Tablets and phones: logo, mode, points, and shortcuts to messages, shop (tablet) and settings. */
+/**
+ * Phones, tablets and small laptops: logo (where there's no side nav), mode, points → shop and
+ * settings. Messages are in the main nav everywhere, so they don't need a shortcut here.
+ */
 export function TopBar() {
-  const unread = useConversations().reduce((n, c) => n + c.unread, 0)
   return (
-    <header className="sheet-grain sticky top-0 z-20 border-b-2 border-ink px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 lg:hidden">
-      <div className="mx-auto flex max-w-3xl items-center gap-2">
-        {/* Below 360px there isn't room for the logo as well; Map is in the bottom tab bar. */}
-        <Link to="/map" aria-label="MIGO home" className="max-[359px]:hidden md:hidden">
+    <header className="sheet-grain sticky top-0 z-20 border-b-2 border-ink px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 sm:px-6 xl:hidden">
+      <div className="flex items-center gap-2 sm:gap-3">
+        {/* Below 380px there isn’t room for the logo as well; Map is in the bottom tab bar. */}
+        <Link to="/map" aria-label="MIGO home" className="shrink-0 max-[379px]:hidden md:hidden">
           <Logo size="sm" variant="icon" />
         </Link>
         <ModeToggle compact className="sm:hidden" />
-        <ModeToggle className="hidden sm:block" />
-        <div className="ml-auto flex items-center gap-1.5">
-          <PointsBadge compact />
-          <Link to="/shop" aria-label="Shop" className={cn(iconButton, 'hidden md:grid')}>
-            <Icon name="shop" className="size-6" />
-          </Link>
-          <Link to="/chat" aria-label={unread ? `Messages, ${unread} unread` : 'Messages'} className={iconButton}>
-            <Icon name="chat" className="size-6" />
-            {unread > 0 && <span className="absolute -top-1.5 -right-1.5 size-3.5 border-2 border-ink bg-sienna" aria-hidden />}
-          </Link>
+        <ModeToggle className="hidden w-64 sm:block" />
+        <div className="hidden min-w-0 lg:block">
+          <ModeContext />
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <div className="flex sm:hidden">
+            <PointsBadge compact />
+          </div>
+          <div className="hidden sm:flex">
+            <PointsBadge />
+          </div>
           <SettingsButton />
         </div>
       </div>

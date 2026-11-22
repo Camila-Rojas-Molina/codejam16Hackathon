@@ -2,8 +2,10 @@
 // extra npm package is needed. Not wired into the screens yet: api.ts still returns mock
 // data. To switch, call these from api.ts when isBackendConfigured() is true. Requests carry the
 // signed-in login's token (auth.ts) when there is one.
+import { prepareImage } from '../features/gallery/image'
+import type { Photo, PhotoMeta } from '../features/gallery/types'
 import type { Account, ProfileRecord } from '../features/profile/types'
-import { getAccessToken } from './auth'
+import { getAccessToken, getSession } from './auth'
 import { config } from './config'
 import type { Difficulty, Hunt, LatLng, Role, ScoreBreakdown, Team, User } from './types'
 
@@ -276,4 +278,123 @@ export async function saveMigoRecord(record: ProfileRecord): Promise<void> {
 
 export async function deleteMigoAccount(id: string): Promise<void> {
   await rpc('migo_delete_account', { p_profile_id: id })
+}
+
+// ---- Gallery (006_gallery.sql) ----------------------------------------------------
+// Photos live in the 'gallery' bucket under the login's own folder (<auth uid>/<random id>.jpg);
+// a private `photos` row holds the city, caption and date. Needs a signed-in login.
+
+type PhotoRow = {
+  id: string
+  storage_path: string
+  city_name: string | null
+  country: string | null
+  country_code: string | null
+  lat: number | null
+  lng: number | null
+  place_id: string | null
+  caption: string | null
+  quest_id: string | null
+  hunt_id: string | null
+  taken_at: string
+  width: number | null
+  height: number | null
+  created_at: string
+}
+
+/** Public URL of a file in the 'gallery' bucket. */
+export function photoUrl(path: string) {
+  return `${config.supabaseUrl}/storage/v1/object/public/gallery/${path.split('/').map(encodeURIComponent).join('/')}`
+}
+
+const toPhoto = (row: PhotoRow): Photo => ({
+  id: row.id,
+  storagePath: row.storage_path,
+  url: photoUrl(row.storage_path),
+  city: row.city_name
+    ? { name: row.city_name, country: row.country, countryCode: row.country_code, placeId: row.place_id }
+    : null,
+  lat: row.lat,
+  lng: row.lng,
+  caption: row.caption,
+  questId: row.quest_id,
+  huntId: row.hunt_id,
+  takenAt: Date.parse(row.taken_at) || Date.parse(row.created_at) || 0,
+  width: row.width,
+  height: row.height,
+  createdAt: Date.parse(row.created_at) || 0,
+})
+
+const randomName = () =>
+  typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('')
+
+async function deleteGalleryFile(path: string): Promise<void> {
+  await fetch(`${config.supabaseUrl}/storage/v1/object/gallery/${path}`, { method: 'DELETE', headers: await headers() })
+}
+
+/** The profile's photos, newest first. */
+export async function listPhotos(profileId: string): Promise<Photo[]> {
+  const rows = await rpc<PhotoRow[] | null>('gallery_list', { p_profile_id: profileId })
+  return (rows ?? []).map(toPhoto)
+}
+
+/**
+ * Shrinks the picture in the browser (≤ 1600 px JPEG), uploads it to the login's folder and saves
+ * its details. Throws BackendError 42501 when nobody is signed in, ImageReadError for unreadable files.
+ */
+export async function uploadPhoto(profileId: string, file: Blob, meta: PhotoMeta = {}): Promise<Photo> {
+  if (!isBackendConfigured()) throw new Error('Backend not configured: set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY')
+  const uid = getSession()?.user.id
+  if (!uid) throw new BackendError('Sign in to save photos', '42501', 401)
+  const image = await prepareImage(file)
+  const path = `${uid}/${randomName()}.jpg`
+  const res = await fetch(`${config.supabaseUrl}/storage/v1/object/gallery/${path}`, {
+    method: 'POST',
+    headers: await headers({ 'Content-Type': 'image/jpeg', 'Cache-Control': 'max-age=31536000' }),
+    body: image.blob,
+  })
+  if (!res.ok) {
+    let message = `Photo upload failed (${res.status})`
+    try {
+      const body = (await res.json()) as { message?: string; error?: string }
+      if (body.message || body.error) message = `Photo upload failed: ${body.message ?? body.error}`
+    } catch {
+      // Keep the generic message.
+    }
+    throw new BackendError(message, null, res.status)
+  }
+  const city = meta.city ?? null
+  try {
+    const row = await rpc<PhotoRow>('gallery_add_photo', {
+      p_profile_id: profileId,
+      p_storage_path: path,
+      p_meta: {
+        city_name: city?.name ?? null,
+        country: city?.country ?? null,
+        country_code: city?.countryCode ?? null,
+        place_id: city?.placeId ?? null,
+        lat: city?.lat ?? null,
+        lng: city?.lng ?? null,
+        caption: meta.caption?.trim() || null,
+        quest_id: meta.questId ?? null,
+        hunt_id: meta.huntId ?? null,
+        taken_at: meta.takenAt ? new Date(meta.takenAt).toISOString() : null,
+        width: image.width,
+        height: image.height,
+      },
+    })
+    return toPhoto(row)
+  } catch (e) {
+    // Don't leave an orphan file behind when the details couldn't be saved.
+    await deleteGalleryFile(path).catch(() => undefined)
+    throw e
+  }
+}
+
+/** Deletes the photo's record, then its file. The file delete is best effort. */
+export async function deletePhoto(profileId: string, photoId: string): Promise<void> {
+  const path = await rpc<string>('gallery_delete_photo', { p_profile_id: profileId, p_photo_id: photoId })
+  if (path) await deleteGalleryFile(path).catch(() => undefined)
 }

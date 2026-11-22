@@ -6,7 +6,7 @@ import { Mascot } from '../components/illustrations/Mascot'
 import { Sparkle, Starburst } from '../components/illustrations/Stickers'
 import Screen from '../components/layout/Screen'
 import { ArrowCell } from '../components/ui/Button'
-import { arrowLabel, arrowRowClasses, buttonClasses } from '../components/ui/buttonStyles'
+import { arrowButtonClasses, arrowLabel, buttonClasses } from '../components/ui/buttonStyles'
 import Logo from '../components/ui/Logo'
 import { hasUniversalProfile } from '../features/profile/flow'
 import { TAGLINE } from '../lib/config'
@@ -18,6 +18,9 @@ const steps: { n: string; title: string; text: string; icon: IconName }[] = [
   { n: '2', title: 'Get matched', text: 'Meet your teammate and a photo of a mystery spot.', icon: 'people2' },
   { n: '3', title: 'Go find it', text: 'Explore together, phone away, then a selfie for points.', icon: 'camera' },
 ]
+
+// The main call to action: one big saffron button, label and arrow on a single surface.
+const cta = arrowButtonClasses({ tone: 'saffron', size: 'lg', fullWidth: true })
 
 export default function WelcomePage() {
   const { account, profile, authEnabled, session } = useStore()
@@ -76,7 +79,7 @@ export default function WelcomePage() {
 
       {authEnabled ? (
         <div className="space-y-3">
-          <Link to="/signup" className={cn(arrowRowClasses, 'min-h-16 w-full text-base')}>
+          <Link to="/signup" className={cta}>
             <span className={arrowLabel}>Get started</span>
             <ArrowCell />
           </Link>
@@ -85,7 +88,7 @@ export default function WelcomePage() {
           </Link>
         </div>
       ) : (
-        <Link to="/onboarding" className={cn(arrowRowClasses, 'min-h-16 w-full text-base')}>
+        <Link to="/onboarding" className={cta}>
           <span className={arrowLabel}>Start exploring</span>
           <ArrowCell />
         </Link>

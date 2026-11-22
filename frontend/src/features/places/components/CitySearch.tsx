@@ -12,12 +12,24 @@ type CitySearchProps = {
   onPick: (place: PlacePick) => void
   /** Place ids already chosen (shown as "Added", not pickable again). */
   takenIds?: string[]
+  /** Called instead of onPick when an "Added" place is chosen, e.g. to point it out on the map. */
+  onTaken?: (place: PlacePick) => void
+  placeholder?: string
   initialQuery?: string
   hint?: string
   autoFocus?: boolean
 }
 
-export default function CitySearch({ label, onPick, takenIds = [], initialQuery = '', hint, autoFocus }: CitySearchProps) {
+export default function CitySearch({
+  label,
+  onPick,
+  takenIds = [],
+  onTaken,
+  placeholder = 'Start typing a city, e.g. Lisbon',
+  initialQuery = '',
+  hint,
+  autoFocus,
+}: CitySearchProps) {
   const id = useId()
   const listId = `${id}-list`
   const inputRef = useRef<HTMLInputElement>(null)
@@ -60,7 +72,11 @@ export default function CitySearch({ label, onPick, takenIds = [], initialQuery 
   }, [q, searching])
 
   function choose(p: PlacePick) {
-    if (takenIds.includes(p.placeId)) return
+    if (takenIds.includes(p.placeId)) {
+      onTaken?.(p)
+      setOpen(false)
+      return
+    }
     onPick(p)
     setQuery('')
     setRemote('idle')
@@ -113,7 +129,7 @@ export default function CitySearch({ label, onPick, takenIds = [], initialQuery 
           autoComplete="off"
           autoFocus={autoFocus}
           value={query}
-          placeholder="Start typing a city, e.g. Lisbon"
+          placeholder={placeholder}
           onChange={(e) => {
             setQuery(e.target.value)
             setOpen(true)
@@ -151,7 +167,7 @@ export default function CitySearch({ label, onPick, takenIds = [], initialQuery 
                 className={cn(
                   'flex cursor-pointer items-center gap-3 border-b-2 border-ink px-3 py-2.5 last:border-b-0',
                   i === active && 'bg-saffron',
-                  taken && 'cursor-default opacity-60',
+                  taken && (onTaken ? 'opacity-75' : 'cursor-default opacity-60'),
                 )}
               >
                 <Icon name="pin" accent="sienna" className="size-6" />
@@ -159,7 +175,7 @@ export default function CitySearch({ label, onPick, takenIds = [], initialQuery 
                   <span className="block font-bold">{p.name}</span>
                   <span className="block text-sm">{[p.region, p.country].filter(Boolean).join(', ')}</span>
                 </span>
-                {taken && <span className="text-xs font-bold tracking-[0.1em] uppercase">Added</span>}
+                {taken && <span className="shrink-0 text-xs font-bold tracking-[0.1em] uppercase">Added</span>}
               </li>
             )
           })}

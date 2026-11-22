@@ -5,6 +5,22 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#F3EBD5" />
+    <!-- Day/Night before first paint (no flash). Mirrors src/lib/theme.ts: same key, same colours. -->
+    <script>
+      ;(function () {
+        var p = null
+        try {
+          p = localStorage.getItem('migo:theme')
+        } catch (e) {}
+        var dark = p === 'dark' || (p !== 'light' && !!window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches)
+        var t = dark ? 'dark' : 'light'
+        var root = document.documentElement
+        root.setAttribute('data-theme', t)
+        root.style.colorScheme = t
+        var meta = document.querySelector('meta[name="theme-color"]')
+        if (meta) meta.setAttribute('content', dark ? '#132428' : '#f3ebd5')
+      })()
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

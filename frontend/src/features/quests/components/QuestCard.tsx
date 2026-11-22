@@ -6,7 +6,7 @@ import { Mascot } from '../../../components/illustrations/Mascot'
 import Badge from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
 import { ErrorText } from '../../../components/ui/Fields'
-import { arrowLabel, arrowRowClasses } from '../../../components/ui/buttonStyles'
+import { arrowButtonClasses, arrowLabel } from '../../../components/ui/buttonStyles'
 import { ArrowCell } from '../../../components/ui/Button'
 import { cn } from '../../../lib/cn'
 import { useStore } from '../../../store/useStore'
@@ -112,7 +112,7 @@ export default function QuestCard({ state, highlight = false }: { state: Challen
             </Button>
           )}
           {status === 'in-progress' && (
-            <Link to={c.action.to} className={arrowRowClasses}>
+            <Link to={c.action.to} className={arrowButtonClasses({ tone: 'saffron' })}>
               <span className={arrowLabel}>{c.action.label}</span>
               <ArrowCell />
             </Link>

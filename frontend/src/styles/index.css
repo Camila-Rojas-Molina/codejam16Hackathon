@@ -1,34 +1,112 @@
 @import 'tailwindcss';
 
 /*
- * MIGO design system: a retro printed-menu look.
+ * MIGO design system: a retro printed-menu look, by day and by night.
  *   Paper: warm cream sheets with a faint grain, ruled with ink lines into cells.
  *   Ink: deep teal-charcoal (#264653) for all text and outlines.
  *   Accents (the MIGO palette): saffron #E9C46A, teal #2A9D8F, sandy #F4A261, sienna #E76F51.
  *   Type: Bowlby One for menu-style titles, Montserrat for big headlines and form text,
  *         Montserrat Alternates for everything you read and tap, Fraunces for speech and quotes.
- * Change tokens here, not in components.
+ * Change tokens here, not in components. Components only ever name tokens (bg-sheet, text-ink,
+ * var(--color-saffron)…), never hex values, so both themes come for free.
  *
  * Contrast (WCAG), text colour on background:
  *   ink on paper 8.7 · ink on sheet 9.3 · ink on saffron 6.0 · ink on sandy 4.9
  *   ink on any *-soft tint 7.3–8.2 · sheet on ink 9.3 · teal-deep on paper 5.0 · sienna-deep on paper 4.6
  *   Teal (3.0) and sienna (3.3) are fills, borders and icons only, never behind small text.
+ *
+ * NIGHT (data-theme="dark" on <html>, set before first paint by index.html + lib/theme.ts)
+ *   Not an inversion: the same printed menu, run on deep teal-charcoal "night paper" with warm
+ *   cream ink. The day/night palettes are the --day-* / --night-* values below; the theme tokens
+ *   (--color-*) point at one or the other.
+ *   - ink becomes cream: every text-ink, border-ink, rule, hatch and focus ring turns light.
+ *   - *-soft tints become deep, dusky versions of the same hue, still carrying cream text.
+ *   - teal-deep and sienna-deep (used for text and danger rules) become light teal and light sienna.
+ *   - Bright accent fills (bg-saffron, bg-sandy, bg-teal, bg-sienna) stay bright and become "day
+ *     islands": they re-declare the day palette for themselves and their children, so ink on
+ *     saffron is the same dark ink as by day (6.0:1), and hover:bg-ink on a saffron button is
+ *     still a dark fill with saffron letters.
+ *   - bg-ink outside an island is a cream fill with dark sheet letters; saffron on it darkens to
+ *     ochre (--color-saffron becomes --saffron-on-ink) so ticks and numbers stay legible.
+ *   - Block shadows and the masthead title's outline use --shadow-ink (a near-black) instead of
+ *     cream, so cards sink into the night rather than glow.
+ *   Contrast, night:
+ *     ink on paper 13.0 · ink on sheet 11.4 · ink on saffron-soft 9.2 · teal-soft 9.4
+ *     sandy-soft 10.0 · sienna-soft 10.4 · sheet on ink 11.4 · teal-deep on paper 8.9 (sheet 7.8)
+ *     sienna-deep on paper 7.1 (sheet 6.2) · ochre (saffron on ink) on ink 5.2
+ *     saffron on paper 9.6 · sandy 7.8 · sienna 5.2 · teal 4.8 (fills and icons, ≥3:1 vs sheet)
+ *     inside day islands: identical to the day table.
  */
+
+/* The two palettes. Only the tokens in @theme below are used by components. */
+:root {
+  --day-ink: #264653;
+  --day-paper: #f3ebd5;
+  --day-sheet: #fbf6e8;
+  --day-saffron: #e9c46a;
+  --day-saffron-soft: #f7e7bc;
+  --day-teal: #2a9d8f;
+  --day-teal-deep: #1e7268;
+  --day-teal-soft: #cfe9e4;
+  --day-sandy: #f4a261;
+  --day-sandy-soft: #fbddc0;
+  --day-sienna: #e76f51;
+  --day-sienna-deep: #b8472d;
+  --day-sienna-soft: #f8d3c7;
+
+  --night-ink: #f3e7c9;
+  --night-paper: #132428;
+  --night-sheet: #1a2f35;
+  --night-saffron: #e9c46a;
+  --night-saffron-soft: #433a1f;
+  --night-teal: #2a9d8f;
+  --night-teal-deep: #7dd0c3;
+  --night-teal-soft: #173f3e;
+  --night-sandy: #f4a261;
+  --night-sandy-soft: #46301f;
+  --night-sienna: #e76f51;
+  --night-sienna-deep: #f0957c;
+  --night-sienna-soft: #4a2a23;
+  /* Night-only helpers. */
+  --night-shadow: #0a1417;
+  --night-saffron-on-ink: #7a5a10;
+
+  /* The grain, tinted to the ink of each theme. */
+  --day-grain-paper:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .15 0 0 0 0 .27 0 0 0 0 .33 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cg fill='%23264653' fill-opacity='.18'%3E%3Ccircle cx='12' cy='30' r='.9'/%3E%3Ccircle cx='88' cy='14' r='.6'/%3E%3Ccircle cx='140' cy='62' r='1.1'/%3E%3Ccircle cx='52' cy='118' r='.7'/%3E%3Ccircle cx='118' cy='136' r='.8'/%3E%3Ccircle cx='30' cy='84' r='.5'/%3E%3C/g%3E%3C/svg%3E");
+  --day-grain-sheet: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .15 0 0 0 0 .27 0 0 0 0 .33 0 0 0 .06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* Night grain: cream fibres and speckles, a touch lighter so the paper still feels printed. */
+  --night-grain-paper:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .95 0 0 0 0 .9 0 0 0 0 .79 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cg fill='%23f3e7c9' fill-opacity='.14'%3E%3Ccircle cx='12' cy='30' r='.9'/%3E%3Ccircle cx='88' cy='14' r='.6'/%3E%3Ccircle cx='140' cy='62' r='1.1'/%3E%3Ccircle cx='52' cy='118' r='.7'/%3E%3Ccircle cx='118' cy='136' r='.8'/%3E%3Ccircle cx='30' cy='84' r='.5'/%3E%3C/g%3E%3C/svg%3E");
+  --night-grain-sheet: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .95 0 0 0 0 .9 0 0 0 0 .79 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+
+  /* Theme helpers (not colour utilities). Day values; night overrides them below. */
+  --grain-paper: var(--day-grain-paper);
+  --grain-sheet: var(--day-grain-sheet);
+  --shadow-ink: var(--day-ink);
+  --saffron-on-ink: var(--day-saffron);
+  /* Light halo behind cut-out art with dark outlines (mascot, logo). None by day. */
+  --art-halo: none;
+  color-scheme: light;
+}
+
 @theme {
   --color-*: initial;
-  --color-ink: #264653;
-  --color-paper: #f3ebd5;
-  --color-sheet: #fbf6e8;
-  --color-saffron: #e9c46a;
-  --color-saffron-soft: #f7e7bc;
-  --color-teal: #2a9d8f;
-  --color-teal-deep: #1e7268;
-  --color-teal-soft: #cfe9e4;
-  --color-sandy: #f4a261;
-  --color-sandy-soft: #fbddc0;
-  --color-sienna: #e76f51;
-  --color-sienna-deep: #b8472d;
-  --color-sienna-soft: #f8d3c7;
+  --color-ink: var(--day-ink);
+  --color-paper: var(--day-paper);
+  --color-sheet: var(--day-sheet);
+  --color-saffron: var(--day-saffron);
+  --color-saffron-soft: var(--day-saffron-soft);
+  --color-teal: var(--day-teal);
+  --color-teal-deep: var(--day-teal-deep);
+  --color-teal-soft: var(--day-teal-soft);
+  --color-sandy: var(--day-sandy);
+  --color-sandy-soft: var(--day-sandy-soft);
+  --color-sienna: var(--day-sienna);
+  --color-sienna-deep: var(--day-sienna-deep);
+  --color-sienna-soft: var(--day-sienna-soft);
   --color-white: #ffffff;
   --color-transparent: transparent;
   --color-current: currentColor;
@@ -126,20 +204,100 @@
   }
 }
 
+/* ---- Night ------------------------------------------------------------------------------- */
+
+/* Night tokens. data-theme is always "light" or "dark" (see lib/theme.ts); system follows the OS. */
+:root[data-theme='dark'] {
+  --color-ink: var(--night-ink);
+  --color-paper: var(--night-paper);
+  --color-sheet: var(--night-sheet);
+  --color-saffron: var(--night-saffron);
+  --color-saffron-soft: var(--night-saffron-soft);
+  --color-teal: var(--night-teal);
+  --color-teal-deep: var(--night-teal-deep);
+  --color-teal-soft: var(--night-teal-soft);
+  --color-sandy: var(--night-sandy);
+  --color-sandy-soft: var(--night-sandy-soft);
+  --color-sienna: var(--night-sienna);
+  --color-sienna-deep: var(--night-sienna-deep);
+  --color-sienna-soft: var(--night-sienna-soft);
+  --grain-paper: var(--night-grain-paper);
+  --grain-sheet: var(--night-grain-sheet);
+  --shadow-ink: var(--night-shadow);
+  --saffron-on-ink: var(--night-saffron-on-ink);
+  --art-halo: drop-shadow(0 0 0.6px var(--night-ink)) drop-shadow(0 0 0.6px var(--night-ink)) drop-shadow(0 0 7px rgb(243 231 201 / 0.28));
+  color-scheme: dark;
+}
+
+/*
+ * A "day island": re-declares the day palette for an element and its children. Bright accent
+ * fills are islands, so whatever sits on saffron, sandy, teal or sienna reads exactly as by day
+ * (dark ink, cream sheets). No effect by day. Use it directly for any other bright surface.
+ */
+@utility day-island {
+  --color-ink: var(--day-ink);
+  --color-paper: var(--day-paper);
+  --color-sheet: var(--day-sheet);
+  --color-saffron: var(--day-saffron);
+  --color-saffron-soft: var(--day-saffron-soft);
+  --color-teal: var(--day-teal);
+  --color-teal-deep: var(--day-teal-deep);
+  --color-teal-soft: var(--day-teal-soft);
+  --color-sandy: var(--day-sandy);
+  --color-sandy-soft: var(--day-sandy-soft);
+  --color-sienna: var(--day-sienna);
+  --color-sienna-deep: var(--day-sienna-deep);
+  --color-sienna-soft: var(--day-sienna-soft);
+  --grain-paper: var(--day-grain-paper);
+  --grain-sheet: var(--day-grain-sheet);
+  --saffron-on-ink: var(--day-saffron);
+  --art-halo: none;
+  /* Inherited text colour is resolved by the parent, so re-resolve it here (any text-* class wins). */
+  color: var(--color-ink);
+}
+/* These merge with Tailwind's own bg-* rules, so variants (hover:, has-checked:, active states) carry the island too. */
+@utility bg-saffron {
+  @apply day-island;
+}
+@utility bg-sandy {
+  @apply day-island;
+}
+@utility bg-teal {
+  @apply day-island;
+}
+@utility bg-sienna {
+  @apply day-island;
+}
+/* On an ink fill, saffron letters and ticks use --saffron-on-ink (ochre on the cream night ink). */
+@utility bg-ink {
+  --color-saffron: var(--saffron-on-ink);
+}
+
+/* Cut-out art with dark outlines (Migo, the logo) gets a faint cream halo at night. Applied
+   automatically to the mascot and logo images; add `art-halo` to any other such image. */
+@utility art-halo {
+  filter: var(--art-halo);
+}
+@layer base {
+  img[src^='/assets/mascot/'],
+  img[src^='/assets/logo'],
+  img[src^='/assets/icon'] {
+    filter: var(--art-halo);
+  }
+}
+
 /* ---- Paper, rules and print details ------------------------------------------------------- */
 
 /* The printed-paper grain: a faint fractal noise plus speckles, tinted to the ink. */
 @utility paper-grain {
   background-color: var(--color-paper);
-  background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .15 0 0 0 0 .27 0 0 0 0 .33 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cg fill='%23264653' fill-opacity='.18'%3E%3Ccircle cx='12' cy='30' r='.9'/%3E%3Ccircle cx='88' cy='14' r='.6'/%3E%3Ccircle cx='140' cy='62' r='1.1'/%3E%3Ccircle cx='52' cy='118' r='.7'/%3E%3Ccircle cx='118' cy='136' r='.8'/%3E%3Ccircle cx='30' cy='84' r='.5'/%3E%3C/g%3E%3C/svg%3E");
+  background-image: var(--grain-paper);
 }
 
 /* Lighter sheet for panels and cells, same grain. */
 @utility sheet-grain {
   background-color: var(--color-sheet);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .15 0 0 0 0 .27 0 0 0 0 .33 0 0 0 .06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-image: var(--grain-sheet);
 }
 
 /* Diagonal hatching, like the band under a printed menu's nav. */
@@ -160,22 +318,22 @@
   background-image: repeating-linear-gradient(-45deg, var(--color-ink) 0 1.5px, transparent 1.5px 6px);
 }
 
-/* Solid offset shadow (the café-card block shadow). */
+/* Solid offset shadow (the café-card block shadow). Ink by day, near-black by night. */
 @utility shadow-block {
-  box-shadow: 6px 6px 0 var(--color-ink);
+  box-shadow: 6px 6px 0 var(--shadow-ink);
 }
 @utility shadow-block-sm {
-  box-shadow: 3px 3px 0 var(--color-ink);
+  box-shadow: 3px 3px 0 var(--shadow-ink);
 }
 
 /* Masthead title: saffron letters, ink outline and a 3D ink extrude. */
 @utility title-retro {
   color: var(--color-saffron);
-  -webkit-text-stroke: 2px var(--color-ink);
+  -webkit-text-stroke: 2px var(--shadow-ink);
   paint-order: stroke fill;
   text-shadow:
-    2px 2px 0 var(--color-ink),
-    4px 4px 0 var(--color-ink);
+    2px 2px 0 var(--shadow-ink),
+    4px 4px 0 var(--shadow-ink);
 }
 
 /* Small caps label used for eyebrows, field labels and metadata. */
@@ -247,8 +405,8 @@
   }
 
   ::selection {
-    background: var(--color-saffron);
-    color: var(--color-ink);
+    background: var(--day-saffron);
+    color: var(--day-ink);
   }
 
   :focus-visible {
