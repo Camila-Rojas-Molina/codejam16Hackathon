@@ -118,7 +118,13 @@ function CameraScreen({ heading, onBack }: { heading: string | null; onBack: () 
       setVideoReady(false)
       dispatch({ type: 'CAMERA_STARTING' })
       startStream(want)
-        .then(() => dispatch({ type: 'CAMERA_READY' }))
+        .then(() => {
+          dispatch({ type: 'CAMERA_READY' })
+          // A video that is already playing (e.g. a tap on "Start camera" right as the automatic
+          // start finished) fires no new loadedmetadata/playing event, so check readiness directly.
+          const v = videoRef.current
+          if (v && v.readyState >= 2 && v.videoWidth > 0) setVideoReady(true)
+        })
         .catch((e: unknown) => {
           if (!(e instanceof CameraSuperseded)) dispatch({ type: 'CAMERA_FAILED', error: classifyCameraError(e) })
         })
