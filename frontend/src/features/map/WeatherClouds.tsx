@@ -2,7 +2,7 @@
 // more clouds when it's overcast (always a couple so the sky isn't empty), drifting with the
 // real wind, each casting a soft shadow on the city. They pan with the map (a little slower,
 // as they sit above it), grow as you zoom in and fade out before street level, so they never
-// hide a pin. If the weather call fails, no clouds: the map is unaffected.
+// hide a pin. If the weather call fails, a light default sky is shown instead.
 // Drawn in the map's canvas container under the markers, with pointer-events off.
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -10,22 +10,25 @@ import type { Map as MapLibreMap } from 'maplibre-gl'
 import { prefersReducedMotion } from './camera'
 import { MONTREAL_CENTER } from './geo'
 
-type Weather = { cover: number; windKmh: number; windFromDeg: number }
+type Weather = { cover: number; windKmh: number; windFromDeg: number; live: boolean }
+
+/** Used when the weather service is unreachable or rate-limited: a light sky, westerly breeze. */
+const FALLBACK: Weather = { cover: 35, windKmh: 12, windFromDeg: 250, live: false }
 
 const WEATHER_URL =
   `https://api.open-meteo.com/v1/forecast?latitude=${MONTREAL_CENTER.lat}&longitude=${MONTREAL_CENTER.lng}` +
   '&current=cloud_cover,wind_speed_10m,wind_direction_10m&timezone=auto'
 
-let cached: Promise<Weather | null> | null = null
-function fetchWeather(): Promise<Weather | null> {
+let cached: Promise<Weather> | null = null
+function fetchWeather(): Promise<Weather> {
   cached ??= fetch(WEATHER_URL)
     .then((r) => (r.ok ? r.json() : null))
     .then((j) => {
       const c = j?.current
-      if (!c || typeof c.cloud_cover !== 'number') return null
-      return { cover: c.cloud_cover, windKmh: c.wind_speed_10m ?? 10, windFromDeg: c.wind_direction_10m ?? 270 }
+      if (!c || typeof c.cloud_cover !== 'number') return FALLBACK
+      return { cover: c.cloud_cover, windKmh: c.wind_speed_10m ?? 10, windFromDeg: c.wind_direction_10m ?? 270, live: true }
     })
-    .catch(() => null)
+    .catch(() => FALLBACK)
   return cached
 }
 
@@ -58,7 +61,7 @@ function makeClouds(count: number, w: number, h: number): Cloud[] {
       const r = 26 + rnd() * 18 + Math.sin(t * Math.PI) * 22
       puffs.push([30 + t * 140, 70 - Math.sin(t * Math.PI) * 22 - rnd() * 10, r])
     }
-    return { x: rnd() * (w + 2 * MARGIN), y: rnd() * (h + 2 * MARGIN), scale: 0.7 + rnd() * 0.7, puffs, speed: 0.7 + rnd() * 0.6 }
+    return { x: rnd() * (w + 2 * MARGIN), y: rnd() * (h + 2 * MARGIN), scale: 0.5 + rnd() * 0.45, puffs, speed: 0.7 + rnd() * 0.6 }
   })
 }
 
@@ -99,7 +102,7 @@ export default function WeatherClouds({ map }: { map: MapLibreMap }) {
   useEffect(() => {
     let alive = true
     fetchWeather().then((w) => {
-      if (!alive || !w) return
+      if (!alive) return
       const count = Math.max(MIN_CLOUDS, Math.round((w.cover / 100) * MAX_CLOUDS))
       const c = map.getContainer()
       setClouds(makeClouds(count, c.clientWidth, c.clientHeight))
@@ -168,7 +171,7 @@ export default function WeatherClouds({ map }: { map: MapLibreMap }) {
     <div
       ref={layer}
       aria-hidden="true"
-      title={`Live weather: ${Math.round(weather.cover)}% cloud cover, wind ${Math.round(weather.windKmh)} km/h`}
+      title={weather.live ? `Live weather: ${Math.round(weather.cover)}% cloud cover, wind ${Math.round(weather.windKmh)} km/h` : 'Weather unavailable: showing a light default sky'}
       style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0, transition: 'opacity 200ms' }}
     >
       {clouds.map((c, i) => (
