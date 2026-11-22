@@ -13,8 +13,9 @@
 // Progress is computed from stored facts only, never self-reported. Period quests count what
 // happened inside their period; starter quests count everything ever.
 import { QUEST_DEFS, conditionTarget } from './catalog'
-import { activeTrip } from '../profile/model'
-import type { ProfileRecord } from '../profile/types'
+import { hasUniversalProfile } from '../profile/flow'
+import { activeTrip, isModeReady } from '../profile/model'
+import type { Account, ProfileRecord } from '../profile/types'
 import {
   DAILY_REFRESHES,
   QUEST_SLOTS,
@@ -52,6 +53,25 @@ export type QuestFacts = {
   equipped: string[]
 }
 
+/**
+ * The same facts, ALREADY limited to the quest's period by the caller (the other accepted shape;
+ * the profile checks are read straight from the record). Times are ms since epoch.
+ */
+export type ProgressFacts = {
+  profile: ProfileRecord | null
+  account: Account | null
+  hunts: { huntId: string; at: number; withPartner: boolean; kind?: string }[]
+  photos: { at: number; city: { name: string; placeId: string | null } | null }[]
+  /** Cities pinned (with a placeId) in the period. */
+  newCities: { placeId: string; at: number }[]
+  /** How many times each page was opened in the period. */
+  visits: Partial<Record<VisitPage, number>>
+  questsCompleted: { category: QuestCategory; at: number }[]
+  purchases: number
+  /** Items worn right now. */
+  equipped: number
+}
+
 /** [from, to) in ms. Undefined = all time. */
 export type TimeWindow = { from: number; to: number }
 
@@ -60,63 +80,118 @@ const inWindow = (at: number, w?: TimeWindow) => !w || (at >= w.from && at < w.t
 /** Same key the server uses for "different cities": the place id, else the lower-cased name. */
 export const cityKey = (city: { name: string; placeId: string | null }) => city.placeId ?? city.name.trim().toLowerCase()
 
+/** Both fact shapes, reduced to what the conditions count (already inside the window). */
+type Counted = {
+  hunts: { huntId: string; withPartner: boolean; kind?: string }[]
+  photos: { city: { name: string; placeId: string | null } | null }[]
+  pinned: string[]
+  fact: (check: ProfileCheck) => boolean
+  visited: (page: VisitPage) => boolean
+  completed: QuestCategory[]
+  purchases: number
+  equipped: number
+}
+
+function countedFromFacts(f: QuestFacts, w?: TimeWindow): Counted {
+  return {
+    hunts: f.huntResults.filter((h) => inWindow(h.completedAt, w)).map((h) => ({ huntId: h.huntId, withPartner: !!h.withPartner, kind: h.kind })),
+    photos: f.photos.filter((p) => inWindow(p.at, w)),
+    pinned: f.cities.filter((c) => c.placeId && inWindow(c.addedAt, w)).map((c) => c.placeId as string),
+    fact: (check) => {
+      switch (check) {
+        case 'questionnaire_complete':
+          return f.profile.questionnaireComplete
+        case 'home_city_pinned':
+          return f.profile.homeCityPinned
+        case 'avatar_chosen':
+          return f.profile.avatarChosen
+        case 'both_modes_ready':
+          return f.profile.bothModesReady
+        case 'first_city':
+          return f.cities.length > 0
+      }
+    },
+    visited: (page) => f.visits.some((v) => v.page === page && inWindow(v.at, w)),
+    completed: f.completedQuests.filter((q) => inWindow(q.completedAt, w)).map((q) => q.category),
+    purchases: f.purchases.filter((p) => inWindow(p.at, w)).length,
+    equipped: f.equipped.length,
+  }
+}
+
+function countedFromProgress(f: ProgressFacts): Counted {
+  return {
+    hunts: f.hunts,
+    photos: f.photos,
+    pinned: f.newCities.map((c) => c.placeId),
+    fact: (check) => profileCheck(check, f.profile, f.account),
+    visited: (page) => (f.visits[page] ?? 0) > 0,
+    completed: f.questsCompleted.map((q) => q.category),
+    purchases: f.purchases,
+    equipped: f.equipped,
+  }
+}
+
+/** The profile facts starter quests check, read from the record (the server reads the same columns). */
+export function profileCheck(check: ProfileCheck, profile: ProfileRecord | null, account: Account | null): boolean {
+  const u = profile?.universal
+  switch (check) {
+    case 'questionnaire_complete':
+      return hasUniversalProfile(profile)
+    case 'home_city_pinned':
+      return !!(u?.homeCityPlace || profile?.local?.homeCityPlace)
+    case 'avatar_chosen':
+      return !!account?.avatar
+    case 'both_modes_ready':
+      return isModeReady(profile, 'tourist') && isModeReady(profile, 'local')
+    case 'first_city':
+      return (u?.citiesDiscovered.length ?? 0) > 0
+  }
+}
+
 /**
  * How far along a quest is. `progress` never exceeds `target`.
  *   hunts       count (distinct hunt ids with distinctHunts; team-of-two only with withPartner)
  *   photos      count; requireCity/distinctCities only count photos with a city. With
  *               distinctCities, the first photo from each city (up to distinctCities) counts, then
  *               further photos fill the rest of `count`. target = max(count, distinctCities)
- *   new_cities  distinct pinned place ids added in the window
- *   profile / visit: 0 or 1. quests_completed / purchases: counts in the window. equipped: now.
+ *   new_cities  distinct pinned place ids added in the period
+ *   profile / visit: 0 or 1. quests_completed / purchases: counts in the period. equipped: now.
+ * Pass QuestFacts plus the period's window, or ProgressFacts already limited to the period.
  */
-export function evaluateProgress(def: Pick<QuestDef, 'condition'>, facts: QuestFacts, window?: TimeWindow): { progress: number; target: number } {
+export function evaluateProgress(def: Pick<QuestDef, 'condition'>, facts: QuestFacts, window?: TimeWindow): { progress: number; target: number }
+export function evaluateProgress(def: Pick<QuestDef, 'condition'>, facts: ProgressFacts): { progress: number; target: number }
+export function evaluateProgress(def: Pick<QuestDef, 'condition'>, facts: QuestFacts | ProgressFacts, window?: TimeWindow) {
   const target = conditionTarget(def)
-  const raw = rawProgress(def.condition, facts, window)
-  return { progress: Math.max(0, Math.min(target, raw)), target }
+  const counted = 'huntResults' in facts ? countedFromFacts(facts, window) : countedFromProgress(facts)
+  return { progress: Math.max(0, Math.min(target, rawProgress(def.condition, counted))), target }
 }
 
-function rawProgress(c: QuestCondition, f: QuestFacts, w?: TimeWindow): number {
+function rawProgress(c: QuestCondition, n: Counted): number {
   switch (c.type) {
     case 'hunts': {
-      let hunts = f.huntResults.filter((h) => inWindow(h.completedAt, w))
+      let hunts = n.hunts
       if (c.withPartner) hunts = hunts.filter((h) => h.withPartner)
       if (c.huntKinds?.length) hunts = hunts.filter((h) => !!h.kind && c.huntKinds!.includes(h.kind))
       return c.distinctHunts ? new Set(hunts.map((h) => h.huntId)).size : hunts.length
     }
     case 'photos': {
-      let photos = f.photos.filter((p) => inWindow(p.at, w))
-      if (c.requireCity || c.distinctCities) photos = photos.filter((p) => !!p.city?.name.trim())
+      const photos = c.requireCity || c.distinctCities ? n.photos.filter((p) => !!p.city?.name.trim()) : n.photos
       if (!c.distinctCities) return photos.length
       const cityPart = Math.min(new Set(photos.map((p) => cityKey(p.city!))).size, c.distinctCities)
       return cityPart + Math.min(photos.length - cityPart, Math.max(0, c.count - c.distinctCities))
     }
     case 'new_cities':
-      return new Set(f.cities.filter((x) => x.placeId && inWindow(x.addedAt, w)).map((x) => x.placeId)).size
+      return new Set(n.pinned).size
     case 'profile':
-      return profileFact(c.check, f) ? 1 : 0
+      return n.fact(c.check) ? 1 : 0
     case 'visit':
-      return f.visits.some((v) => v.page === c.page && inWindow(v.at, w)) ? 1 : 0
+      return n.visited(c.page) ? 1 : 0
     case 'quests_completed':
-      return f.completedQuests.filter((q) => (!c.categories?.length || c.categories.includes(q.category)) && inWindow(q.completedAt, w)).length
+      return n.completed.filter((cat) => !c.categories?.length || c.categories.includes(cat)).length
     case 'purchases':
-      return f.purchases.filter((p) => inWindow(p.at, w)).length
+      return n.purchases
     case 'equipped':
-      return f.equipped.length
-  }
-}
-
-function profileFact(check: ProfileCheck, f: QuestFacts): boolean {
-  switch (check) {
-    case 'questionnaire_complete':
-      return f.profile.questionnaireComplete
-    case 'home_city_pinned':
-      return f.profile.homeCityPinned
-    case 'avatar_chosen':
-      return f.profile.avatarChosen
-    case 'both_modes_ready':
-      return f.profile.bothModesReady
-    case 'first_city':
-      return f.cities.length > 0
+      return n.equipped
   }
 }
 
@@ -316,6 +391,19 @@ export function questCity(profile: ProfileRecord | null): string | null {
   return profile.local?.homeCity?.trim() || profile.universal?.homeCity?.trim() || null
 }
 
+/** QuestPerson from a profile record. hasTeamedUp can't be read from it: pass it (default false). */
+export function personFrom(profile: ProfileRecord | null, opts: { hasTeamedUp?: boolean } = {}): QuestPerson {
+  const u = profile?.universal
+  const trip = profile?.activeMode === 'tourist' ? activeTrip(profile) : null
+  return {
+    mode: profile?.activeMode ?? null,
+    interests: [...new Set([...(u?.interests ?? []), ...(trip?.interests ?? [])])],
+    accessibility: [...new Set([...(u?.accessibility.needs ?? []), ...(trip?.accessibility.needs ?? [])])],
+    pace: u?.exploration.pace ?? null,
+    hasTeamedUp: !!opts.hasTeamedUp,
+  }
+}
+
 // ---- Issuing ---------------------------------------------------------------------------------
 
 export type ExistingAssignment = Pick<QuestAssignment, 'id' | 'defId' | 'category' | 'periodKey' | 'status' | 'assignedAt'>
@@ -408,11 +496,55 @@ function makeAssignment(def: QuestDef, periodKey: string, now: number, expiresAt
   }
 }
 
+/** The other accepted input: "pick `count` quests of one category" (the caller owns slots and periods). */
+export type PickInput = {
+  category: Exclude<QuestCategory, 'starter'>
+  count: number
+  profile: ProfileRecord | null
+  /**
+   * Def ids not to offer: everything active now and everything handed out this period (replaced
+   * ones too). Those of the same category also count as "in this period" for the variety rules.
+   */
+  exclude: string[]
+  /** Def ids from recent periods: avoided while anything else fits. */
+  recent?: string[]
+  /** Stable for the person and period, e.g. '<account>:a:2026-W48:2'. */
+  seed: string
+  /** Overrides what personFrom(profile) can't know (hasTeamedUp). */
+  person?: Partial<QuestPerson>
+  defs?: QuestDef[]
+}
+
 /**
  * Fills every empty slot for the current periods and lists assignments that have expired.
  * Idempotent: calling it again in the same period issues nothing new.
+ * With a PickInput instead, returns the `count` best quests for that category.
  */
-export function issueAssignments(input: IssueInput): IssueResult {
+export function issueAssignments(input: IssueInput): IssueResult
+export function issueAssignments(input: PickInput): QuestDef[]
+export function issueAssignments(input: IssueInput | PickInput): IssueResult | QuestDef[] {
+  return 'category' in input ? pickMany(input) : issueForPeriods(input)
+}
+
+function pickMany(input: PickInput): QuestDef[] {
+  const defs = input.defs ?? QUEST_DEFS
+  const person = { ...personFrom(input.profile), ...input.person }
+  const byId = new Map(defs.map((d) => [d.id, d]))
+  const taken = input.exclude.map((id) => byId.get(id)).filter((d): d is QuestDef => !!d && d.category === input.category)
+  const avoid = new Set(input.exclude)
+  const candidates = defs.filter((d) => d.category === input.category && eligible(d, person))
+  const picked: QuestDef[] = []
+  for (let n = 0; n < input.count; n++) {
+    const def = pick(input.category, candidates, taken, avoid, new Set(input.recent ?? []), person, input.seed)
+    if (!def) break
+    picked.push(def)
+    taken.push(def)
+    avoid.add(def.id)
+  }
+  return picked
+}
+
+function issueForPeriods(input: IssueInput): IssueResult {
   const { now, seed, person } = input
   const defs = input.defs ?? QUEST_DEFS
   const periods = periodsAt(now, input.timezone)

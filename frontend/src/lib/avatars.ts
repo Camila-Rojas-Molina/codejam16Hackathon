@@ -4,21 +4,42 @@
 //
 // Every picture is a 500×500 PNG with a transparent background and the character centred with
 // roughly 15% clear space around it, so they all frame the same in the square avatar stamp.
-// `anchors` say where shop accessories sit on that character (see features/rewards/shop.ts).
+// `landmarks` record where the character's features are, measured on the picture (see
+// AvatarLandmarks). Shop accessories don't compute their placement from them at runtime: every
+// accessory carries an explicit, visually checked placement per avatar
+// (features/rewards/catalog/accessories.ts `fits`), and these landmarks are the reference those
+// placements were derived from. A new avatar needs its landmarks here plus a fit on each accessory
+// it can wear (anything without a fit shows "doesn't fit your avatar").
 
-/** Where accessories sit on one avatar, in the picture's own 0–1 square (x right, y down). */
-export type AnchorPoint = {
-  /** Centre of the anchor line. */
-  x: number
-  y: number
-  /** Width of the anchor (0–1 of the square): head width for hats, eye span for eyewear… */
-  w: number
-  /** Tilt in degrees (clockwise), for characters drawn at an angle. */
-  r?: number
+/** A point in the picture's own 0–1 square (x right, y down). */
+export type Pt = { x: number; y: number }
+
+/**
+ * Measured features of one character picture, in its 0–1 square. These are objects with faces, so
+ * "head", "ears" and "neck" are the sensible equivalents on each shape (documented per avatar).
+ */
+export type AvatarLandmarks = {
+  /** Bounding box of the drawn character: [left, top, right, bottom]. */
+  bounds: [number, number, number, number]
+  /** Highest point of the head shape (where a floating halo centres). */
+  headTop: Pt
+  /** Where a hat rests: centre of the hat line, the head's width along it, and its tilt (° clockwise). */
+  hat: Pt & { w: number; r: number }
+  /** Eye centres (for sunglasses: on a character with built-in shades, the lens centres). */
+  eyes: { l: Pt; r: Pt }
+  /** Centre of the mouth. */
+  mouth: Pt
+  /** Left and right edge of the head shape at eye level (headphone cups, earrings). */
+  sides: { l: Pt; r: Pt }
+  /** The neck line: where a necklace or scarf sits, with the shape's width there. */
+  neck: Pt & { w: number }
+  /** Closed fists that can hold something, if the character has hands. */
+  hands?: { l?: Pt; r?: Pt }
+  /** Already wearing sunglasses in the picture. */
+  builtInShades?: boolean
+  /** How the shape maps to a head/neck, in words. */
+  notes: string
 }
-
-/** head: centre of the hat line (where a brim rests). face: centre of the eye line. neck: centre of the chin/collar line. */
-export type AvatarAnchors = { head: AnchorPoint; face: AnchorPoint; neck: AnchorPoint }
 
 export type AvatarArt = {
   id: string
@@ -31,8 +52,8 @@ export type AvatarArt = {
   newSet?: boolean
   /** Visual size correction inside the stamp (1 = as drawn). Keep the art itself consistently framed. */
   scale?: number
-  /** Where accessories sit. Omitted: DEFAULT_ANCHORS (a front-facing character centred in the square). */
-  anchors?: AvatarAnchors
+  /** Measured features (reference for accessory fits). */
+  landmarks?: AvatarLandmarks
 }
 
 /**
@@ -41,12 +62,6 @@ export type AvatarArt = {
  * (accounts already using a legacy picture keep seeing it).
  */
 export const NEW_AVATAR_SET_READY = false
-
-export const DEFAULT_ANCHORS: AvatarAnchors = {
-  head: { x: 0.5, y: 0.22, w: 0.44 },
-  face: { x: 0.5, y: 0.42, w: 0.3 },
-  neck: { x: 0.5, y: 0.66, w: 0.34 },
-}
 
 /** The 3 pictures that stay in the new set. */
 const KEPT_AVATARS: AvatarArt[] = [
