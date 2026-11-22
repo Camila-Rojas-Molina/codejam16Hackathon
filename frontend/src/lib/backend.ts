@@ -1,7 +1,9 @@
 // Client for the Supabase backend (backend/supabase/migrations). Uses plain fetch, so no
 // extra npm package is needed. Not wired into the screens yet: api.ts still returns mock
-// data. To switch, call these from api.ts when isBackendConfigured() is true.
+// data. To switch, call these from api.ts when isBackendConfigured() is true. Requests carry the
+// signed-in login's token (auth.ts) when there is one.
 import type { Account, ProfileRecord } from '../features/profile/types'
+import { getAccessToken } from './auth'
 import { config } from './config'
 import type { Difficulty, Hunt, LatLng, Role, ScoreBreakdown, Team, User } from './types'
 
@@ -51,12 +53,27 @@ export type BackendScore = ScoreBreakdown & {
 /** Thrown when the server says the team isn't close enough to the spot yet. */
 export class TooFarError extends Error {}
 
+/** Any other server error. code is the Postgres errcode when there is one (e.g. '42501', '23505'). */
+export class BackendError extends Error {
+  readonly code: string | null
+  readonly status: number
+  constructor(message: string, code: string | null, status: number) {
+    super(message)
+    this.name = 'BackendError'
+    this.code = code
+    this.status = status
+  }
+}
+
 // ---- HTTP helpers --------------------------------------------------------------
 
-function headers(extra?: Record<string, string>): Record<string, string> {
+// apikey is always the anon key; Authorization carries the signed-in login's token when there is
+// one (so the database knows who is calling), else the anon key.
+async function headers(extra?: Record<string, string>): Promise<Record<string, string>> {
+  const token = (await getAccessToken()) ?? config.supabaseAnonKey
   return {
     apikey: config.supabaseAnonKey,
-    Authorization: `Bearer ${config.supabaseAnonKey}`,
+    Authorization: `Bearer ${token}`,
     ...extra,
   }
 }
@@ -65,13 +82,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!isBackendConfigured()) throw new Error('Backend not configured: set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY')
   const res = await fetch(`${config.supabaseUrl}${path}`, {
     ...init,
-    headers: { ...headers({ 'Content-Type': 'application/json' }), ...(init.headers as Record<string, string>) },
+    headers: { ...(await headers({ 'Content-Type': 'application/json' })), ...(init.headers as Record<string, string>) },
   })
   const text = await res.text()
-  const body = text ? JSON.parse(text) : null
+  let body: { hint?: string; message?: string; code?: string } | null = null
+  try {
+    body = text ? JSON.parse(text) : null
+  } catch {
+    body = null
+  }
   if (!res.ok) {
     if (body?.hint === 'too_far') throw new TooFarError(body.message ?? 'Not at the spot yet')
-    throw new Error(body?.message ?? `Request failed (${res.status})`)
+    // 42501 "Not your account", 23505 "This login already has a profile", etc.: show the server's message.
+    throw new BackendError(body?.message ?? `Request failed (${res.status})`, body?.code ?? null, res.status)
   }
   return body as T
 }
@@ -172,7 +195,7 @@ export async function uploadSelfie(teamId: string, huntId: string, image: Blob):
   const path = `${teamId}/${huntId}-${Date.now()}.${ext}`
   const res = await fetch(`${config.supabaseUrl}/storage/v1/object/selfies/${path}`, {
     method: 'POST',
-    headers: headers({ 'Content-Type': image.type || 'image/jpeg', 'x-upsert': 'true' }),
+    headers: await headers({ 'Content-Type': image.type || 'image/jpeg', 'x-upsert': 'true' }),
     body: image,
   })
   if (!res.ok) throw new Error(`Selfie upload failed (${res.status})`)
@@ -235,6 +258,12 @@ export async function createMigoAccount(input: { name: string; avatar: string })
 export async function getMigoProfile(id: string): Promise<{ account: Account; record: unknown } | null> {
   const row = await rpc<{ account: MigoAccountRow; record: unknown } | null>('migo_get_profile', { p_profile_id: id })
   return row ? { account: toAccount(row.account), record: row.record } : null
+}
+
+/** The signed-in login's account and record, or null when this login has no profile yet. */
+export async function getMyMigoProfile(): Promise<{ account: Account; record: unknown } | null> {
+  const row = await rpc<{ account: MigoAccountRow; record: unknown } | null>('migo_my_profile', {})
+  return row?.account ? { account: toAccount(row.account), record: row.record } : null
 }
 
 export async function updateMigoAccount(account: Account): Promise<void> {

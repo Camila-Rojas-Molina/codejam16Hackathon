@@ -16,6 +16,8 @@ export type ProfileRepo = {
   getRecord(accountId: string): Promise<ProfileRecord>
   saveRecord(record: ProfileRecord): Promise<void>
   deleteAccount(accountId: string): Promise<void>
+  /** The signed-in login's account and record (Supabase only; always null on this device). */
+  getMine(): Promise<{ account: Account; record: ProfileRecord } | null>
 }
 
 const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
@@ -42,6 +44,9 @@ const deviceRepo: ProfileRepo = {
   async deleteAccount(accountId) {
     db.deleteAccountData(accountId)
   },
+  async getMine() {
+    return null
+  },
 }
 
 const supabaseRepo: ProfileRepo = {
@@ -56,6 +61,10 @@ const supabaseRepo: ProfileRepo = {
   },
   saveRecord: (record) => backend.saveMigoRecord(record),
   deleteAccount: (accountId) => backend.deleteMigoAccount(accountId),
+  async getMine() {
+    const found = await backend.getMyMigoProfile()
+    return found ? { account: found.account, record: normalizeRecord(found.record, found.account.id) } : null
+  },
 }
 
 export const profileRepo = (): ProfileRepo => (backend.isBackendConfigured() ? supabaseRepo : deviceRepo)

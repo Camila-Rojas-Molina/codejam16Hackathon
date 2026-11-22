@@ -132,6 +132,12 @@ export async function getProfile(accountId: string): Promise<{ account: Account;
   return { account: clone(account), profile: clone(await repo.getRecord(accountId)) }
 }
 
+/** The signed-in login's account and profile (Supabase login). Null = this login has no profile yet. */
+export async function getMyProfile(): Promise<{ account: Account; profile: ProfileRecord } | null> {
+  const found = await profileRepo().getMine()
+  return found ? { account: clone(found.account), profile: clone(found.record) } : null
+}
+
 /** Saves the universal profile only. Trips, local context and rewards are untouched. */
 export async function saveUniversalProfile(accountId: string, universal: UniversalProfile): Promise<ProfileRecord> {
   await delay(250)
