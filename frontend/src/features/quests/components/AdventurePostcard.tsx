@@ -29,7 +29,7 @@ export default function AdventurePostcard({
       className={cn(
         'relative flex scroll-mt-24 flex-col border-2 border-ink',
         state === 'claimed' ? 'bg-sheet' : 'bg-teal-soft',
-        highlight && 'shadow-block outline-4 outline-offset-4 outline-saffron',
+        highlight ? 'shadow-block outline-4 outline-offset-4 outline-saffron' : 'shadow-block-sm',
       )}
     >
       {/* Top strip: postmark (place) and the stamp (reward). */}

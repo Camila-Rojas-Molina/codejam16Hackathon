@@ -30,7 +30,7 @@ export default function PointsSummary({ compact = false, className }: PointsSumm
   }
 
   return (
-    <div className={cn('sheet-grain border-2 border-ink', className)} aria-busy={loading}>
+    <div className={cn('sheet-grain border-2 border-ink shadow-block-sm', className)} aria-busy={loading}>
       <div className="flex items-center gap-4 border-b-2 border-ink bg-saffron p-4 sm:p-5">
         <Icon name="coin" accent="sheet" className="size-12 shrink-0 sm:size-14" />
         <div className="min-w-0">

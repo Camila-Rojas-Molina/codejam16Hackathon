@@ -38,7 +38,7 @@ export default function ModeToggle({ compact = false, showContext = false, class
   const { pathname } = useLocation()
   const { choose, pending, message, activeMode } = useModeSwitcher()
   return (
-    <div className={className}>
+    <div className={className} data-tour="mode">
       <div role="group" aria-label="Exploring mode" className="grid grid-cols-2 gap-1.5">
         {MODE_OPTIONS.map((m) => {
           const active = activeMode === m.mode

@@ -16,7 +16,6 @@ and no light fringe, so the poses sit cleanly on dark backgrounds too.
 | --- | --- | --- |
 | `<pose>.webp` | the sheet's full resolution, 445–686 px wide, 497–779 px tall | about 3x the largest size in the app (`h-52`) |
 | `<pose>-sm.webp` | 360 px tall | small spots and 2x phones |
-| `nav-icon.webp` | 192 × 192, transparent | Migo's face (from `cheer`), for the MAP nav icon |
 
 Poses: `hello`, `glide`, `leap`, `read`, `goodies`, `play`, `curious`, `cheer`, `search` (loading)
 and `ponder` (empty and error states). Use them through `<Mascot pose="…" />`

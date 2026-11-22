@@ -13,7 +13,7 @@ const iconButton =
 
 export function SettingsButton({ className }: { className?: string }) {
   return (
-    <Link to="/settings" aria-label="Settings" title="Settings" className={cn(iconButton, 'group', className)}>
+    <Link to="/settings" data-tour="settings" aria-label="Settings" title="Settings" className={cn(iconButton, 'group', className)}>
       <Icon name="cog" className="size-6 transition-transform duration-300 group-hover:rotate-45" />
     </Link>
   )

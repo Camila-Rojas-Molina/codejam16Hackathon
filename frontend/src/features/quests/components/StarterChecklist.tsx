@@ -53,7 +53,7 @@ export default function StarterChecklist({ todo, done, highlightId }: { todo: Qu
   const ordered = all ? sorted : sorted.slice(0, limit)
   const hidden = sorted.length - ordered.length
   return (
-    <div className="sheet-grain border-2 border-ink">
+    <div className="sheet-grain border-2 border-ink shadow-block-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-ink px-4 py-3">
         <p className="font-bold">
           {done.length} of {total} done

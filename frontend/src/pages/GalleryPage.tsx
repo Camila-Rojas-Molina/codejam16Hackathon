@@ -108,6 +108,7 @@ export default function GalleryPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+      <div data-tour="gallery-header">
       <PageHeader
         eyebrow="Your adventures"
         title="Gallery"
@@ -115,6 +116,7 @@ export default function GalleryPage() {
         // With no photos yet, the buttons sit in the empty state instead.
         aside={(status !== 'ready' || photos.length > 0) && addButtons ? addButtons : undefined}
       />
+      </div>
 
       {/* Hidden picker behind "Upload" (manual: no location check, city and caption by hand). */}
       {online && <input ref={libraryInput} type="file" accept="image/*" onChange={onFile} className="sr-only" tabIndex={-1} aria-hidden />}
@@ -151,7 +153,7 @@ export default function GalleryPage() {
       )}
 
       {online && status === 'ready' && photos.length === 0 && (
-        <section aria-labelledby="gallery-empty" className="sheet-grain flex flex-col items-center gap-4 border-2 border-ink px-5 py-8 text-center">
+        <section aria-labelledby="gallery-empty" className="sheet-grain flex flex-col items-center gap-4 border-2 border-ink px-5 py-8 text-center shadow-block">
           <Mascot pose="ponder" className="h-40 sm:h-48" />
           <h2 id="gallery-empty" className="text-2xl sm:text-3xl">
             No photos yet

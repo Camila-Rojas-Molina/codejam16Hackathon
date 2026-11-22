@@ -7,6 +7,7 @@
 // <Icon name="pin" accent="teal" />       accent fill: saffron | teal | sienna | sandy | sheet | none
 import { cn } from '../../lib/cn'
 import { ICONS, type IconName } from './iconPaths'
+import { BRIGHT_ACCENTS, LINE_ONLY_ICONS } from './iconSets'
 
 export type { IconName }
 
@@ -39,7 +40,7 @@ export default function Icon({ name, label, accent = 'saffron', className, strok
       strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={cn('size-6 shrink-0', className)}
+      className={cn('size-6 shrink-0', BRIGHT_ACCENTS.has(accent) && !LINE_ONLY_ICONS.has(name) && 'icon-bright', className)}
       style={{ ['--icon-accent' as string]: accents[accent] }}
       role={label ? 'img' : undefined}
       aria-label={label}

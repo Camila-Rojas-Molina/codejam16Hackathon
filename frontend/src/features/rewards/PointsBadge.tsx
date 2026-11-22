@@ -21,6 +21,7 @@ export default function PointsBadge({ className, compact = false }: PointsBadgeP
     // NavLink: marked as the current page (and drawn inverted) while you're in the shop.
     <NavLink
       to="/shop"
+      data-tour="points"
       title="Spend your MIGO points in the shop"
       aria-label={label}
       className={({ isActive }) =>

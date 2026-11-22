@@ -284,7 +284,20 @@ export type ProfileRecord = {
   tourist: { trips: TouristTrip[]; activeTripId: string | null }
   local: LocalContext | null
   rewards: Rewards
-  /** People this account has shown interest in (Chat → Discover). */
+  /**
+   * Legacy: people this account tapped "Show interest" on, before connection requests replaced it.
+   * Kept so no saved data is lost; nothing reads it any more.
+   */
   likes: string[]
+  /**
+   * People removed from Messages: person id → when. Their messages are kept, just hidden; they come
+   * back only through a connection accepted after that time (same conversation, never a duplicate).
+   */
+  removedChats: Record<string, number>
+  /** The guided tour (features/tutorial). Null = never offered (accounts from before it existed). */
+  tutorial: TutorialState | null
   updatedAt: number
 }
+
+/** pending = show it on the next visit to the hub; completed / skipped = never auto-show again. */
+export type TutorialState = { status: 'pending' | 'completed' | 'skipped'; at: number }

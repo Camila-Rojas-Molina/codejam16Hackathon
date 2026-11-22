@@ -143,6 +143,26 @@ export const ICONS = {
       <path d="M9 4.5v13M15 6.5v13" />
     </>
   ),
+  // Migo the walking globe (the MAP tab): the mascot's globe with its land, big cartoon eyes, grin and
+  // chunky shoes, drawn in the icon set's line style. The globe is always light sea and teal land,
+  // like the mascot's blue-and-green globe; the shoes take the accent (saffron, like Migo's shoes).
+  migo: (
+    <>
+      <path d="M10.1 16.4 9.5 18.6M13.9 16.4l.6 2.2" strokeWidth="1.6" />
+      <circle cx="12" cy="9.3" r="7.3" fill="var(--color-teal-soft)" />
+      <path d="M4.9 7.7c1.4-.4 2.4.4 2.3 1.6 0 .9.7 1.5.3 2.6-.3.8-1 1.1-1.7.9" fill="var(--color-teal)" strokeWidth="1" />
+      <path d="M15.5 2.7c-.5 1 .2 1.9 1.2 1.9.8 0 1.2.8 2 .7" fill="var(--color-teal)" strokeWidth="1" />
+      <path d="M18.8 12.4c-.9-.2-1.8.4-1.9 1.3-.1.6-.6 1-1.3 1.1" fill="var(--color-teal)" strokeWidth="1" />
+      <circle cx="12" cy="9.3" r="7.3" />
+      <ellipse cx="10.15" cy="8.2" rx="1.9" ry="2.7" strokeWidth="1.1" {...P} />
+      <ellipse cx="13.85" cy="8.2" rx="1.9" ry="2.7" strokeWidth="1.1" {...P} />
+      <ellipse cx="10.7" cy="8.75" rx=".85" ry="1.45" {...K} />
+      <ellipse cx="14.4" cy="8.75" rx=".85" ry="1.45" {...K} />
+      <path d="M9.3 12.5c1.6 1.5 3.8 1.5 5.4 0" strokeWidth="1.3" />
+      <path d="M4.6 21.2c0-1.6 1.3-2.6 3-2.6h2.2c.7 0 1.1.4 1.1 1.1v1.5z" strokeWidth="1.4" {...A} />
+      <path d="M19.4 21.2c0-1.6-1.3-2.6-3-2.6h-2.2c-.7 0-1.1.4-1.1 1.1v1.5z" strokeWidth="1.4" {...A} />
+    </>
+  ),
   quest: (
     <>
       <path d="M5 4.5h12.5v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z" {...A} />
@@ -771,4 +791,3 @@ export type IconName = keyof typeof ICONS
 
 /** Every icon name, e.g. for the style guide. */
 export const ICON_NAMES = Object.keys(ICONS) as IconName[]
-

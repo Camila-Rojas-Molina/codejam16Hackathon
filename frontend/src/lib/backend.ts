@@ -4,6 +4,7 @@
 // signed-in login's token (auth.ts) when there is one.
 import { prepareImage } from '../features/gallery/image'
 import type { Photo, PhotoMeta } from '../features/gallery/types'
+import type { Connection, Person } from '../features/chat/types'
 import type { Account, ProfileRecord } from '../features/profile/types'
 import { getAccessToken, getSession } from './auth'
 import { config } from './config'
@@ -286,6 +287,51 @@ export async function saveMigoRecord(record: ProfileRecord): Promise<void> {
 export async function deleteMigoAccount(id: string): Promise<void> {
   await deleteMyGalleryFiles().catch(() => undefined)
   await rpc('migo_delete_account', { p_profile_id: id })
+}
+
+// ---- Connections (013_connections.sql) -------------------------------------------
+// Tourist → local requests. Signed-in only; the server enforces who can ask, answer and remove.
+// Rows come back already shaped like Connection / DiscoverEntry, with ISO timestamps.
+
+type ConnectionRow = Omit<Connection, 'createdAt' | 'respondedAt' | 'updatedAt'> & {
+  createdAt: string
+  respondedAt: string | null
+  updatedAt: string
+}
+
+const toConnection = (row: ConnectionRow): Connection => ({
+  ...row,
+  createdAt: Date.parse(row.createdAt) || Date.now(),
+  respondedAt: row.respondedAt ? Date.parse(row.respondedAt) : null,
+  updatedAt: Date.parse(row.updatedAt) || Date.now(),
+})
+
+export async function discoverLocals(): Promise<(Person & { pending: boolean })[]> {
+  return (await rpc<(Person & { pending: boolean })[] | null>('migo_discover', {})) ?? []
+}
+
+export async function myConnections(): Promise<Connection[]> {
+  return ((await rpc<ConnectionRow[] | null>('migo_my_connections', {})) ?? []).map(toConnection)
+}
+
+export async function requestConnection(personId: string): Promise<Connection> {
+  return toConnection(await rpc<ConnectionRow>('migo_request_connection', { p_recipient: personId }))
+}
+
+export async function respondConnection(id: string, accept: boolean): Promise<Connection> {
+  return toConnection(await rpc<ConnectionRow>('migo_respond_connection', { p_connection: id, p_accept: accept }))
+}
+
+export async function cancelConnection(id: string): Promise<Connection> {
+  return toConnection(await rpc<ConnectionRow>('migo_cancel_connection', { p_connection: id }))
+}
+
+export async function removeConnection(id: string): Promise<Connection> {
+  return toConnection(await rpc<ConnectionRow>('migo_remove_connection', { p_connection: id }))
+}
+
+export async function markConnectionsSeen(ids?: string[]): Promise<void> {
+  await rpc('migo_mark_connections_seen', { p_ids: ids ?? null })
 }
 
 // ---- Gallery (006_gallery.sql, 007_landmarks_geofencing.sql) -------------------------

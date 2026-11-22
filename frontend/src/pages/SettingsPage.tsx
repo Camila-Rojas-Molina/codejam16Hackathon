@@ -69,7 +69,7 @@ function AppearancePicker() {
 }
 
 export default function SettingsPage() {
-  const { account, profile, saveUniversal, saveTrip, deleteAccount, demoMode, setDemoMode, session, signOut } = useStore()
+  const { account, profile, saveUniversal, saveTrip, deleteAccount, demoMode, setDemoMode, session, signOut, setTutorial } = useStore()
   const navigate = useNavigate()
   const [confirm, setConfirm] = useState<null | 'access' | 'account'>(null)
   const [busy, setBusy] = useState(false)
@@ -79,6 +79,11 @@ export default function SettingsPage() {
   if (!account || !profile?.universal) return null
   const universal = profile.universal
   const storage = profileStorage()
+
+  async function replayTour() {
+    await setTutorial('pending')
+    navigate('/map')
+  }
 
   async function act(action: () => Promise<unknown>, done: string) {
     setBusy(true)
@@ -251,6 +256,16 @@ export default function SettingsPage() {
             checked={demoMode}
             onChange={setDemoMode}
           />
+          <div className="mt-5 flex flex-wrap items-center gap-4 border-t-2 border-dashed border-ink pt-5">
+            <div className="min-w-0 flex-1">
+              <p className="font-bold">Tour with Migo</p>
+              <p className="text-sm">A one-minute walk through MIGO’s main sections.</p>
+            </div>
+            <button type="button" onClick={replayTour} className={buttonClasses({ variant: 'secondary', size: 'sm' })}>
+              <Icon name="undo" className="size-5" />
+              Replay the tour
+            </button>
+          </div>
         </Card>
       </section>
 

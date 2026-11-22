@@ -18,7 +18,8 @@ backend/
 │   ├── 009_landmarks_seed.sql  the landmark catalogue (generated)
 │   ├── 010_simple_recommendations.sql  rule-based recommendations from Questionnaire B
 │   ├── 011_economy.sql  points, quests and the shop, decided by the server (+ carries over old points)
-│   └── 012_economy_catalog.sql  GENERATED: the quest and shop catalogues (`npm run gen:economy`)
+│   ├── 012_economy_catalog.sql  GENERATED: the quest and shop catalogues (`npm run gen:economy`)
+│   └── 013_connections.sql  CHAT matching: a tourist picks a local, the local is notified "You've been matched!"
 ├── scripts/import_landmarks.mjs  rebuilds 008/009 from Montréal open data (see scripts/README.md)
 └── tests/
     ├── smoke_test.sql          checks the hunt flow, then rolls back
@@ -27,6 +28,7 @@ backend/
     ├── gallery_test.sql        checks the gallery owner rules, ordering and delete, then rolls back
     ├── explore_test.sql        checks geofences, the island boundary, visits and owner rules, then rolls back
     ├── economy_test.sql        checks points, quests, refreshes, the shop and timezones, then rolls back
+    ├── connections_test.sql    checks requests, answers, no duplicates, Discover exclusions, removal
     └── local_supabase_stub.sql fake `auth` schema for testing on plain Postgres (never run on Supabase)
 ```
 
@@ -185,6 +187,33 @@ All of them apply the owner rule from 005 (`42501` `Not your account`), so they 
 **Testing time:** every function reads the clock from `economy_now()`. It returns `now()` unless the session setting `economy.test_now` is set (`select set_config('economy.test_now', '2026-11-23 10:00Z', true)`), which only `tests/economy_test.sql` does. Browsers can't set it: PostgREST only sets its own `request.*` settings (headers and JWT claims arrive as `request.headers` / `request.jwt.claims`; `Prefer: timezone` only changes how times are printed), the API roles can't run SQL or call `set_config` through the API, and the setting is ignored outright for PostgREST's `authenticator` login.
 
 **Gaps:** progress for hunts relies on `submit_selfie`, which (like the other 001 hunt functions) doesn't check the login yet. Device accounts without a login are identified only by their id, as everywhere else. Page visits are reported by the app, so a "visit" quest proves the app was opened, nothing more.
+
+## Connections (`013_connections.sql`)
+
+How people meet in CHAT. A tourist browses locals in Discover and taps **Connect**; the local gets the
+request at the top of Messages and picks **Connect** or **Not now**. Accepted connections show up in
+Messages for both people and leave both people's Discover. Signed-in only.
+
+**Set up:** after 005 (and 006), paste and run `013_connections.sql` (safe to run again), then
+optionally `tests/connections_test.sql`, which should say `All connection checks passed`. Existing
+data is untouched: hunt teammates keep messaging as before, and the old `likes` list stays in each
+profile record (unused).
+
+| Function | Does |
+|---|---|
+| `migo_discover()` | Locals the caller (in Tourist mode) can ask, with public answers only. Leaves out connected people, people who've asked you, anyone who said "not now" to you in the last 14 days, and dog mismatches. People you've asked come with `pending: true`. Locals get `[]`. |
+| `migo_request_connection(recipient)` | Tourist → local. Idempotent: an open request or connection is returned as is; if they already asked you, this accepts theirs. |
+| `migo_respond_connection(id, accept)` | The recipient's answer. A request that's already answered or withdrawn comes back unchanged. |
+| `migo_cancel_connection(id)` | The requester withdraws an unanswered request. |
+| `migo_remove_connection(id)` | Either person ends an accepted connection (row kept as `removed`; they can be discovered again). |
+| `migo_my_connections()` | Every connection the caller is part of, as `{id, status, direction, person, seen, …}`. |
+| `migo_mark_connections_seen(ids)` | Marks news as seen (an incoming request stays new until answered). |
+
+Rules: one live (pending/accepted) row per pair, enforced by a unique index on the unordered pair,
+plus a per-pair advisory lock, so double taps and two people connecting at once can't duplicate.
+The `connections` table has RLS on and no grants. Errors: `42501` not signed in, `P0002` unknown
+person/request or not yours, `22023` wrong mode / declined recently. Messages themselves still live
+on each device (not on the server yet).
 
 ## Security
 

@@ -90,6 +90,8 @@
   /* Light halo behind cut-out art with dark outlines (mascot, logo). None by day. */
   --art-halo: none;
   --art-outline: none;
+  /* Thin cream cut-out edge for bright icons at night (see "Night icons"). None by day. */
+  --icon-rim: none;
   color-scheme: light;
 }
 
@@ -228,6 +230,9 @@
   --saffron-on-ink: var(--night-saffron-on-ink);
   --art-outline: drop-shadow(0 0 0.6px var(--night-ink)) drop-shadow(0 0 0.6px var(--night-ink));
   --art-halo: var(--art-outline) drop-shadow(0 0 7px rgb(243 231 201 / 0.28));
+  --icon-rim:
+    drop-shadow(0.7px 0 0 var(--night-ink)) drop-shadow(-0.7px 0 0 var(--night-ink)) drop-shadow(0 0.7px 0 var(--night-ink))
+    drop-shadow(0 -0.7px 0 var(--night-ink));
   color-scheme: dark;
 }
 
@@ -236,7 +241,7 @@
  * fills are islands, so whatever sits on saffron, sandy, teal or sienna reads exactly as by day
  * (dark ink, cream sheets). No effect by day. Use it directly for any other bright surface.
  */
-@utility day-island {
+@utility day-palette {
   --color-ink: var(--day-ink);
   --color-paper: var(--day-paper);
   --color-sheet: var(--day-sheet);
@@ -253,8 +258,13 @@
   --grain-paper: var(--day-grain-paper);
   --grain-sheet: var(--day-grain-sheet);
   --saffron-on-ink: var(--day-saffron);
+}
+@utility day-island {
+  @apply day-palette;
   --art-halo: none;
   --art-outline: none;
+  /* Icons inside an island sit on a bright fill already, so they need no night rim. */
+  --icon-rim: none;
   /* Inherited text colour is resolved by the parent, so re-resolve it here (any text-* class wins). */
   color: var(--color-ink);
 }
@@ -308,6 +318,42 @@
   }
 }
 
+/*
+ * Night icons (components/icons/Icon.tsx). An icon's outline is currentColor, the ink, so by night
+ * it turns cream. That's right for line-only icons (accent "none") and paper-filled ones (accent
+ * "sheet", which is dark at night). But on a bright accent fill (saffron, teal, sienna, sandy) the
+ * details drawn over the fill (a face, a clock's hands, a photo's mountains) would be cream on
+ * saffron, about 1.3:1, and the icon turns into a blob.
+ * So a bright icon is a tiny day island: the same dark ink lines on the same bright fill as by day,
+ * cut out with a thin cream rim, like Migo and the logo at night, so it still reads on night paper.
+ * Inside a real island (a saffron button or nav cell) --icon-rim is none: there it is simply the day icon.
+ */
+:root[data-theme='dark'] .icon-bright {
+  @apply day-palette;
+  color: var(--day-ink);
+  filter: var(--icon-rim);
+}
+
+/*
+ * Migo's guided tour (features/tutorial/Tour.tsx): the page is dimmed in ink (near-black at night)
+ * with a faint printed hatch, and the spotlight, its frame and the tour sheet glide between stops.
+ */
+:root {
+  --tour-dim: rgb(38 70 83 / 0.78);
+  --tour-hatch: rgb(251 246 232 / 0.07);
+}
+:root[data-theme='dark'] {
+  --tour-dim: rgb(6 13 15 / 0.8);
+  --tour-hatch: rgb(243 231 201 / 0.05);
+}
+.tour-hole {
+  transition: x 320ms var(--ease-spring), y 320ms var(--ease-spring), width 320ms var(--ease-spring), height 320ms var(--ease-spring);
+}
+.tour-frame,
+.tour-sheet {
+  transition: left 320ms var(--ease-spring), top 320ms var(--ease-spring), width 320ms var(--ease-spring), height 320ms var(--ease-spring);
+}
+
 /* ---- Paper, rules and print details ------------------------------------------------------- */
 
 /* The printed-paper grain: a faint fractal noise plus speckles, tinted to the ink. */
@@ -340,7 +386,13 @@
   background-image: repeating-linear-gradient(-45deg, var(--color-ink) 0 1.5px, transparent 1.5px 6px);
 }
 
-/* Solid offset shadow (the café-card block shadow). Ink by day, near-black by night. */
+/*
+ * Solid offset shadow (the café-card block shadow). Ink by day, near-black by night.
+ * Hierarchy: shadow-block lifts the main standalone box of a screen (your profile header and public
+ * card, a Discover person card, the map, the open chat, the shop's fitting room); shadow-block-sm
+ * lifts secondary panels and repeated cards (quest cards, the conversation list, profile panels) and
+ * small floating chips. Ruled grids, nav, tabs, notices and form cards stay flat.
+ */
 @utility shadow-block {
   box-shadow: 6px 6px 0 var(--shadow-ink);
 }

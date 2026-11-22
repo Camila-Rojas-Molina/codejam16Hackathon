@@ -28,7 +28,7 @@ export default function QuestHistory({ items }: { items: QuestView[] }) {
   }
   const shown = all ? items : items.slice(0, SHOWN)
   return (
-    <div className="sheet-grain border-2 border-ink">
+    <div className="sheet-grain border-2 border-ink shadow-block-sm">
       <ul>
         {shown.map((v) => {
           const c = CATEGORY[v.a.category]

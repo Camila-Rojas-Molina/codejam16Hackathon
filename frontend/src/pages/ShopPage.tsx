@@ -288,9 +288,10 @@ function FittingRoom({ inv, avatar, name, tryOn, focusId, onRemoveTry, onReset, 
 
   return (
     <section
+      data-tour="shop-fitting"
       aria-labelledby="fitting-title"
       className={cn(
-        'sheet-grain z-10 -mx-4 border-y-2 border-ink sm:mx-0 sm:border-x-2',
+        'sheet-grain z-10 -mx-4 border-y-2 border-ink sm:mx-0 sm:border-x-2 sm:shadow-block',
         // Phones/tablets: stuck under the top bar while collapsed. Desktop: the sticky left column.
         !expanded && 'sticky top-[calc(max(0.5rem,env(safe-area-inset-top))+3.25rem+2px)]',
         'lg:sticky lg:top-[calc(max(0.5rem,env(safe-area-inset-top))+4.75rem)] lg:max-h-[calc(100dvh-6.5rem)] lg:overflow-y-auto xl:top-8 xl:max-h-[calc(100dvh-4rem)]',
@@ -759,7 +760,7 @@ export default function ShopPage() {
           notice={notice}
         />
 
-        <section aria-labelledby="catalogue-title" className="min-w-0 space-y-4">
+        <section aria-labelledby="catalogue-title" data-tour="shop-catalogue" className="min-w-0 space-y-4">
           <h2 id="catalogue-title" className="sr-only">
             Catalogue
           </h2>
