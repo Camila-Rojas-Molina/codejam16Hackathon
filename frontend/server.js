@@ -8,7 +8,7 @@ import { extname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const DIST = join(fileURLToPath(new URL('.', import.meta.url)), 'dist')
-const PORT = Number(process.env.PORT) || 3000
+const PORT = Number(process.env.PORT) || 8080
 
 if (!isFile(join(DIST, 'index.html'))) {
   console.error('dist/ is missing: run `npm run build` before `npm start`.')
