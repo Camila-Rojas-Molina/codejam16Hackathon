@@ -1,0 +1,12 @@
+{
+  "name": "migo",
+  "private": true,
+  "description": "Hosting entry point (Runway deploys from the repo root). The app itself lives in frontend/.",
+  "scripts": {
+    "build": "npm --prefix frontend ci --include=dev && npm --prefix frontend run build",
+    "start": "node frontend/server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
