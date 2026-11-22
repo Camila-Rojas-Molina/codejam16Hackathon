@@ -313,7 +313,11 @@ export function deviceEconomy(accountId: string, facts: () => DeviceFacts): Econ
       transact((book, now, f) => {
         const old = book.assignments.find((x) => x.id === id)
         const claimable = old ? withProgress(old, factsOf(book, f, accountId), book.timezone, now).claimable : false
-        const result = refreshDailyAssignment(issueInput(book, f, accountId, now), id, { claimable })
+        const facts = factsOf(book, f, accountId)
+        // Same rule as the server: the replacement can't be a daily that's already done today.
+        const isDoneToday = (def: { id: string }) =>
+          !!old && withProgress({ ...old, id: `probe:${def.id}`, defId: def.id }, facts, book.timezone, now).claimable
+        const result = refreshDailyAssignment(issueInput(book, f, accountId, now), id, { claimable, isDoneToday })
         if (!result.ok) throw new Error(REFRESH_ERRORS[result.reason] ?? 'Couldn’t refresh that challenge')
         const replaced = book.assignments.find((x) => x.id === result.replace)
         if (replaced) replaced.status = 'replaced'

@@ -53,7 +53,7 @@ export default function Modal({ open, onClose, labelledBy, describedBy, classNam
         if (closeOnBackdrop && e.target === e.currentTarget) onClose()
       }}
       onKeyDown={onKeyDown}
-      className={cn('text-ink backdrop:bg-ink/75 open:animate-step-in', className)}
+      className={cn('text-ink backdrop:bg-[color-mix(in_srgb,var(--shadow-ink)_75%,transparent)] open:animate-step-in', className)}
     >
       {open && children}
     </dialog>

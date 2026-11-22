@@ -496,52 +496,12 @@ function makeAssignment(def: QuestDef, periodKey: string, now: number, expiresAt
   }
 }
 
-/** The other accepted input: "pick `count` quests of one category" (the caller owns slots and periods). */
-export type PickInput = {
-  category: Exclude<QuestCategory, 'starter'>
-  count: number
-  profile: ProfileRecord | null
-  /**
-   * Def ids not to offer: everything active now and everything handed out this period (replaced
-   * ones too). Those of the same category also count as "in this period" for the variety rules.
-   */
-  exclude: string[]
-  /** Def ids from recent periods: avoided while anything else fits. */
-  recent?: string[]
-  /** Stable for the person and period, e.g. '<account>:a:2026-W48:2'. */
-  seed: string
-  /** Overrides what personFrom(profile) can't know (hasTeamedUp). */
-  person?: Partial<QuestPerson>
-  defs?: QuestDef[]
-}
-
 /**
  * Fills every empty slot for the current periods and lists assignments that have expired.
  * Idempotent: calling it again in the same period issues nothing new.
- * With a PickInput instead, returns the `count` best quests for that category.
  */
-export function issueAssignments(input: IssueInput): IssueResult
-export function issueAssignments(input: PickInput): QuestDef[]
-export function issueAssignments(input: IssueInput | PickInput): IssueResult | QuestDef[] {
-  return 'category' in input ? pickMany(input) : issueForPeriods(input)
-}
-
-function pickMany(input: PickInput): QuestDef[] {
-  const defs = input.defs ?? QUEST_DEFS
-  const person = { ...personFrom(input.profile), ...input.person }
-  const byId = new Map(defs.map((d) => [d.id, d]))
-  const taken = input.exclude.map((id) => byId.get(id)).filter((d): d is QuestDef => !!d && d.category === input.category)
-  const avoid = new Set(input.exclude)
-  const candidates = defs.filter((d) => d.category === input.category && eligible(d, person))
-  const picked: QuestDef[] = []
-  for (let n = 0; n < input.count; n++) {
-    const def = pick(input.category, candidates, taken, avoid, new Set(input.recent ?? []), person, input.seed)
-    if (!def) break
-    picked.push(def)
-    taken.push(def)
-    avoid.add(def.id)
-  }
-  return picked
+export function issueAssignments(input: IssueInput): IssueResult {
+  return issueForPeriods(input)
 }
 
 function issueForPeriods(input: IssueInput): IssueResult {
@@ -611,7 +571,11 @@ export type RefreshResult =
  * Swaps one of today's unfinished dailies for a different one (same slot). The caller marks the
  * old one 'replaced' and stores the new one. Pass `claimable` = whether the old one is finished.
  */
-export function refreshDailyAssignment(input: IssueInput, assignmentId: string, opts: { claimable: boolean }): RefreshResult {
+export function refreshDailyAssignment(
+  input: IssueInput,
+  assignmentId: string,
+  opts: { claimable: boolean; isDoneToday?: (def: QuestDef) => boolean },
+): RefreshResult {
   const defs = input.defs ?? QUEST_DEFS
   const periods = periodsAt(input.now, input.timezone)
   const old = input.existing.find((a) => a.id === assignmentId)
@@ -626,7 +590,8 @@ export function refreshDailyAssignment(input: IssueInput, assignmentId: string, 
   const today = input.existing.filter((a) => a.category === 'daily' && a.periodKey.startsWith(prefix))
   const taken = today.filter((a) => isLive(a) && a.id !== old.id).map((a) => byId.get(a.defId)).filter((d): d is QuestDef => !!d)
   const avoid = new Set(today.map((a) => a.defId))
-  const candidates = defs.filter((d) => d.category === 'daily' && eligible(d, input.person))
+  // Never swap in something already finished today: that would be a free reward.
+  const candidates = defs.filter((d) => d.category === 'daily' && eligible(d, input.person) && !opts.isDoneToday?.(d))
   const def = pick('daily', candidates, taken, avoid, recentDefIds(input.existing, 'daily', input.now), input.person, `${input.seed}|${old.periodKey}|refresh`)
   if (!def) return { ok: false, reason: 'nothing-else' }
   return { ok: true, replace: old.id, issue: makeAssignment(def, old.periodKey, input.now, periods.day.end) }
