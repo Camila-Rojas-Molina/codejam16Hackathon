@@ -3,6 +3,7 @@ import RequireAuth from './components/auth/RequireAuth'
 import AppShell from './components/layout/AppShell'
 import DashboardLayout from './components/layout/DashboardLayout'
 import AccessibilityPage from './pages/AccessibilityPage'
+import CameraPage from './pages/CameraPage'
 import ChatPage from './pages/ChatPage'
 import DogsPage from './pages/DogsPage'
 import GalleryPage from './pages/GalleryPage'
@@ -65,6 +66,8 @@ export default function App() {
 
           <Route path="match" element={<MatchPage />} />
           <Route path="hunts" element={<HuntsPage />} />
+          {/* Full-screen camera: GPS-checked captures linked to MIGO places (?landmark=<id> optional). */}
+          <Route path="camera" element={<CameraPage />} />
 
           {/* Original scaffold pages, not part of the PRD loop. */}
           <Route element={<AppShell />}>
