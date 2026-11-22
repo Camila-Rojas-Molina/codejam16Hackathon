@@ -416,6 +416,31 @@ begin
   update quest_defs set retired = false where id like 't-a-%' and id <> 't-a-duo2';
   update quest_defs set retired = true where id = 't-a-duo2';
 
+  -- ---- A refresh never swaps in a daily that is already finished today ----
+  update quest_defs set retired = true where category = 'daily' and id not in ('t-d-map', 't-d-chat', 't-d-gallery', 't-d-shop');
+  perform pg_temp.act_as(null);
+  dev := (migo_create_account('Refresher', 'star') ->> 'id')::uuid;
+  s := economy_state(dev);
+  defs := array(select x ->> 'defId' from jsonb_array_elements(pg_temp.active(s, 'daily')) x);
+  r := (select id from quest_defs where id in ('t-d-map', 't-d-chat', 't-d-gallery', 't-d-shop') and not (id = any (defs)));
+  -- Finish the only possible replacement (open its page) but none of today's three.
+  perform economy_record_visit(dev, (select condition ->> 'page' from quest_defs where id = r));
+  s := economy_state(dev);
+  assert not exists (select 1 from jsonb_array_elements(pg_temp.active(s, 'daily')) x where (x -> 'claimable')::boolean), 'none of today''s is finished';
+  q := pg_temp.active(s, 'daily') -> 0;
+  r := pg_temp.fails(format('select economy_refresh_daily(%L, %L)', dev, q ->> 'id'));
+  assert r = 'P0001/none_available', 'an instantly claimable replacement is never offered: ' || r;
+  s := economy_state(dev);
+  assert (s -> 'dailyRefreshAvailable')::boolean and not exists (select 1 from daily_refreshes where profile_id = dev),
+    'a failed refresh is not used up';
+  assert (select status from quest_assignments where id = (q ->> 'id')::uuid) = 'active', 'the daily stays';
+  update quest_defs set retired = false where id = 't-d-quests';
+  s := economy_refresh_daily(dev, (q ->> 'id')::uuid);
+  q := (select x from jsonb_array_elements(pg_temp.active(s, 'daily')) x where x ->> 'periodKey' = q ->> 'periodKey');
+  assert q ->> 'defId' = 't-d-quests' and (q ->> 'progress')::int = 0 and not (q -> 'claimable')::boolean,
+    'the replacement is an unfinished one';
+  update quest_defs set retired = false where id like 't-d-%';
+
   -- ---- Timezones: periods follow the saved zone, and switching can't re-issue a day ----
   perform pg_temp.at('2026-11-24 02:00:00+00');
   tzp := (migo_create_account('Zone', 'star') ->> 'id')::uuid;

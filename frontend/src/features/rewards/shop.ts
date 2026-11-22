@@ -13,12 +13,6 @@ export type { AccessoryDef, BackdropDef, ShopItemDef }
 /** One shop item (wearable or backdrop). */
 export type ShopItem = ShopItemDef
 
-/**
- * @deprecated Old per-item placement nudge (pre per-avatar fits). Kept only so older imports still
- * type-check while the renderer moves to `AccessoryDef.fits`; catalogue items no longer carry it.
- */
-export type ItemFit = { dx?: number; dy?: number; scale?: number; r?: number }
-
 // ---- Slots, rarities, tiers, themes ------------------------------------------------------------
 
 /** Wearable slots, in browsing order. */

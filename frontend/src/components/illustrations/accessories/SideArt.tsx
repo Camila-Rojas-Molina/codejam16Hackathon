@@ -32,7 +32,6 @@ export function EarsArt({ art, sw }: { art: string; sw: number }) {
       return (
         <g>
           <Band d="M-45 -10 C-50 -72 50 -72 45 -10" fill={C.ink} sw={sw} k={2.6} />
-          <path d="M-41 -44 C-34 -56 -20 -61 -8 -62" fill="none" stroke={C.teal} strokeWidth={sw * 1} strokeLinecap="round" />
           {[-1, 1].map((k) => (
             <g key={k} transform={`scale(${k} 1)`}>
               <rect x="-49" y="-20" width="6" height="12" rx="2" fill={C.sheet} {...s} />

@@ -494,15 +494,21 @@ $$;
 --   p_exclude   never pick (already in this period, or the one being replaced)
 --   p_recent    avoid if possible (shown recently)
 --   p_existing  the period's other live quests (for the companion rule)
+--   p_from/p_to (daily refresh only) the period's window: skip quests whose progress in it has
+--               already reached the target, so a refresh can never swap in an instant reward.
 -- Hard rules: not retired; suits the active mode (def.modes); never one whose avoid_for matches the
 -- person's accessibility needs (universal + active trip + local, if present).
 -- Companion-only quests: at most one per period, never the only option (a lone daily/adventure
--- companion pick is dropped), and a companion-only weekly only for someone who has teamed up before.
+-- companion pick is dropped), and a companion-only weekly only for someone who has done a hunt with a
+-- teammate before.
 -- Adventures are personalised: most shared interests first (with the universal interests, plus the
 -- trip's in Tourist mode), then effort matching the pace (relaxed→light, balanced→moderate,
--- fast→big), then random. Dailies and weeklies are random.
+-- fast→big), then random. Dailies and weeklies are random. "Recent" (avoided while anything else
+-- fits): dailies 3 days, weeklies 4 weeks, adventures 2 weeks (as in features/quests/engine.ts).
+drop function if exists economy_pick(uuid, jsonb, text, integer, text[], text[], text[]);
 create or replace function economy_pick(p_profile_id uuid, p_rec jsonb, p_category text, p_n integer,
-                                        p_exclude text[], p_recent text[], p_existing text[])
+                                        p_exclude text[], p_recent text[], p_existing text[],
+                                        p_from timestamptz default null, p_to timestamptz default null)
 returns text[]
 language plpgsql security definer set search_path = public as $$
 declare
@@ -535,7 +541,7 @@ begin
 
   for pass in 1..2 loop
     for d in
-      select q.id, q.company
+      select q.id, q.company, q.condition
         from quest_defs q
        where q.category = p_category and not q.retired
          and q.id <> all (v_exclude) and q.id <> all (v_picked)
@@ -550,6 +556,8 @@ begin
          random()
     loop
       exit when cardinality(v_picked) >= p_n;
+      continue when p_to is not null
+                and coalesce(economy_progress(p_profile_id, p_rec, d.condition, p_from, p_to), 0) >= economy_target(d.condition);
       if d.company = 'companion' then
         continue when v_comp >= 1;
         v_comp := v_comp + 1;
@@ -623,7 +631,8 @@ begin
     end if;
   end if;
 
-  -- Dailies: three different ones, not yesterday's (= the previous day this person had dailies).
+  -- Dailies: three different ones, none from the last 3 days (and never yesterday's, i.e. the
+  -- previous day this person had dailies), while anything else fits.
   select * into v_b from economy_period_bounds(v_day, v_tz);
   v_missing := array(select s from generate_series(1, 3) s
                       where not exists (select 1 from quest_assignments
@@ -632,9 +641,10 @@ begin
     v_picked := economy_pick(p_profile_id, v_rec, 'daily', cardinality(v_missing),
       array(select def_id from quest_assignments where profile_id = p_profile_id and period_key = v_day),
       array(select def_id from quest_assignments
-             where profile_id = p_profile_id and category = 'daily'
-               and period_key = (select max(period_key) from quest_assignments
-                                  where profile_id = p_profile_id and category = 'daily' and period_key < v_day)),
+             where profile_id = p_profile_id and category = 'daily' and period_key < v_day
+               and (assigned_at > v_now - interval '3 days'
+                    or period_key = (select max(period_key) from quest_assignments
+                                      where profile_id = p_profile_id and category = 'daily' and period_key < v_day))),
       array(select def_id from quest_assignments where profile_id = p_profile_id and period_key = v_day
                                                    and status in ('active', 'completed')));
     for i in 1..coalesce(cardinality(v_picked), 0) loop
@@ -642,7 +652,7 @@ begin
     end loop;
   end if;
 
-  -- Adventures: three personalised ones, none shown in the previous 3 weeks.
+  -- Adventures: three personalised ones, none shown in the previous 2 weeks while anything else fits.
   select * into v_b from economy_period_bounds(v_adv, v_tz);
   v_missing := array(select s from generate_series(1, 3) s
                       where not exists (select 1 from quest_assignments
@@ -651,7 +661,7 @@ begin
     v_picked := economy_pick(p_profile_id, v_rec, 'adventure', cardinality(v_missing),
       array(select def_id from quest_assignments where profile_id = p_profile_id and period_key = v_adv),
       array(select def_id from quest_assignments where profile_id = p_profile_id and category = 'adventure'
-                                                   and period_key <> v_adv and assigned_at > v_now - interval '21 days'),
+                                                   and period_key <> v_adv and assigned_at > v_now - interval '14 days'),
       array(select def_id from quest_assignments where profile_id = p_profile_id and period_key = v_adv
                                                    and status in ('active', 'completed')));
     for i in 1..coalesce(cardinality(v_picked), 0) loop
@@ -995,7 +1005,8 @@ begin
 end;
 $$;
 
--- Swaps one of today's unfinished dailies for a different one. Once a day; no points involved.
+-- Swaps one of today's unfinished dailies for a different one that isn't already finished today.
+-- Once a day; no points involved. If nothing fits, the refresh isn't used up.
 create or replace function economy_refresh_daily(p_profile_id uuid, p_assignment_id uuid) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
@@ -1034,17 +1045,19 @@ begin
   end if;
 
   v_picked := economy_pick(p_profile_id, v_rec, 'daily', 1,
-    -- Not the one being replaced, nor anything else shown today.
+    -- Not the one being replaced, nor anything else shown (or claimed) today.
     array(select def_id from quest_assignments where profile_id = p_profile_id and period_key = a.period_key),
     array(select def_id from quest_assignments
            where profile_id = p_profile_id and category = 'daily'
              and period_key = (select max(period_key) from quest_assignments
                                 where profile_id = p_profile_id and category = 'daily' and period_key < a.period_key)),
     array(select def_id from quest_assignments where profile_id = p_profile_id and period_key = a.period_key
-                                                 and status in ('active', 'completed') and id <> a.id));
+                                                 and status in ('active', 'completed') and id <> a.id),
+    -- Never one that is already finished today (that would be a free reward).
+    a.starts_at, a.expires_at);
   if cardinality(v_picked) = 0 then
     -- Raising rolls back the refresh row too, so it isn't used up.
-    raise exception 'No other daily challenges to swap in' using errcode = 'P0001', hint = 'none_available';
+    raise exception 'No other challenge available right now' using errcode = 'P0001', hint = 'none_available';
   end if;
 
   update quest_assignments set status = 'replaced' where id = a.id;
@@ -1233,7 +1246,7 @@ revoke execute on function economy_has_teamed_up(uuid) from public, anon, authen
 revoke execute on function economy_progress(uuid, jsonb, jsonb, timestamptz, timestamptz, uuid) from public, anon, authenticated;
 revoke execute on function economy_legacy_ref(text, text, text) from public, anon, authenticated;
 revoke execute on function economy_assign(uuid, text, text, text, integer, timestamptz, timestamptz) from public, anon, authenticated;
-revoke execute on function economy_pick(uuid, jsonb, text, integer, text[], text[], text[]) from public, anon, authenticated;
+revoke execute on function economy_pick(uuid, jsonb, text, integer, text[], text[], text[], timestamptz, timestamptz) from public, anon, authenticated;
 revoke execute on function economy_issue(uuid) from public, anon, authenticated;
 revoke execute on function economy_ledger_json(points_ledger) from public, anon, authenticated;
 revoke execute on function economy_assignment_json(quest_assignments, jsonb) from public, anon, authenticated;
