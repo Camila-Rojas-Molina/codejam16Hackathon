@@ -44,8 +44,11 @@ export type StoreValue = AppState & {
   deleteTrip: (tripId: string) => Promise<ProfileRecord>
   saveLocal: (local: LocalContext, opts?: { activate?: boolean }) => Promise<ProfileRecord>
   clearLocal: () => Promise<ProfileRecord>
-  /** Permanently deletes the account and all its answers, then signs out. */
-  deleteAccount: () => Promise<void>
+  /**
+   * Permanently deletes the account and all its answers, then signs out. `then` runs in the same
+   * update as the sign-out (pass the navigation away, e.g. to the Welcome page).
+   */
+  deleteAccount: (then?: () => void) => Promise<void>
 
   // Cities discovered (universal profile)
   addCity: (place: PlacePick) => Promise<ProfileRecord>

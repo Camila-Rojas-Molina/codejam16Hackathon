@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
+import { startTransition, useEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
 import type { Thread } from '../features/chat/types'
 import type { ProfileRecord } from '../features/profile/types'
 import { todayKey } from '../features/quests/challenges'
@@ -133,9 +133,11 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
         else dispatch({ type: 'reset' })
         return { hasProfile: Boolean(found) }
       },
+      // Clears the cached account and the login in the same render (the server logout finishes in
+      // the background), so page guards never see a half-signed-out state and bounce around.
       signOut: async () => {
-        await auth.signOut()
         dispatch({ type: 'reset' })
+        await auth.signOut()
       },
 
       createAccount: async (input) => {
@@ -156,10 +158,15 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
       deleteTrip: async (tripId) => commit(await api.deleteTrip(requireId(), tripId)),
       saveLocal: async (local, opts) => commit(await api.saveLocalContext(requireId(), local, opts)),
       clearLocal: async () => commit(await api.clearLocalContext(requireId())),
-      deleteAccount: async () => {
+      deleteAccount: async (then) => {
         await api.deleteAccount(requireId())
-        dispatch({ type: 'reset' })
-        if (AUTH_ENABLED) await auth.signOut()
+        // One transition with the caller's navigation (`then`), so guards never see a
+        // signed-out page and bounce to /login first.
+        startTransition(() => {
+          then?.()
+          dispatch({ type: 'reset' })
+          if (AUTH_ENABLED) void auth.signOut()
+        })
       },
 
       addCity: async (place) => commit(await api.addDiscoveredCity(requireId(), place)),

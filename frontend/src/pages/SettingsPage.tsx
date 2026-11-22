@@ -1,5 +1,5 @@
 // SETTINGS: account, privacy, app preferences and data.
-import { useState } from 'react'
+import { startTransition, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import Button from '../components/ui/Button'
 import { buttonClasses } from '../components/ui/buttonStyles'
@@ -42,8 +42,14 @@ export default function SettingsPage() {
   async function handleSignOut() {
     setSigningOut(true)
     try {
-      await signOut()
-      navigate('/', { replace: true })
+      // One transition for both: the router applies navigations as transitions, so the sign-out
+      // must join it or this page would render signed-out first and get bounced to /login.
+      let done: Promise<void> = Promise.resolve()
+      startTransition(() => {
+        navigate('/', { replace: true })
+        done = signOut()
+      })
+      await done
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'Something went wrong.')
       setSigningOut(false)
@@ -200,8 +206,7 @@ export default function SettingsPage() {
                 disabled={busy}
                 onClick={async () => {
                   setBusy(true)
-                  await deleteAccount()
-                  navigate('/', { replace: true })
+                  await deleteAccount(() => navigate('/', { replace: true }))
                 }}
               >
                 Delete everything
