@@ -1,5 +1,5 @@
 // MIGO's points economy: the shared contract between the quest catalogue, the shop catalogue,
-// the server (backend/supabase/migrations/007_economy.sql) and the app.
+// the server (backend/supabase/migrations/011_economy.sql) and the app.
 //
 // Rules that everything here is built around:
 //   * The server is the source of truth for points, quests, inventory and what's equipped. The
@@ -11,7 +11,7 @@
 //     is never trusted.
 //   * Catalogues (quests: features/quests/catalog/*, shop: features/rewards/catalog/*) are plain
 //     data files with no React imports, so `npm run gen:economy` can turn them into SQL seed data
-//     (backend/supabase/migrations/008_economy_catalog.sql). Ids are saved in accounts: never
+//     (backend/supabase/migrations/012_economy_catalog.sql). Ids are saved in accounts: never
 //     rename or delete one; set `retired: true` instead.
 //   * Device-only mode (no Supabase) runs the same rules locally (lib/economy/device.ts). It can't
 //     be tamper-proof and says so; it exists so the app works offline and in development.

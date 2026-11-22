@@ -1,12 +1,12 @@
 // Turns the quest and shop catalogues into SQL seed data for the server:
 //   src/features/quests/catalog/index.ts   (QUEST_DEFS)
 //   src/features/rewards/catalog/index.ts  (SHOP_ITEMS)
-//   → ../backend/supabase/migrations/008_economy_catalog.sql
+//   → ../backend/supabase/migrations/012_economy_catalog.sql
 //
-// Run it with `npm run gen:economy` after changing a catalogue, then run the new 008 in Supabase.
+// Run it with `npm run gen:economy` after changing a catalogue, then run the new 012 in Supabase.
 // The SQL only upserts: ids are never deleted, and an id that's no longer in a catalogue is marked
 // retired (people who own an item or have a quest keep it). The output is deterministic, so
-// `npm run check:economy` can tell whether 008 is up to date.
+// `npm run check:economy` can tell whether 012 is up to date.
 //
 // Options (for testing with other files): --quests <file> --shop <file> --out <file>
 //
@@ -35,7 +35,7 @@ export const FRONTEND = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 export const DEFAULT_PATHS = {
   quests: resolve(FRONTEND, 'src/features/quests/catalog/index.ts'),
   shop: resolve(FRONTEND, 'src/features/rewards/catalog/index.ts'),
-  out: resolve(FRONTEND, '../backend/supabase/migrations/008_economy_catalog.sql'),
+  out: resolve(FRONTEND, '../backend/supabase/migrations/012_economy_catalog.sql'),
 }
 
 export function parseArgs(argv) {
@@ -99,7 +99,7 @@ export function buildSql({ questDefs, shopItems }) {
   const lines = [
     '-- GENERATED FILE: do not edit. Made by `npm run gen:economy` (frontend/scripts/gen-economy-sql.mjs)',
     '-- from frontend/src/features/quests/catalog and frontend/src/features/rewards/catalog.',
-    '-- Run after 007_economy.sql, and again whenever the catalogues change. Safe to run again.',
+    '-- Run after 011_economy.sql, and again whenever the catalogues change. Safe to run again.',
     '--',
     "-- The server's copy of every quest (rewards, conditions, personalisation) and shop item (prices).",
     '-- Only upserts: ids are never deleted. An id missing from the catalogues is marked retired, so',

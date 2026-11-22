@@ -1,10 +1,10 @@
--- Checks 007_economy.sql: points, quests and the shop are decided by the server. Rolls back.
--- Run in the Supabase SQL editor (or psql) after the migrations (007 and 008).
+-- Checks 011_economy.sql: points, quests and the shop are decided by the server. Rolls back.
+-- Run in the Supabase SQL editor (or psql) after the migrations (011 and 012).
 -- Prints "All economy checks passed".
 --
 -- It brings its own test catalogue (ids 't-…'; everything else is retired inside this transaction),
--- so it doesn't depend on what 008 contains. Users are simulated like in auth_test.sql, and time
--- with `economy.test_now` (read by economy_now(); see the top of 007_economy.sql).
+-- so it doesn't depend on what 012 contains. Users are simulated like in auth_test.sql, and time
+-- with `economy.test_now` (read by economy_now(); see the top of 011_economy.sql).
 begin;
 set local timezone = 'UTC';
 

@@ -1,5 +1,5 @@
 // The real economy: every call goes to the Supabase rpc functions in
-// backend/supabase/migrations/007_economy.sql, which check eligibility, use the server's own copy
+// backend/supabase/migrations/011_economy.sql, which check eligibility, use the server's own copy
 // of rewards and prices, and return the fresh state. Nothing here computes points.
 import type { EconomyApi, EconomyState, ShopSlot } from '../../features/economy/types'
 import * as backend from '../backend'

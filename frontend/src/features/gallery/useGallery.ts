@@ -1,17 +1,26 @@
 // Loads, adds and deletes the signed-in person's photos (lib/backend.ts → 006_gallery.sql).
 // Photos need an online account: in device mode (no Supabase) or when signed out, nothing is
 // fetched and `availability` says why, so the page can explain instead of faking an upload.
+// The bucket is private: images are shown through signed URLs, re-signed before they expire.
 import { useCallback, useEffect, useState } from 'react'
-import { deletePhoto, isBackendConfigured, listPhotos, uploadPhoto } from '../../lib/backend'
+import { deletePhoto, isBackendConfigured, listPhotos, resignPhotos, uploadPhoto } from '../../lib/backend'
 import { useStore } from '../../store/useStore'
 import type { Photo, PhotoMeta } from './types'
 
 export type GalleryAvailability = 'device' | 'signed-out' | 'online'
 
-export function useGallery() {
+/** Re-sign this long before the URLs run out. */
+const RESIGN_MARGIN_MS = 10 * 60_000
+
+/** Whether photos can be saved here, and for which profile. Shared with the camera. */
+export function useGalleryAvailability() {
   const { account, authEnabled, session } = useStore()
   const availability: GalleryAvailability = !isBackendConfigured() || !authEnabled ? 'device' : !session || !account ? 'signed-out' : 'online'
-  const profileId = availability === 'online' ? (account?.id ?? null) : null
+  return { availability, profileId: availability === 'online' ? (account?.id ?? null) : null }
+}
+
+export function useGallery() {
+  const { availability, profileId } = useGalleryAvailability()
 
   // The last load, tagged with what it was for, so a stale one never shows as current.
   const [reloadKey, setReloadKey] = useState(0)
@@ -33,6 +42,32 @@ export function useGallery() {
 
   const current = loaded && loaded.key === key ? loaded : null
   const status: 'idle' | 'loading' | 'ready' | 'error' = !key ? 'idle' : !current ? 'loading' : current.error ? 'error' : 'ready'
+
+  // Fresh signed URLs before the oldest ones expire, and right away when the tab comes back after
+  // they did (timers don't run while a phone sleeps). The list itself isn't reloaded.
+  const photos = current?.photos
+  const oldest = photos?.length ? Math.min(...photos.map((p) => p.urlExpiresAt)) : null
+  useEffect(() => {
+    if (!photos || oldest === null || !key) return
+    let cancelled = false
+    const resign = () => {
+      resignPhotos(photos)
+        .then((next) => !cancelled && setLoaded((l) => (l && l.key === key ? { ...l, photos: mergeUrls(l.photos, next) } : l)))
+        .catch(() => undefined)
+    }
+    const due = oldest - RESIGN_MARGIN_MS - Date.now()
+    // A failed signing (expiresAt 0) retries after a minute rather than in a tight loop.
+    const timer = window.setTimeout(resign, Math.max(due, oldest === 0 ? 60_000 : 0))
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && Date.now() > oldest - RESIGN_MARGIN_MS) resign()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [photos, oldest, key])
 
   const reload = useCallback(() => setReloadKey((k) => k + 1), [])
 
@@ -57,11 +92,20 @@ export function useGallery() {
 
   return {
     availability,
-    photos: current?.photos ?? [],
+    photos: photos ?? [],
     status,
     error: current?.error ?? null,
     reload,
     add,
     remove,
   }
+}
+
+// Take the new URLs for photos still in the list (one may have been deleted meanwhile).
+function mergeUrls(currentPhotos: Photo[], signed: Photo[]): Photo[] {
+  const byId = new Map(signed.map((p) => [p.id, p]))
+  return currentPhotos.map((p) => {
+    const s = byId.get(p.id)
+    return s ? { ...p, url: s.url, urlExpiresAt: s.urlExpiresAt } : p
+  })
 }

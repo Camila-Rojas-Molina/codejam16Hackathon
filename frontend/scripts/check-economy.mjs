@@ -1,5 +1,5 @@
 // Checks the quest and shop catalogues against the economy contract (features/economy/types.ts)
-// and that backend/supabase/migrations/008_economy_catalog.sql matches them.
+// and that backend/supabase/migrations/012_economy_catalog.sql matches them.
 // Run with `npm run check:economy`. Exits 1 and lists every problem if something is off.
 // Same options as gen-economy-sql.mjs: --quests <file> --shop <file> --out <file>
 import { pathToFileURL } from 'node:url'
@@ -98,7 +98,7 @@ for (const s of shopItems) {
 }
 for (const id of LEGACY_ITEM_IDS) if (!itemIds.has(id)) problems.push(`item ${id} is missing (people own it; set retired: true instead of deleting)`)
 
-// ---- 008 up to date ----
+// ---- 012 up to date ----
 const expected = buildSql({ questDefs, shopItems })
 const actual = readExisting(paths.out)
 if (actual === null) problems.push(`${paths.out} doesn't exist: run npm run gen:economy`)
@@ -110,4 +110,4 @@ if (problems.length) {
   for (const p of problems) console.error(`  - ${p}`)
   process.exit(1)
 }
-console.log(`Economy check passed: ${questDefs.length} quests, ${shopItems.length} shop items, 008 is up to date.`)
+console.log(`Economy check passed: ${questDefs.length} quests, ${shopItems.length} shop items, 012 is up to date.`)

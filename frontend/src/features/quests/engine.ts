@@ -1,7 +1,7 @@
 // The quest rules: which quests a person gets each period, and how far along they are.
 //
 // Device-only mode (lib/economy/device.ts) runs these functions directly. The server implements
-// the SAME rules in SQL (backend/supabase/migrations/007_economy.sql), so keep both in step and
+// the SAME rules in SQL (backend/supabase/migrations/011_economy.sql), so keep both in step and
 // keep this file free of React and browser-only APIs (Intl is fine).
 //
 // Periods, in the person's timezone:

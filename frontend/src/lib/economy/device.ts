@@ -1,4 +1,4 @@
-// Device-only economy: the same rules as the server (007_economy.sql), kept in this browser's
+// Device-only economy: the same rules as the server (011_economy.sql), kept in this browser's
 // localStorage. Used when Supabase isn't configured (development, offline demos). Which quests a
 // person gets, the periods and how far along they are come from the shared quest engine
 // (features/quests/engine.ts), the same rules the server runs in SQL.

@@ -1,4 +1,5 @@
-// MAP: MIGO's main exploration space. The 3D map isn't built yet; see features/map/MapWorkspace.tsx.
+// MAP: MIGO's main exploration space: Montréal Island's landmarks on a 3D map (MapLibre; Google or a
+// plain list as fallbacks); see features/map/MapWorkspace.tsx. /map?landmark=<id|slug> opens one.
 // Phones: a context line, then the map fills the screen. Laptops and up: the map with a details
 // column beside it.
 import MapPanel, { MapContextBar } from '../features/map/MapPanel'
