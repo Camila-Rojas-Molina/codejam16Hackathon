@@ -4,6 +4,7 @@ import type { EconomyApi, EconomyState } from '../features/economy/types'
 import type { ProfileRecord } from '../features/profile/types'
 import { shopItem } from '../features/rewards/shop'
 import * as api from '../lib/api'
+import { BackendError } from '../lib/backend'
 import * as auth from '../lib/auth'
 import { STORAGE_KEY as CONNECTIONS_KEY } from '../lib/connectionsDb'
 import { economyFor, forgetDeviceEconomy, mirrorRewards, type DeviceFacts, type EconomyPage } from '../lib/economy'
@@ -325,7 +326,20 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
 
       createAccount: async (input) => {
         if (AUTH_ENABLED && !auth.getSession()) throw new Error('Please log in first.')
-        const { account, profile } = await api.createAccount(input)
+        let created: Awaited<ReturnType<typeof api.createAccount>>
+        try {
+          created = await api.createAccount(input)
+        } catch (err) {
+          // The login was deleted on the server (e.g. in the Supabase dashboard) while this
+          // browser still had its token: sign out so the guards send them to Log in.
+          if (err instanceof BackendError && err.code === '28000') {
+            dispatch({ type: 'reset' })
+            await auth.signOut()
+            throw new Error('Your login no longer exists, so you’ve been logged out. Please sign up or log in again.')
+          }
+          throw err
+        }
+        const { account, profile } = created
         dispatch({ type: 'signIn', account, profile })
         return account
       },
