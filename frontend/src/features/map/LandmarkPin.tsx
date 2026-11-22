@@ -3,7 +3,6 @@
 //   visited              teal pin with a check
 //   recommended          saffron star badge on the pin's shoulder
 //   recommended+visited  teal pin with a check and the star badge
-// Glyph sizes use `!` because Icon's own size-6 would otherwise win at these small sizes.
 import Icon from '../../components/icons/Icon'
 import { cn } from '../../lib/cn'
 import type { LandmarkCategory } from '../explore/types'
@@ -47,9 +46,9 @@ export default function LandmarkPin({ visited, recommended, category, selected, 
       </svg>
       <span className={cn('absolute inset-x-0 grid place-items-center text-ink', sm ? 'top-0.5 h-3.5' : 'top-[5px] h-[22px]', selected && !sm && '-translate-y-1.5 scale-125')}>
         {visited ? (
-          <Icon name="check" accent="none" strokeWidth={sm ? 3.4 : 3} className={sm ? 'size-3!' : 'size-4!'} />
+          <Icon name="check" accent="none" strokeWidth={sm ? 3.4 : 3} className={sm ? 'size-3' : 'size-4'} />
         ) : category && !sm ? (
-          <Icon name={categoryOf(category).icon} accent="saffron" strokeWidth={2} className="size-4!" />
+          <Icon name={categoryOf(category).icon} accent="saffron" strokeWidth={2} className="size-4" />
         ) : (
           <span className={cn('block rounded-full bg-ink', sm ? 'size-1.5' : 'size-2')} />
         )}
@@ -62,7 +61,7 @@ export default function LandmarkPin({ visited, recommended, category, selected, 
             selected && !sm && '-translate-y-2 translate-x-1',
           )}
         >
-          <Icon name="star" accent="sheet" strokeWidth={sm ? 3 : 2.6} className={sm ? 'size-3!' : 'size-3.5!'} />
+          <Icon name="star" accent="sheet" strokeWidth={sm ? 3 : 2.6} className={sm ? 'size-3' : 'size-3.5'} />
         </span>
       )}
     </span>
