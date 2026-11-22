@@ -70,7 +70,7 @@ async function scenario(browser, name, geo, checkResponse, run) {
   await ctx.close()
 }
 
-const oratoryCheck = (b) => ({ status: 'ok', reason: null, message: 'You’re at L’Oratoire Saint-Joseph du Mont-Royal.', candidates: [{ id: ORAT, name: 'L’Oratoire Saint-Joseph du Mont-Royal', category: 'religious', distance_m: 42, match: 'radius', visited: false }], resolved_landmark_id: ORAT, ambiguous: false, limits: { max_accuracy_m: 50, max_position_age_s: 120, max_capture_gap_s: 30 } })
+const oratoryCheck = (_b) => ({ status: 'ok', reason: null, message: 'You’re at L’Oratoire Saint-Joseph du Mont-Royal.', candidates: [{ id: ORAT, name: 'L’Oratoire Saint-Joseph du Mont-Royal', category: 'religious', distance_m: 42, match: 'radius', visited: false }], resolved_landmark_id: ORAT, ambiguous: false, limits: { max_accuracy_m: 50, max_position_age_s: 120, max_capture_gap_s: 30 } })
 const limits = { max_accuracy_m: 50, max_position_age_s: 120, max_capture_gap_s: 30 }
 
 async function shoot(page) {
