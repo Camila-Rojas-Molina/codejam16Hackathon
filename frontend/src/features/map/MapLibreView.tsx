@@ -18,7 +18,7 @@ import { isCoarsePointer } from './layout'
 import MapFrame from './MapFrame'
 import MapLibreMarker from './MapLibreMarker'
 import WeatherClouds from './WeatherClouds'
-import { TREES_MIN_ZOOM, useTrees } from './useTrees'
+import { useTrees } from './useTrees'
 import { FIRST_BUILDING_LAYER, OPTIONAL_SOURCES, TERRAIN, TEXTURES, buildMapStyle, readPalette, textureImage, type MapPalette } from './mapStyle'
 import { ClusterBubble, LandmarkMarker, UserDot } from './Pins'
 import type { LatLng } from './types'
@@ -251,22 +251,8 @@ export default function MapLibreView({ className, onFail }: { className?: string
   useTrees(map)
 
   // Raised terrain only in the tilted view; the flat 2D view keeps just the hillshade.
-  // At street zoom the terrain flattens out (smoothly, over one zoom level) so the trees, which
-  // MapLibre can't stand on raised terrain, can show; the hills matter when zoomed out anyway.
   useEffect(() => {
-    if (!map) return
-    let last = -1
-    const apply = () => {
-      const k = tilted ? Math.round(Math.max(0, Math.min(1, TREES_MIN_ZOOM - 0.2 - map.getZoom())) * 10) / 10 : 0
-      if (k === last) return
-      last = k
-      map.setTerrain(k > 0 ? { ...TERRAIN, exaggeration: TERRAIN.exaggeration * k } : null)
-    }
-    apply()
-    map.on('zoom', apply)
-    return () => {
-      map.off('zoom', apply)
-    }
+    if (map) map.setTerrain(tilted ? TERRAIN : null)
   }, [map, tilted])
 
   const toggleTilt = () => {
