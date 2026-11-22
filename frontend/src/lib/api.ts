@@ -5,7 +5,7 @@ import { DEFAULT_AVATAR } from './avatars'
 import type { PlacePick } from '../features/places/types'
 import { MESSAGE_MAX_LENGTH, type Connection, type DiscoverEntry, type Message, type Person, type Thread } from '../features/chat/types'
 import { addCity, tidyDogs } from '../features/profile/model'
-import { compatibility, type Compatibility, type MatchDogs, type MatchProfile } from '../features/profile/matching'
+import { compatibility, toMatchProfile, type Compatibility, type MatchDogs, type MatchProfile } from '../features/profile/matching'
 import type {
   Account,
   DiscoveredCity,
@@ -248,11 +248,13 @@ export async function deleteAccount(accountId: string): Promise<void> {
 // here writes points, purchases or the outfit into the profile record any more; `record.rewards`
 // is only read once, to carry an existing device ledger into the device economy.
 
-// ---- People, connections & messages ----------------------------------------------------------
-// Discover lists locals for tourists; a tourist asks to connect; the local says Connect or Not now.
-// Real people: Supabase (013_connections.sql, the server enforces every rule) when configured, else
-// every account on this device (connectionsDb.ts, same rules). MIGO's sample locals (mockData) live
-// on the device in both cases, and say yes straight away so the flow can be tried alone.
+// ---- People, matches & messages --------------------------------------------------------------
+// Discover ranks locals for a tourist (their top matches first); the tourist picks one and it's a
+// match straight away. The local is assigned: they get "You've been matched!" and pick Say hi or
+// Not now. Real people: Supabase (013_connections.sql, the server enforces every rule) when
+// configured, else every account on this device (connectionsDb.ts, same rules). MIGO's sample
+// profiles (mockData) live on the device in both cases: sample locals can be picked like anyone, and
+// a local with nobody yet is assigned a sample tourist, so both sides can be tried alone.
 // Messages themselves are still kept on this device (TODO(backend): message delivery).
 
 const SAMPLE_IDS = new Set(USERS.map((u) => u.id))
@@ -333,10 +335,31 @@ async function myCard(accountId: string): Promise<{ person: Person; record: Prof
   return { person: personFromRecord(account, record), record }
 }
 
-/** Every connection you're part of (requests both ways, connections, and closed ones), newest first. */
+/**
+ * Local mode, nobody yet: MIGO assigns the most compatible sample tourist this local hasn't met, so
+ * "You've been matched!" can be tried without a second phone. Each sample is assigned at most once
+ * (a Not now or a removal is final for that sample), and never while the local has a live match.
+ */
+async function assignSampleTourist(accountId: string, server: Connection[]): Promise<void> {
+  const { person: me, record } = await myCard(accountId)
+  if (record.activeMode !== 'local' || !record.universalCompletedAt) return
+  const rows = conn.forAccount(accountId)
+  if (rows.some((r) => r.recipientId === accountId && (r.status === 'accepted' || r.status === 'pending'))) return
+  if (server.some((c) => c.direction === 'incoming' && (c.status === 'accepted' || c.status === 'pending'))) return
+  const metBefore = new Set(rows.flatMap((r) => [r.requesterId, r.recipientId]))
+  const mine = toMatchProfile(record)
+  const best = USERS.filter((u) => u.role === 'tourist' && !metBefore.has(u.id))
+    .map((u) => ({ u, match: mine ? compatibility(mine, asMatchProfile(u)) : null }))
+    .filter(({ match }) => !match?.blocked)
+    .sort((a, b) => (b.match?.total ?? 0) - (a.match?.total ?? 0))[0]
+  if (best) conn.assignSample(samplePerson(best.u), me)
+}
+
+/** Every match you're part of (both ways, live and closed), newest first. */
 export async function getConnections(accountId: string): Promise<Connection[]> {
-  const device = conn.forAccount(accountId).map((r) => conn.asConnection(r, accountId, deviceCard))
   const server = onSupabase() ? await backend.myConnections() : []
+  await assignSampleTourist(accountId, server).catch(() => {})
+  const device = conn.forAccount(accountId).map((r) => conn.asConnection(r, accountId, deviceCard))
   return [...server, ...device].sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
@@ -390,34 +413,34 @@ export async function discoverLocals(
     .sort((a, b) => (b.match.total ?? 0) - (a.match.total ?? 0))
 }
 
-/** Asks a local to connect. Returns the request (or the existing connection: never a duplicate). */
+/** A tourist picks a local: it's a match. Returns the match (or the existing one: never a duplicate). */
 export async function requestConnection(accountId: string, person: Person): Promise<Connection> {
   await delay(150)
   if (isSamplePerson(person.id)) {
     const { person: me, record } = await myCard(accountId)
-    if (record.activeMode !== 'tourist') throw new Error('Switch to Tourist mode to connect with locals.')
-    return conn.asConnection(conn.request(me, person, { autoAccept: true }), accountId)
+    if (record.activeMode !== 'tourist') throw new Error('Switch to Tourist mode to match with locals.')
+    return conn.asConnection(conn.request(me, person), accountId)
   }
   if (onSupabase()) return backend.requestConnection(person.id)
 
   const { person: me, record } = await myCard(accountId)
   const existing = conn.livePair(accountId, person.id)
   if (!existing) {
-    if (record.activeMode !== 'tourist') throw new Error('Switch to Tourist mode to connect with locals.')
+    if (record.activeMode !== 'tourist') throw new Error('Switch to Tourist mode to match with locals.')
     const theirs = db.getAccount(person.id) ? db.getRecord(person.id) : null
     if (!theirs) throw new Error('That person isn’t on MIGO any more.')
     if (theirs.activeMode !== 'local') throw new Error('They’re not in Local mode right now.')
-    if (conn.declinedRecently(accountId, person.id)) throw new Error('They’re not taking new requests from you right now.')
+    if (conn.declinedRecently(accountId, person.id)) throw new Error('They can’t meet up right now. Try another of your top matches.')
   }
   return conn.asConnection(conn.request(me, deviceCard(person.id) ?? person), accountId, deviceCard)
 }
 
-/** The local's answer: true = Connect, false = Not now. An already-answered request comes back unchanged. */
+/** The local's answer to "You've been matched!": true = Say hi, false = Not now. Settled matches come back unchanged. */
 export async function respondToConnection(accountId: string, connectionId: string, accept: boolean): Promise<Connection> {
   await delay(120)
   if (!isDeviceConnection(connectionId)) return backend.respondConnection(connectionId, accept)
   const row = conn.respond(accountId, connectionId, accept)
-  if (!row) throw new Error('That request isn’t there any more.')
+  if (!row) throw new Error('That match isn’t there any more.')
   return conn.asConnection(row, accountId, deviceCard)
 }
 

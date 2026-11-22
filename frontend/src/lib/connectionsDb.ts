@@ -1,7 +1,11 @@
-// Device-local connection requests. The same rules as backend/supabase/migrations/013_connections.sql,
-// for when Supabase isn't configured (every account on this device shares one table, so two accounts
-// on one device can try the whole tourist → local flow) and for MIGO's sample profiles, which only
-// exist in the app. Only the data layer (api.ts) imports this.
+// Device-local matches. The same rules as backend/supabase/migrations/013_connections.sql, for when
+// Supabase isn't configured (every account on this device shares one table, so two accounts on one
+// device can try the whole tourist → local flow) and for MIGO's sample profiles, which only exist in
+// the app. Only the data layer (api.ts) imports this.
+//
+// A tourist picks a local → matched straight away (accepted). The local's "You've been matched!"
+// stays new (recipientSeen false) until they answer it: Say hi keeps it, Not now closes it (declined).
+// 'pending' / 'cancelled' rows come from the first version (the local had to accept a request).
 import type { Connection, ConnectionStatus, Person } from '../features/chat/types'
 import { readJSON, writeJSON } from './storage'
 
@@ -91,16 +95,23 @@ export function declinedRecently(me: string, other: string, now = Date.now()): b
 const newId = () => `conn-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 
 /**
- * Tourist → local. Same outcomes as migo_request_connection: an existing live row is returned as is;
- * if they already asked you, this accepts theirs. `autoAccept` is for sample profiles, which can't answer.
+ * Tourist (`me`) picks a local (`them`): a match, straight away. Same outcomes as
+ * migo_request_connection: an existing match is returned as is, and an old pending request between
+ * the two (either way) becomes the match. The local gets "You've been matched!" (recipientSeen false).
  */
-export function request(me: Person, them: Person, opts: { autoAccept?: boolean } = {}): Row {
+export function request(me: Person, them: Person): Row {
   const rows = load()
   const now = Date.now()
   const existing = rows.find((r) => samePair(r, me.id, them.id) && live(r))
   if (existing) {
-    if (existing.status === 'pending' && existing.recipientId === me.id) {
-      Object.assign(existing, { status: 'accepted', respondedAt: now, updatedAt: now, recipientSeen: true, requesterSeen: false })
+    if (existing.status === 'pending') {
+      Object.assign(existing, {
+        status: 'accepted',
+        respondedAt: now,
+        updatedAt: now,
+        requesterSeen: existing.requesterId === me.id,
+        recipientSeen: existing.recipientId === me.id,
+      })
       save(rows)
     }
     return existing
@@ -109,19 +120,26 @@ export function request(me: Person, them: Person, opts: { autoAccept?: boolean }
     id: newId(),
     requesterId: me.id,
     recipientId: them.id,
-    status: opts.autoAccept ? 'accepted' : 'pending',
+    status: 'accepted',
     createdAt: now,
-    respondedAt: opts.autoAccept ? now : null,
+    respondedAt: now,
     updatedAt: now,
     removedBy: null,
-    // A sample's instant yes still shows the tourist the "they said yes" note once.
-    requesterSeen: !opts.autoAccept,
+    requesterSeen: true,
     recipientSeen: false,
     requester: me,
     recipient: them,
   }
   save([...rows, row])
   return row
+}
+
+/**
+ * MIGO assigns a sample tourist to a local (`me`) who has nobody yet, so Local mode can be tried
+ * alone: the local gets "You've been matched!" exactly as when a real tourist picks them.
+ */
+export function assignSample(sampleTourist: Person, me: Person): Row {
+  return request(sampleTourist, me)
 }
 
 function update(id: string, change: (r: Row) => boolean): Row | null {
@@ -132,13 +150,21 @@ function update(id: string, change: (r: Row) => boolean): Row | null {
   return row
 }
 
-/** The recipient answers. Already answered (or withdrawn) = returned unchanged. */
+/**
+ * The local answers "You've been matched!": true = Say hi (keep it), false = Not now (close it).
+ * Only until they've said hi; anything already settled comes back unchanged. Also answers old pending requests.
+ */
 export function respond(me: string, id: string, accept: boolean): Row | null {
   const now = Date.now()
   return update(id, (r) => {
-    if (r.recipientId !== me) throw new Error('Request not found.')
-    if (r.status !== 'pending') return false
-    Object.assign(r, { status: accept ? 'accepted' : 'declined', respondedAt: now, updatedAt: now, recipientSeen: true, requesterSeen: false })
+    if (r.recipientId !== me) throw new Error('Match not found.')
+    const open = r.status === 'pending' || (r.status === 'accepted' && !r.recipientSeen)
+    if (!open) return false
+    if (accept) {
+      Object.assign(r, { status: 'accepted', respondedAt: r.respondedAt ?? now, updatedAt: now, recipientSeen: true, requesterSeen: r.status === 'pending' ? false : r.requesterSeen })
+    } else {
+      Object.assign(r, { status: 'declined', respondedAt: now, updatedAt: now, recipientSeen: true, requesterSeen: false })
+    }
     return true
   })
 }
@@ -170,8 +196,8 @@ export function markSeen(me: string, ids?: string[]) {
       r.requesterSeen = true
       changed = true
     }
-    // An incoming request stays "new" until it's answered.
-    if (r.recipientId === me && !r.recipientSeen && r.status !== 'pending') {
+    // "You've been matched!" (and an old request) stays new until it's answered.
+    if (r.recipientId === me && !r.recipientSeen && r.status !== 'pending' && r.status !== 'accepted') {
       r.recipientSeen = true
       changed = true
     }

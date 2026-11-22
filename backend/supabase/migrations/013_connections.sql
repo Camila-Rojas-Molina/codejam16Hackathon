@@ -1,20 +1,24 @@
--- 013_connections.sql: CHAT connection requests (tourist → local, the local accepts or says not now).
--- Run after 005_auth.sql (and 006). Safe to run again.
+-- 013_connections.sql: CHAT matching. The tourist picks a local from their top matches; the local
+-- is assigned and told "You've been matched!". Run after 005_auth.sql (and 006). Safe to run again.
 --
 -- The flow
---   1. A tourist browses locals in Discover (migo_discover) and taps Connect (migo_request_connection).
---   2. The local sees the request (migo_my_connections, status 'pending', incoming) and picks
---      Connect (accept) or Not now (decline) with migo_respond_connection.
---   3. Accepted: both people see each other in Messages, and neither appears in the other's Discover.
---      Declined: the request is closed, no conversation. The tourist is told once, gently.
---   4. Either person can remove an accepted connection from Messages (migo_remove_connection). The
---      row is kept as 'removed' (history, nothing deleted); they can meet again through Discover,
---      which creates a fresh request. Messages are not stored on the server yet, so nothing else changes.
+--   1. A tourist browses their top-matched locals in Discover (migo_discover; the app ranks them by
+--      compatibility) and taps Match (migo_request_connection).
+--   2. That's a match straight away (status 'accepted'): it opens in both people's Messages and
+--      neither appears in the other's Discover any more.
+--   3. The local gets a "You've been matched!" notification (incoming, recipient_seen = false). They
+--      pick Say hi (migo_respond_connection(id, true): seen, the match stays) or Not now
+--      (migo_respond_connection(id, false): status 'declined', the conversation closes for both, and
+--      the tourist is told once, gently). Not now is only offered until the local has said hi.
+--   4. Either person can remove a match from Messages later (migo_remove_connection). The row is kept
+--      as 'removed' (history, nothing deleted); they can meet again through Discover, which makes a
+--      fresh match. Messages are not stored on the server yet, so nothing else changes.
 --
--- Statuses: pending → accepted | declined | cancelled (the tourist withdrew it); accepted → removed.
+-- Statuses: accepted (matched) → declined (the local's Not now) | removed. 'pending' and 'cancelled'
+-- come from the first version of this file (the local had to accept a request first): pending rows
+-- still work (the local's answer, or the tourist withdrawing it) so nothing in flight breaks.
 -- Only one live (pending or accepted) row per pair, whoever started it: a unique index on the
--- unordered pair enforces that, so double taps and two people connecting at once can't duplicate.
--- If the person you're requesting already has a pending request to you, yours accepts theirs.
+-- unordered pair enforces that, so double taps and two people matching at once can't duplicate.
 --
 -- Everything goes through these functions (security definer, signed-in only). The table has RLS on
 -- and no grants. Errors: 42501 not signed in / not yours, P0002 unknown person or request,
@@ -148,9 +152,9 @@ begin
 end;
 $$;
 
--- Tourist → local. Returns the connection. Idempotent: asking twice returns the same pending request;
--- asking someone you're already connected with returns that connection; if they've already asked
--- you, this accepts their request instead of making a second one.
+-- Tourist → local: a match, straight away. Returns the connection. Idempotent: matching someone
+-- you're already matched with returns that match; an older pending request between you (either way)
+-- becomes the match instead of a second row.
 create or replace function migo_request_connection(p_recipient uuid) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
@@ -175,11 +179,11 @@ begin
    for update;
 
   if found then
-    if c.status = 'pending' and c.recipient_id = me then
-      -- They asked first: connecting back is a yes.
+    if c.status = 'pending' then
+      -- A request from the first version: matching now settles it as a match.
       update connections
          set status = 'accepted', responded_at = now(), updated_at = now(),
-             recipient_seen = true, requester_seen = false
+             requester_seen = (requester_id = me), recipient_seen = (recipient_id = me)
        where id = c.id
       returning * into c;
     end if;
@@ -187,7 +191,7 @@ begin
   end if;
 
   if my_role is distinct from 'tourist' then
-    raise exception 'Switch to Tourist mode to connect with locals' using errcode = '22023';
+    raise exception 'Switch to Tourist mode to match with locals' using errcode = '22023';
   end if;
   if their_role is distinct from 'local' then
     raise exception 'They''re not in Local mode right now' using errcode = '22023';
@@ -195,15 +199,20 @@ begin
   if exists (select 1 from connections
               where requester_id = me and recipient_id = p_recipient and status = 'declined'
                 and responded_at > now() - migo_decline_cooldown()) then
-    raise exception 'They''re not taking new requests from you right now' using errcode = '22023';
+    raise exception 'They can''t meet up right now. Try another of your top matches' using errcode = '22023';
   end if;
 
-  insert into connections (requester_id, recipient_id) values (me, p_recipient) returning * into c;
+  -- Matched: the tourist has seen it (they made it), the local gets "You've been matched!".
+  insert into connections (requester_id, recipient_id, status, responded_at, requester_seen, recipient_seen)
+  values (me, p_recipient, 'accepted', now(), true, false)
+  returning * into c;
   return migo_connection_json(c, me);
 end;
 $$;
 
--- The local answers: true = connect, false = not now. Only the recipient, only while pending.
+-- The local's answer to "You've been matched!": true = Say hi (keep the match), false = Not now
+-- (close it). Only the local. Not now only works until they've said hi (after that, it's Remove);
+-- anything already settled elsewhere comes back unchanged. Also answers first-version pending requests.
 create or replace function migo_respond_connection(p_connection uuid, p_accept boolean) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
@@ -212,23 +221,32 @@ declare
 begin
   select * into c from connections where id = p_connection for update;
   if not found or c.recipient_id <> me then
-    raise exception 'Request not found' using errcode = 'P0002';
+    raise exception 'Match not found' using errcode = 'P0002';
   end if;
-  if c.status <> 'pending' then
-    -- Already answered (or withdrawn) elsewhere: report how it stands instead of changing it.
-    return migo_connection_json(c, me);
+
+  if c.status = 'pending' or (c.status = 'accepted' and not c.recipient_seen) then
+    if p_accept then
+      update connections
+         set status = 'accepted', responded_at = coalesce(c.responded_at, now()), updated_at = now(),
+             recipient_seen = true,
+             -- A first-version request: the tourist hears the yes. A match: they already know.
+             requester_seen = case when c.status = 'pending' then false else c.requester_seen end
+       where id = c.id
+      returning * into c;
+    else
+      update connections
+         set status = 'declined', responded_at = now(), updated_at = now(),
+             recipient_seen = true, requester_seen = false
+       where id = c.id
+      returning * into c;
+    end if;
   end if;
-  update connections
-     set status = case when p_accept then 'accepted' else 'declined' end,
-         responded_at = now(), updated_at = now(),
-         recipient_seen = true, requester_seen = false
-   where id = c.id
-  returning * into c;
   return migo_connection_json(c, me);
 end;
 $$;
 
--- The tourist withdraws a request that hasn't been answered yet.
+-- The tourist withdraws a first-version request that hasn't been answered yet (new matches have no
+-- pending step; they're removed instead).
 create or replace function migo_cancel_connection(p_connection uuid) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
@@ -290,8 +308,10 @@ declare
 begin
   update connections set requester_seen = true
    where requester_id = me and not requester_seen and (p_ids is null or id = any(p_ids));
+  -- "You've been matched!" stays new until the local answers it (Say hi or Not now).
   update connections set recipient_seen = true
-   where recipient_id = me and not recipient_seen and status <> 'pending' and (p_ids is null or id = any(p_ids));
+   where recipient_id = me and not recipient_seen and status not in ('pending', 'accepted')
+     and (p_ids is null or id = any(p_ids));
 end;
 $$;
 

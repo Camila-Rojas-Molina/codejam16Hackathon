@@ -1,91 +1,128 @@
-// The guided tour's script. Migo walks a brand-new account through the hub in eight short stops.
+// The guided tour's script. Migo walks a brand-new account through MIGO in ten short stops, and
+// actually opens each part of the app on the way, so the real thing is on screen while Migo talks
+// (it doubles as a walkthrough when someone is showing MIGO to others).
 //
 // What made the cut, and why (everything here exists in the app today):
 //   1. Hello: who Migo is, and that the tour is short.
-//   2. Map: the hub's home page. The interactive map itself isn't switched on yet, so the stop says
-//      what Map really does today: where you're exploring, and the shortcut to photo hunts.
-//   3. Tourist / Local: the one idea people must get. It's a mode you switch, not an account type,
+//   2. Tourist / Local: the one idea people must get. It's a mode you switch, not an account type,
 //      and it decides who you meet.
-//   4. Chat: how people actually meet (tourist taps Connect, the local says yes, then Messages).
-//   5. Quests: where points come from.
-//   6. Points → Shop: what points are for (dressing up your avatar).
-//   7. Gallery + Profile: the two personal sections, together (one sentence each is enough).
-//   8. Settings: done, and where to replay this.
-// Left out on purpose: questionnaire details, trips, privacy settings, Day/Night, Discover's match
-// scores. They're explained where they appear.
+//   3. Map: the real 3D map of Montréal's landmarks, with recommended places (from your answers)
+//      highlighted and the ones you've visited ticked off.
+//   4. Camera: how a visit counts. The photo's GPS reading links it to the landmark you're at.
+//   5. Matching: the heart of MIGO. Tourists pick from their top-matched locals (an instant match);
+//      locals are matched by tourists and get "You've been matched!".
+//   6. Quests: daily and weekly challenges that pay points.
+//   7. Points: where the balance lives (it's also the way into the Shop).
+//   8. Shop: what points are for (dressing up your avatar).
+//   9. Gallery: every photo, grouped by place and city.
+//  10. Profile, then done: the card your matches see, and where to replay this.
+// Left out on purpose: questionnaire details, trips, privacy settings, Day/Night, photo hunts and the
+// match-score breakdown. They're explained where they appear.
 //
-// `target` names [data-tour] hooks on the real interface (nav items, the mode toggle, the points
-// badge, the settings button). Several elements can share a name (desktop nav and phone tab bar):
-// the tour spotlights whichever are visible. No target = Migo in the middle of the screen.
+// `route` is the page the stop opens (the tour stays on top). `target` names [data-tour] hooks on the
+// real interface. Several elements can share a name (desktop nav and phone tab bar): the tour
+// spotlights whichever are visible. No target, or a target that isn't on screen = Migo in the middle.
 import type { MascotPose } from '../../components/illustrations/Mascot'
 import type { ExploreMode } from '../profile/types'
 
+type ByMode<T> = T | ((mode: ExploreMode | null) => T)
+
 export type TourStep = {
   id: string
-  target?: string[]
+  route?: ByMode<string>
+  target?: ByMode<string[] | undefined>
   pose: MascotPose
   title: string
   /** Mode-aware where it helps (null = no mode picked yet). */
   text: (mode: ExploreMode | null) => string
 }
 
+export const resolve = <T,>(v: ByMode<T>, mode: ExploreMode | null): T => (typeof v === 'function' ? (v as (m: ExploreMode | null) => T)(mode) : v)
+
 export const TOUR_STEPS: TourStep[] = [
   {
     id: 'hello',
+    route: '/map',
     pose: 'hello',
     title: 'Hi, I’m Migo!',
-    text: () => 'I’ll show you around MIGO. It takes under a minute, promise.',
-  },
-  {
-    id: 'map',
-    target: ['nav-map'],
-    pose: 'glide',
-    title: 'Map is home base',
-    text: () => 'It shows where you’re exploring, with shortcuts to quests and photo hunts: team up with someone and find a mystery spot together.',
+    text: () => 'Let me show you around. MIGO pairs tourists with locals, then sends you out to explore the city together. It only takes a minute.',
   },
   {
     id: 'mode',
+    route: '/map',
     target: ['mode'],
     pose: 'curious',
     title: 'Tourist or Local?',
-    text: () => 'Switch here any time. As a tourist you meet locals; as a local you show visitors your city.',
+    text: () => 'One account, two modes. Switch here any time: as a tourist you meet locals, as a local you show visitors your city.',
   },
   {
-    id: 'chat',
-    target: ['nav-chat'],
+    id: 'map',
+    route: '/map',
+    target: ['map-view'],
+    pose: 'glide',
+    title: 'Explore the real city',
+    text: () =>
+      'A 3D map of Montréal’s landmarks. The highlighted ones are picked for you from your answers, and every place you visit gets ticked off. Tap a pin for the details.',
+  },
+  {
+    id: 'camera',
+    route: '/map',
+    target: ['camera'],
+    pose: 'search',
+    title: 'Snap it to count it',
+    text: () => 'At a landmark? Take a photo. Your phone’s location tells MIGO where you are, and the place is marked visited on your map.',
+  },
+  {
+    id: 'match',
+    route: (mode) => (mode === 'tourist' ? '/chat?tab=discover' : '/chat'),
+    target: (mode) => (mode === 'tourist' ? ['top-matches'] : ['nav-chat']),
     pose: 'read',
-    title: 'Meet people in Chat',
+    title: 'Find your people',
     text: (mode) =>
       mode === 'local'
-        ? 'Tourists find you in Discover and ask to connect. Pick Connect or Not now. Once you’re connected, you chat in Messages.'
-        : 'Browse locals in Discover and tap Connect. When a local says yes, you’ll find each other in Messages.',
+        ? 'Tourists see you among their top matches. When one picks you, you’ll get a “You’ve been matched!”. Say hi and plan something together in Chat.'
+        : mode === 'tourist'
+          ? 'These are your top-matched locals, ranked by what you have in common. Pick one and it’s a match, straight away. They get a “You’ve been matched!”.'
+          : 'Tourists pick from their top-matched locals, and locals get a “You’ve been matched!”. Pick a mode to start meeting people.',
   },
   {
     id: 'quests',
-    target: ['nav-quests'],
+    route: '/quests',
+    target: ['quests-weekly', 'quests-daily'],
     pose: 'play',
     title: 'Quests earn points',
-    text: () => 'Do the daily challenge and a few starter goals, then claim your points.',
+    text: () => 'A big weekly challenge and three fresh dailies, plus adventures picked for your interests. Finish one, then claim its points.',
   },
   {
     id: 'points',
+    route: '/quests',
     target: ['points'],
     pose: 'goodies',
-    title: 'Treat yourself',
-    text: () => 'Your points live here. Tap them to open the Shop and dress up your avatar.',
+    title: 'Your points',
+    text: () => 'Your balance lives up here, wherever you are. Tap it any time to go shopping.',
   },
   {
-    id: 'you',
-    target: ['nav-gallery', 'nav-profile'],
-    pose: 'search',
-    title: 'Your photos and profile',
-    text: () => 'Gallery keeps photos from your adventures. Profile holds your answers and the card other people see.',
+    id: 'shop',
+    route: '/shop',
+    target: ['shop-fitting'],
+    pose: 'cheer',
+    title: 'Treat yourself',
+    text: () => 'Spend points on hats, glasses, pets and backdrops. Try things on in the fitting room before you buy.',
+  },
+  {
+    id: 'gallery',
+    route: '/gallery',
+    target: ['gallery-header'],
+    pose: 'leap',
+    title: 'Your adventures',
+    text: () => 'Every photo you take lands here, with the place, the city and the day. Your visited places add up too.',
   },
   {
     id: 'done',
-    target: ['settings'],
+    route: '/profile',
+    target: ['profile-card'],
     pose: 'cheer',
     title: 'You’re all set!',
-    text: () => 'You can replay this tour any time in Settings. Now go find your people!',
+    text: () => 'This is the card your matches see. You can replay this tour any time from Settings. Now go find your people!',
   },
 ]

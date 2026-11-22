@@ -32,7 +32,7 @@ export default function MapFrame({ ex, locate, onOpenFromList, controls, classNa
   const { status, error, retry, listOpen, setListOpen, sheetOpen, selected, detail } = ex
 
   return (
-    <section aria-label="Map" className={cn('relative flex min-h-[22rem] flex-1 flex-col overflow-hidden border-2 border-ink bg-teal-soft', className)}>
+    <section aria-label="Map" data-tour="map-view" className={cn('relative flex min-h-[22rem] flex-1 flex-col overflow-hidden border-2 border-ink bg-teal-soft shadow-block', className)}>
       <MapToolbar
         summary={ex.summary}
         busy={status === 'loading'}
@@ -112,7 +112,7 @@ export default function MapFrame({ ex, locate, onOpenFromList, controls, classNa
           >
             <Icon name="compass" accent="teal" className={cn('size-6', locate.state.status === 'locating' && 'animate-spin')} />
           </button>
-          <button type="button" onClick={() => navigate('/camera')} className={buttonClasses({ className: 'min-h-14 shadow-block-sm' })}>
+          <button type="button" data-tour="camera" onClick={() => navigate('/camera')} className={buttonClasses({ className: 'min-h-14 shadow-block-sm' })}>
             <Icon name="camera" accent="sheet" className="size-6" />
             Camera
           </button>

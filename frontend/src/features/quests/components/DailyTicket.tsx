@@ -42,7 +42,7 @@ export default function DailyTicket({
       className={cn(
         '@container scroll-mt-24 border-2 border-ink',
         state === 'claimed' ? 'bg-teal-soft' : 'sheet-grain',
-        highlight && 'shadow-block outline-4 outline-offset-4 outline-saffron',
+        highlight ? 'shadow-block outline-4 outline-offset-4 outline-saffron' : 'shadow-block-sm',
       )}
     >
       <div className="flex h-full flex-col @[19rem]:flex-row">

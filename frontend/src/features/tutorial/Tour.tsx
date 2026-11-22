@@ -5,17 +5,22 @@
 //     explained, framed like a ruled cell with a saffron block shadow.
 //   * Migo, the MIGO logo and a speech bubble sit together on one sheet, placed beside the target where
 //     there's room (desktop) or above/below it (phones), never on top of it.
-//   * Progress squares + "Step 3 of 8", Back, Next, and Skip tour. Esc skips; ← and → step.
+//   * Each stop can open a page of the app (steps.ts `route`), so the real Map, Discover, Quests,
+//     Shop, Gallery and Profile are on screen while Migo explains them. The spotlight waits for the
+//     page to draw its target, and scrolls it into view.
+//   * Progress squares + "Step 3 of 10", Back, Next, and Skip tour. Esc skips; ← and → step.
+//     Finishing goes back to the Map; skipping leaves you wherever you are.
 //   * Skip and Finish are saved to the profile record right away (api.setTutorialStatus), so the tour
 //     never comes back on its own. The tour blocks clicks on the page underneath while it's open.
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useLocation, useNavigate } from 'react-router'
 import Icon from '../../components/icons/Icon'
 import { Mascot } from '../../components/illustrations/Mascot'
 import { buttonClasses } from '../../components/ui/buttonStyles'
 import Logo from '../../components/ui/Logo'
 import { cn } from '../../lib/cn'
 import { useStore } from '../../store/useStore'
-import { TOUR_STEPS } from './steps'
+import { resolve, TOUR_STEPS } from './steps'
 
 type Rect = { x: number; y: number; w: number; h: number }
 
@@ -43,6 +48,15 @@ function findTarget(names: string[] | undefined): { rect: Rect | null; els: Elem
 
 const same = (a: Rect | null, b: Rect | null) =>
   a === b || (!!a && !!b && Math.abs(a.x - b.x) < 0.5 && Math.abs(a.y - b.y) < 0.5 && Math.abs(a.w - b.w) < 0.5 && Math.abs(a.h - b.h) < 0.5)
+
+/** The part of a rect that's on screen (null when none of it is). */
+function clipToViewport(r: Rect, vw: number, vh: number): Rect | null {
+  const x = Math.max(r.x, 0)
+  const y = Math.max(r.y, 0)
+  const w = Math.min(r.x + r.w, vw) - x
+  const h = Math.min(r.y + r.h, vh) - y
+  return w > 0 && h > 0 ? { x, y, w, h } : null
+}
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(v, Math.max(lo, hi)))
 
@@ -78,14 +92,23 @@ export default function Tour() {
     setClosed(false)
   }
   if (!pending || closed) return null
-  return (
-    <TourOverlay
-      mode={profile?.activeMode ?? null}
-      onClose={(status) => {
+  return <TourRunner mode={profile?.activeMode ?? null} onClosed={(status) => {
         setClosed(true)
         void setTutorial(status).catch(() => {
           // Offline: it will simply be offered again next time.
         })
+      }} />
+}
+
+/** Finishing returns to the Map (home); skipping leaves you where you are. */
+function TourRunner({ mode, onClosed }: { mode: 'tourist' | 'local' | null; onClosed: (status: 'completed' | 'skipped') => void }) {
+  const navigate = useNavigate()
+  return (
+    <TourOverlay
+      mode={mode}
+      onClose={(status) => {
+        onClosed(status)
+        if (status === 'completed') navigate('/map')
       }}
     />
   )
@@ -102,13 +125,33 @@ function TourOverlay({ mode, onClose }: { mode: 'tourist' | 'local' | null; onCl
   const step = TOUR_STEPS[index]
   const last = index === TOUR_STEPS.length - 1
   const remaining = TOUR_STEPS.length - 1 - index
+  const route = step.route ? resolve(step.route, mode) : null
+  const names = step.target ? resolve(step.target, mode) : undefined
+  const namesKey = names?.join(',') ?? ''
+  const navigate = useNavigate()
+  const location = useLocation()
+  const here = location.pathname + location.search
+
+  // Open the stop's page (the tour stays on top). Replace, so Back in the browser isn't ten tour stops.
+  useEffect(() => {
+    if (route && route !== here) navigate(route, { replace: true })
+  }, [route, here, navigate])
+
+  // Once the page has drawn the target, bring it into view (once per stop).
+  const scrolledFor = useRef<string | null>(null)
 
   // Follow the target (and the sheet's own size) every frame: layout shifts, scrolling, resizing,
   // the phone's toolbar sliding in… all just work.
   useLayoutEffect(() => {
     let frame = 0
+    const list = namesKey ? namesKey.split(',') : undefined
     const tick = () => {
-      const found = findTarget(step.target)
+      const found = findTarget(list)
+      if (found.els[0] && scrolledFor.current !== step.id) {
+        scrolledFor.current = step.id
+        const r = found.els[0].getBoundingClientRect()
+        if (r.top < 0 || r.bottom > window.innerHeight) found.els[0].scrollIntoView({ block: r.height > window.innerHeight * 0.6 ? 'start' : 'center', behavior: 'smooth' })
+      }
       setTarget((prev) => (same(prev, found.rect) ? prev : found.rect))
       setViewport((v) => (v.w === window.innerWidth && v.h === window.innerHeight ? v : { w: window.innerWidth, h: window.innerHeight }))
       const el = sheetRef.current
@@ -117,14 +160,7 @@ function TourOverlay({ mode, onClose }: { mode: 'tourist' | 'local' | null; onCl
     }
     tick()
     return () => cancelAnimationFrame(frame)
-  }, [step])
-
-  // New step: bring the target into view if it's off screen.
-  useEffect(() => {
-    const { els } = findTarget(step.target)
-    const r = els[0]?.getBoundingClientRect()
-    if (r && (r.top < 0 || r.bottom > window.innerHeight)) els[0].scrollIntoView({ block: 'center', behavior: 'smooth' })
-  }, [step])
+  }, [step, namesKey])
 
   // Move focus to Next once the sheet is placed (it's hidden until measured, and can't take focus before).
   const measured = sheetSize.w > 0
@@ -169,8 +205,10 @@ function TourOverlay({ mode, onClose }: { mode: 'tourist' | 'local' | null; onCl
     }
   }
 
-  const pos = placeSheet(step.target ? target : null, sheetSize, viewport.w, viewport.h)
-  const hole = step.target ? target : null
+  // Big targets (the map) are clipped to the screen, so the sheet can be placed against what's visible.
+  const visible = names && target ? clipToViewport(target, viewport.w, viewport.h) : null
+  const pos = placeSheet(visible, sheetSize, viewport.w, viewport.h)
+  const hole = visible
   const narrow = viewport.w < 640
 
   return (

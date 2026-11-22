@@ -35,7 +35,7 @@ export default function CatalogueOnly({ reason, className }: { reason: 'missing-
     status === 'unconfigured' ? 'Catalogue offline' : status === 'loading' || status === 'idle' ? 'Loading landmarks…' : `${shown.length} of ${landmarks.length} places on the island`
 
   return (
-    <section aria-label="Map" className={cn('relative flex min-h-[22rem] flex-1 flex-col overflow-hidden border-2 border-ink bg-paper', className)}>
+    <section aria-label="Map" data-tour="map-view" className={cn('relative flex min-h-[22rem] flex-1 flex-col overflow-hidden border-2 border-ink bg-paper shadow-block', className)}>
       <MapToolbar summary={summary} busy={status === 'loading'} filters={filters} onFilters={setFilters} categories={categories} />
       <div className="relative min-h-0 flex-1">
         <div className="absolute inset-0 overflow-y-auto">

@@ -7,6 +7,7 @@
 import { useEffect } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router'
 import { hasUniversalProfile } from '../../features/profile/flow'
+import MatchNotice from '../../features/chat/components/MatchNotice'
 import Tour from '../../features/tutorial/Tour'
 import { ECONOMY_PAGES, type EconomyPage } from '../../lib/economy'
 import { useStore } from '../../store/useStore'
@@ -44,6 +45,8 @@ export default function DashboardLayout() {
       <RightSidebar />
       <MobileTabBar />
       {/* Migo's guided tour: once for new accounts, or when replayed from Settings. */}
+      {/* "You've been matched!" for locals, on every screen but Chat. */}
+      <MatchNotice />
       <Tour />
     </div>
   )

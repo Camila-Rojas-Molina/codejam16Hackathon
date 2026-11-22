@@ -1,4 +1,5 @@
-// A local in Discover: who they are, what you share, and Connect (or "Request sent" once you've asked).
+// A local in a tourist's Discover: who they are, how well you match, what you share, and Match.
+// ("Request sent" only shows for a request made by the first version, which had a pending step.)
 import { useId, useState } from 'react'
 import Icon from '../../../components/icons/Icon'
 import Avatar from '../../../components/ui/Avatar'
@@ -25,8 +26,10 @@ const DIMENSION_LABELS: Record<Dimension, string> = {
 type PersonCardProps = {
   person: Person
   match: Compatibility
-  /** You've asked and they haven't answered yet. */
+  /** A first-version request still waiting for an answer. */
   pending: boolean
+  /** 1, 2, 3… for the tourist's top matches (shown as a ranked stamp). */
+  rank?: number
   onConnect: () => void
   onWithdraw: () => void
   busy?: boolean
@@ -74,7 +77,7 @@ export function PersonDetails({ person, match, id }: { person: Person; match?: C
   )
 }
 
-export default function PersonCard({ person, match, pending, onConnect, onWithdraw, busy }: PersonCardProps) {
+export default function PersonCard({ person, match, pending, rank, onConnect, onWithdraw, busy }: PersonCardProps) {
   const [open, setOpen] = useState(false)
   const detailsId = useId()
   const label = matchLabel(match.total)
@@ -83,10 +86,15 @@ export default function PersonCard({ person, match, pending, onConnect, onWithdr
   const mode = modeMeta(person.mode)
 
   return (
-    <article aria-labelledby={`${detailsId}-name`} className="sheet-grain border-2 border-ink shadow-block">
+    <article aria-labelledby={`${detailsId}-name`} className={cn('sheet-grain border-2 border-ink', rank === 1 ? 'shadow-block' : 'shadow-block-sm')}>
       <div className="flex items-stretch border-b-2 border-ink">
-        <div className="grid w-24 shrink-0 place-items-center border-r-2 border-ink bg-saffron-soft p-2 sm:w-28">
+        <div className="relative grid w-24 shrink-0 place-items-center border-r-2 border-ink bg-saffron-soft p-2 sm:w-28">
           <Avatar avatar={person.avatar} size="lg" className="border-0 bg-transparent" />
+          {rank && (
+            <span className="absolute top-1.5 left-1.5 grid min-w-8 place-items-center border-2 border-ink bg-sienna px-1 font-display text-lg leading-7 text-sheet">
+              <span className="sr-only">Top match number </span>#{rank}
+            </span>
+          )}
         </div>
         <div className="min-w-0 flex-1 p-4">
           <div className="flex flex-wrap items-center gap-2">
@@ -155,8 +163,8 @@ export default function PersonCard({ person, match, pending, onConnect, onWithdr
           </>
         ) : (
           <button type="button" disabled={busy} onClick={onConnect} className={buttonClasses()}>
-            <Icon name="people2" accent="sheet" className="size-5" />
-            {busy ? 'Connecting…' : 'Connect'}
+            <Icon name="heart" accent="sheet" className="size-5" />
+            {busy ? 'Matching…' : `Match with ${person.name}`}
           </button>
         )}
       </div>

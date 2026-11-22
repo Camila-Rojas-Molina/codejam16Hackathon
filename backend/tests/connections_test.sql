@@ -1,5 +1,6 @@
--- Checks 013_connections.sql: tourist → local requests, accept / not now, no duplicates, Discover
--- leaves out connected people (both sides), removal, and the owner rules. Rolls back.
+-- Checks 013_connections.sql: a tourist picks a local (an instant match), the local's "You've been
+-- matched!" (Say hi / Not now), no duplicates, Discover leaves out matched people (both sides),
+-- removal, first-version pending requests, and the owner rules. Rolls back.
 -- Run after the migrations (psql or the Supabase SQL editor). Prints "All connection checks passed".
 begin;
 
@@ -81,49 +82,41 @@ begin
   -- And a local can't start a request.
   assert pg_temp.fails_with(format('select migo_request_connection(%L)', l2)) = '22023', 'locals cannot request';
 
-  -- Tom asks Lou. Asking again returns the same request (no duplicate).
+  -- Tom picks Lou: a match straight away. Picking again returns the same match (no duplicate).
   perform pg_temp.act_as(tom);
   r := migo_request_connection(l1);
   cid := (r ->> 'id')::uuid;
-  assert r ->> 'status' = 'pending' and r ->> 'direction' = 'outgoing', 'request is pending';
+  assert r ->> 'status' = 'accepted' and r ->> 'direction' = 'outgoing', 'picking a local is a match';
+  assert (r ->> 'seen')::boolean, 'the tourist made it, so it is not news to them';
   r2 := migo_request_connection(l1);
-  assert (r2 ->> 'id')::uuid = cid, 'asking twice returns the same request';
+  assert (r2 ->> 'id')::uuid = cid, 'matching twice returns the same match';
   assert (select count(*) from connections where requester_id = t1 and recipient_id = l1) = 1, 'one row';
-  -- Discover still lists Lou, flagged as already asked.
-  r := (select x from jsonb_array_elements(migo_discover()) x where x ->> 'id' = l1::text);
-  assert (r ->> 'pending')::boolean, 'Discover shows the request as sent';
-  -- Can't ask a tourist.
-  assert pg_temp.fails_with(format('select migo_request_connection(%L)', t2)) = '22023', 'only locals can be asked';
+  -- Matched: Lou leaves Tom's Discover.
+  ids := (select coalesce(jsonb_agg(x ->> 'id'), '[]') from jsonb_array_elements(migo_discover()) x);
+  assert not ids @> to_jsonb(array[l1::text]), 'matched locals leave Discover';
+  -- Can't match a tourist.
+  assert pg_temp.fails_with(format('select migo_request_connection(%L)', t2)) = '22023', 'only locals can be picked';
 
-  -- Lou sees it as a new incoming request. Only Lou can answer it.
+  -- Lou is told "You've been matched!" (incoming, unseen) and it stays new until Lou answers.
   perform pg_temp.act_as(lou);
   r := (select x from jsonb_array_elements(migo_my_connections()) x where (x ->> 'id')::uuid = cid);
-  assert r ->> 'direction' = 'incoming' and r ->> 'status' = 'pending' and not (r ->> 'seen')::boolean, 'incoming and unseen';
-  assert r -> 'person' ->> 'name' = 'Tom', 'shows who asked';
+  assert r ->> 'direction' = 'incoming' and r ->> 'status' = 'accepted' and not (r ->> 'seen')::boolean, 'local gets the news';
+  assert r -> 'person' ->> 'name' = 'Tom', 'shows who picked them';
+  perform migo_mark_connections_seen(null);
+  r := (select x from jsonb_array_elements(migo_my_connections()) x where (x ->> 'id')::uuid = cid);
+  assert not (r ->> 'seen')::boolean, 'opening Chat does not answer the match';
+  -- Only Lou can answer it.
   perform pg_temp.act_as(tia);
   assert pg_temp.fails_with(format('select migo_respond_connection(%L, true)', cid)) = 'P0002', 'others cannot answer';
   perform pg_temp.act_as(tom);
-  assert pg_temp.fails_with(format('select migo_respond_connection(%L, true)', cid)) = 'P0002', 'the requester cannot answer';
+  assert pg_temp.fails_with(format('select migo_respond_connection(%L, false)', cid)) = 'P0002', 'the tourist cannot answer';
 
-  -- Lou accepts. Answering again doesn't change it.
+  -- Lou says hi: the match stays, and Not now is no longer possible (that's Remove now).
   perform pg_temp.act_as(lou);
   r := migo_respond_connection(cid, true);
-  assert r ->> 'status' = 'accepted', 'accepted';
+  assert r ->> 'status' = 'accepted' and (r ->> 'seen')::boolean, 'said hi';
   r := migo_respond_connection(cid, false);
-  assert r ->> 'status' = 'accepted', 'a second answer is ignored';
-
-  -- Tom is told once; then it's seen.
-  perform pg_temp.act_as(tom);
-  r := (select x from jsonb_array_elements(migo_my_connections()) x where (x ->> 'id')::uuid = cid);
-  assert r ->> 'status' = 'accepted' and not (r ->> 'seen')::boolean, 'requester sees the news';
-  perform migo_mark_connections_seen(null);
-  r := (select x from jsonb_array_elements(migo_my_connections()) x where (x ->> 'id')::uuid = cid);
-  assert (r ->> 'seen')::boolean, 'marked seen';
-
-  -- Connected: Lou is gone from Tom's Discover. Asking again just returns the connection.
-  ids := (select coalesce(jsonb_agg(x ->> 'id'), '[]') from jsonb_array_elements(migo_discover()) x);
-  assert not ids @> to_jsonb(array[l1::text]), 'connected people leave Discover';
-  assert (migo_request_connection(l1) ->> 'id')::uuid = cid, 'no second connection';
+  assert r ->> 'status' = 'accepted', 'not now after saying hi is ignored';
 
   -- If Lou switches to Tourist mode, Tom (when local) doesn't show up in Lou's Discover either.
   perform pg_temp.act_as(tom);
@@ -132,6 +125,8 @@ begin
   perform migo_save_record(l1, (select record from migo_profiles where profile_id = l1) || '{"activeMode":"tourist"}');
   ids := (select coalesce(jsonb_agg(x ->> 'id'), '[]') from jsonb_array_elements(migo_discover()) x);
   assert not ids @> to_jsonb(array[t1::text]), 'hidden on both sides';
+  -- And matching back (Lou as tourist picks Tom as local) returns the same match.
+  assert (migo_request_connection(t1) ->> 'id')::uuid = cid, 'both matching each other is still one match';
   perform migo_save_record(l1, (select record from migo_profiles where profile_id = l1) || '{"activeMode":"local"}');
   perform pg_temp.act_as(tom);
   perform migo_save_record(t1, (select record from migo_profiles where profile_id = t1) || '{"activeMode":"tourist"}');
@@ -142,51 +137,55 @@ begin
   perform pg_temp.act_as(lou);
   r := migo_remove_connection(cid);
   assert r ->> 'status' = 'removed' and (r ->> 'removedByMe')::boolean, 'removed by Lou';
+  assert migo_respond_connection(cid, true) ->> 'status' = 'removed', 'a removed match cannot be revived by answering';
   perform pg_temp.act_as(tom);
   ids := (select coalesce(jsonb_agg(x ->> 'id'), '[]') from jsonb_array_elements(migo_discover()) x);
   assert ids @> to_jsonb(array[l1::text]), 'removed people can be discovered again';
   assert (select count(*) from connections where id = cid) = 1, 'history is kept';
-  -- A new request is a new row (the old one stays removed).
+  -- A new match is a new row (the old one stays removed).
   r := migo_request_connection(l1);
-  assert (r ->> 'id')::uuid <> cid and r ->> 'status' = 'pending', 'fresh request after removal';
-  perform migo_cancel_connection((r ->> 'id')::uuid);
+  assert (r ->> 'id')::uuid <> cid and r ->> 'status' = 'accepted', 'fresh match after removal';
 
-  -- Not now: closed, no conversation, and Lea drops out of Tia's Discover for a while.
+  -- Not now: Lea closes Tia's match. Tia is told once; Lea drops out of Tia's Discover for a while.
   perform pg_temp.act_as(tia);
   cid := (migo_request_connection(l2) ->> 'id')::uuid;
   perform pg_temp.act_as(lea);
   r := migo_respond_connection(cid, false);
-  assert r ->> 'status' = 'declined', 'declined';
+  assert r ->> 'status' = 'declined', 'not now closes the match';
   perform pg_temp.act_as(tia);
+  r := (select x from jsonb_array_elements(migo_my_connections()) x where (x ->> 'id')::uuid = cid);
+  assert r ->> 'status' = 'declined' and not (r ->> 'seen')::boolean, 'the tourist hears it once';
+  perform migo_mark_connections_seen(array[cid]);
+  r := (select x from jsonb_array_elements(migo_my_connections()) x where (x ->> 'id')::uuid = cid);
+  assert (r ->> 'seen')::boolean, 'then it is seen';
   ids := (select coalesce(jsonb_agg(x ->> 'id'), '[]') from jsonb_array_elements(migo_discover()) x);
   assert not ids @> to_jsonb(array[l2::text]), 'declined locals leave Discover for a while';
-  assert pg_temp.fails_with(format('select migo_request_connection(%L)', l2)) = '22023', 'no asking again right away';
-
-  -- Both at once: Lea (now a tourist) asks Tom while Tom (now a local) has an open request to her?
-  -- Simpler real case: Tom asks Lea; Lea, before answering, taps Connect on Tom → that accepts.
-  perform pg_temp.act_as(tom);
-  cid := (migo_request_connection(l2) ->> 'id')::uuid;
-  perform pg_temp.act_as(lea);
-  r := migo_request_connection(t1);
-  assert (r ->> 'id')::uuid = cid and r ->> 'status' = 'accepted', 'connecting back accepts the pending request';
-  assert (select count(*) from connections
-           where least(requester_id, recipient_id) = least(t1, l2)
-             and greatest(requester_id, recipient_id) = greatest(t1, l2)
-             and status in ('pending', 'accepted')) = 1, 'still one live row for the pair';
+  assert pg_temp.fails_with(format('select migo_request_connection(%L)', l2)) = '22023', 'no matching again right away';
 
   -- The database itself refuses a second live row for a pair.
-  assert pg_temp.fails_with(format('insert into connections (requester_id, recipient_id) values (%L, %L)', l2, t1)) = '23505',
+  assert pg_temp.fails_with(format('insert into connections (requester_id, recipient_id) values (%L, %L)', l1, t1)) = '23505',
     'unique live pair';
 
-  -- Cancel: only the requester, only while pending.
-  perform pg_temp.act_as(tia);
-  cid := (migo_request_connection(l1) ->> 'id')::uuid;
-  perform pg_temp.act_as(lou);
+  -- Requests from the first version (pending, waiting for the local) still settle cleanly.
+  insert into connections (requester_id, recipient_id) values (t2, d1) returning id into cid;
+  perform pg_temp.act_as(dan);
   assert pg_temp.fails_with(format('select migo_cancel_connection(%L)', cid)) = 'P0002', 'recipient cannot cancel';
+  r := migo_respond_connection(cid, true);
+  assert r ->> 'status' = 'accepted', 'an old request can still be accepted';
   perform pg_temp.act_as(tia);
-  assert migo_cancel_connection(cid) ->> 'status' = 'cancelled', 'cancelled';
-  perform pg_temp.act_as(lou);
-  assert migo_respond_connection(cid, true) ->> 'status' = 'cancelled', 'a cancelled request cannot be accepted';
+  r := (select x from jsonb_array_elements(migo_my_connections()) x where (x ->> 'id')::uuid = cid);
+  assert not (r ->> 'seen')::boolean, 'and the tourist hears the yes';
+  perform migo_remove_connection(cid);
+  insert into connections (requester_id, recipient_id) values (t2, d1) returning id into cid;
+  assert migo_cancel_connection(cid) ->> 'status' = 'cancelled', 'an old request can be withdrawn';
+  perform pg_temp.act_as(dan);
+  assert migo_respond_connection(cid, true) ->> 'status' = 'cancelled', 'a withdrawn request cannot be accepted';
+  insert into connections (requester_id, recipient_id) values (t2, d1) returning id into cid;
+  perform pg_temp.act_as(tia);
+  -- Matching someone who has an old pending request with you settles it as the match.
+  -- (Dan is a dog owner Tia doesn't filter out.)
+  r := migo_request_connection(d1);
+  assert (r ->> 'id')::uuid = cid and r ->> 'status' = 'accepted', 'matching settles an old pending request';
 
   -- Deleting an account deletes its connections (cascade), nobody else's.
   perform pg_temp.act_as(tia);

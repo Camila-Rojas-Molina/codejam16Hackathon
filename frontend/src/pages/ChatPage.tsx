@@ -1,9 +1,10 @@
-// CHAT: your conversations, connection requests, discovering locals, and individual threads.
+// CHAT: your conversations, matches, discovering locals, and individual threads.
 //   /chat               Messages (default) or ?tab=discover
 //   /chat/:personId     one conversation
-// How people meet: a tourist taps Connect on a local in Discover; the local gets the request at the
-// top of Messages and picks Connect or Not now; once connected, both see each other in Messages and
-// no longer in Discover. Rules live in api.ts (People, connections & messages) and 013_connections.sql.
+// How people meet: a tourist sees their top-matched locals in Discover and picks one: it's a match
+// straight away, and both see each other in Messages (and no longer in Discover). The local doesn't
+// browse: they get "You've been matched!" (MatchNotice, and the top of Messages) and pick Say hi or
+// Not now. Rules live in api.ts (People, matches & messages) and 013_connections.sql.
 // Message delivery isn't built yet: messages are kept on this device.
 //
 // Phones and tablets: one view at a time (list, discover, or a thread). Laptops and up: two panes,
@@ -19,7 +20,9 @@ import { buttonClasses } from '../components/ui/buttonStyles'
 import Card from '../components/ui/Card'
 import { inputBase } from '../components/ui/Fields'
 import PageHeader from '../components/ui/PageHeader'
+import { matchedCopy, useAnswerMatch } from '../features/chat/useAnswerMatch'
 import PersonCard, { PersonDetails } from '../features/chat/components/PersonCard'
+import Modal from '../features/gallery/components/Modal'
 import { MESSAGE_MAX_LENGTH, type Connection, type Conversation, type Person } from '../features/chat/types'
 import { useConnectionNews, useConversations } from '../features/chat/useConversations'
 import { modeMeta, roleLabel } from '../features/onboarding/options'
@@ -77,8 +80,8 @@ function ConversationList({ conversations, current }: { conversations: Conversat
         <MascotSays pose="ponder">
           <p>
             {local
-              ? 'No chats yet! When a tourist asks to connect, you’ll see it here. Say yes and you can start chatting.'
-              : 'No chats yet! Find a local in Discover and tap Connect. Once they say yes, you can chat here.'}
+              ? 'No chats yet! In Local mode, tourists pick you from their top matches. When it happens, you’ll get a “You’ve been matched!” right here.'
+              : 'No chats yet! Open Discover, pick one of your top-matched locals, and you can start chatting straight away.'}
           </p>
         </MascotSays>
         <div className="flex flex-wrap gap-2">
@@ -116,7 +119,7 @@ function ConversationList({ conversations, current }: { conversations: Conversat
                 </Badge>
               </p>
               <p className="truncate text-sm">
-                {last ? `${last.from === 'me' ? 'You: ' : ''}${last.text}` : person.demo ? 'Sample profile · say hi!' : 'You’re connected! Say hi.'}
+                {last ? `${last.from === 'me' ? 'You: ' : ''}${last.text}` : person.demo ? 'Sample profile · say hi!' : 'You’re matched! Say hi.'}
               </p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
@@ -135,19 +138,26 @@ function ConversationList({ conversations, current }: { conversations: Conversat
   )
 }
 
+/** How many of a tourist's best-ranked locals count as their "top matches". */
+const TOP_MATCHES = 3
+
 function Discover() {
   const { account, profile, connections, requestConnection, cancelConnection } = useStore()
   const conversations = useConversations()
+  const navigate = useNavigate()
   const [people, setPeople] = useState<Awaited<ReturnType<typeof discoverLocals>> | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [showMore, setShowMore] = useState(false)
+  // The local you just matched with, for the "It's a match!" moment.
+  const [matched, setMatched] = useState<Person | null>(null)
   const me = toMatchProfile(profile)
   // People already in your Messages never show up here.
   const inMessages = new Set(conversations.map((c) => c.person.id))
   const load = useEffectEvent(() => (account ? discoverLocals(account.id, me, inMessages) : Promise.resolve([])))
   const mode = profile?.activeMode ?? null
-  // Reload when the mode changes, and whenever connections change (a yes moves someone to Messages).
+  // Reload when the mode changes, and whenever matches change (a match moves someone to Messages).
   const reloadKey = `${mode}|${(connections ?? []).map((c) => `${c.id}:${c.status}`).join(',')}|${[...inMessages].join(',')}`
 
   useEffect(() => {
@@ -164,14 +174,14 @@ function Discover() {
     }
   }, [reloadKey])
 
-  async function connect(person: Person) {
+  async function pick(person: Person) {
     setBusy(person.id)
     setNotice(null)
     try {
       const c = await requestConnection(person)
-      if (c.status === 'accepted') setNotice(`You and ${person.name} are connected! Find them in Messages.`)
+      if (c.status === 'accepted') setMatched(person)
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : 'Couldn’t send that request.')
+      setNotice(err instanceof Error ? err.message : 'Couldn’t make that match. Try again.')
     } finally {
       setBusy(null)
     }
@@ -192,14 +202,20 @@ function Discover() {
 
   if (mode !== 'tourist') {
     return (
-      <Card tone="teal-soft" className="flex items-end gap-4">
+      <Card tone="teal-soft" className="flex items-end gap-4 shadow-block-sm">
         <div className="min-w-0 flex-1 space-y-3">
-          <p>
-            {mode === 'local'
-              ? 'In Local mode, tourists find you. When someone asks to connect, the request shows up at the top of Messages, and you choose Connect or Not now.'
-              : 'Pick Tourist or Local mode (top of the screen) to meet people.'}
-          </p>
-          {mode === 'local' && <p className="text-sm">Exploring somewhere new yourself? Switch to Tourist mode to browse locals.</p>}
+          {mode === 'local' ? (
+            <>
+              <h2 className="text-2xl">No searching needed</h2>
+              <p>
+                In Local mode, MIGO does the matching. Tourists see you among their top matches, and when one picks you, you get a
+                “You’ve been matched!” notification. Say hi, or Not now if the timing’s wrong.
+              </p>
+              <p className="text-sm">Exploring somewhere new yourself? Switch to Tourist mode to pick from your own top-matched locals.</p>
+            </>
+          ) : (
+            <p>Pick Tourist or Local mode (top of the screen) to meet people.</p>
+          )}
           <Link to="/chat" className={buttonClasses({ variant: 'secondary', size: 'sm' })}>
             <Icon name="chats" className="size-5" />
             Go to Messages
@@ -210,15 +226,32 @@ function Discover() {
     )
   }
 
+  const top = people?.slice(0, TOP_MATCHES) ?? []
+  const more = people?.slice(TOP_MATCHES) ?? []
   const hasSamples = people?.some((p) => p.person.demo)
+  const card = (entry: NonNullable<typeof people>[number], rank?: number) => (
+    <PersonCard
+      key={entry.person.id}
+      person={entry.person}
+      match={entry.match}
+      pending={entry.pending}
+      rank={rank}
+      busy={busy === entry.person.id}
+      onConnect={() => pick(entry.person)}
+      onWithdraw={() => withdraw(entry.person)}
+    />
+  )
   return (
     <div className="space-y-6">
-      <Card tone="teal-soft" className="flex items-end gap-4">
+      <Card tone="teal-soft" className="flex items-end gap-4 shadow-block-sm">
         <div className="min-w-0 flex-1">
-          <p>Locals who share your vibe, ranked by what you have in common. Tap Connect and they’ll get your request.</p>
+          <p>
+            Locals ranked by what you have in common: interests, languages, pace and style. Pick the one you like best and it’s a
+            match, straight away.
+          </p>
           {hasSamples && (
             <p className="mt-2 text-sm">
-              <strong>Sample</strong> locals are from MIGO’s demo pool: they say yes straight away so you can try it out, but they won’t reply.
+              <strong>Sample</strong> locals are from MIGO’s demo pool, so you can try matching alone. They won’t reply.
             </p>
           )}
         </div>
@@ -231,33 +264,82 @@ function Discover() {
         </p>
       )}
       {error && <p role="alert">{error}</p>}
-      {!people && !error && <p aria-live="polite">Finding locals…</p>}
+      {!people && !error && <p aria-live="polite">Finding your top matches…</p>}
       {people?.length === 0 && (
         <MascotSays pose="ponder">
-          <p>You’ve met everyone around for now. Check back soon for new locals!</p>
+          <p>You’ve matched with everyone around for now. Check back soon for new locals!</p>
         </MascotSays>
       )}
-      {people?.map(({ person, match, pending }) => (
-        <PersonCard
-          key={person.id}
-          person={person}
-          match={match}
-          pending={pending}
-          busy={busy === person.id}
-          onConnect={() => connect(person)}
-          onWithdraw={() => withdraw(person)}
-        />
-      ))}
+      {top.length > 0 && (
+        <section aria-labelledby="top-matches-title" data-tour="top-matches" className="space-y-4">
+          <h2 id="top-matches-title" className="flex items-center gap-2 text-2xl">
+            <Icon name="star" className="size-7" />
+            Your top matches
+          </h2>
+          {top.map((entry, i) => card(entry, i + 1))}
+        </section>
+      )}
+      {more.length > 0 && (
+        <section aria-labelledby="more-locals-title" className="space-y-4">
+          <h2 id="more-locals-title" className="text-xl">
+            More locals
+          </h2>
+          {showMore ? (
+            more.map((entry) => card(entry))
+          ) : (
+            <button type="button" onClick={() => setShowMore(true)} className={buttonClasses({ variant: 'secondary' })}>
+              <Icon name="chevron-down" accent="none" className="size-5" />
+              Show {more.length} more
+            </button>
+          )}
+        </section>
+      )}
+
+      <Modal open={!!matched} onClose={() => setMatched(null)} labelledBy="its-a-match-title" className="m-auto w-[min(28rem,calc(100vw-2rem))] bg-transparent p-0">
+        {matched && (
+          <div className="sheet-grain border-2 border-ink text-center shadow-block">
+            <div className="flex items-end justify-center gap-2 border-b-2 border-ink bg-saffron px-4 pt-4">
+              <Avatar avatar={account?.avatar ?? matched.avatar} size="lg" className="mb-3" />
+              <Mascot pose="cheer" className="h-28 shrink-0" />
+              <Avatar avatar={matched.avatar} size="lg" className="mb-3" />
+            </div>
+            <div className="space-y-2 p-5">
+              <h2 id="its-a-match-title" className="text-4xl">
+                It’s a match!
+              </h2>
+              <p>
+                You and {matched.name} are matched. {matched.demo ? 'They’re a sample local, so they won’t reply, but this is exactly how it works.' : `${matched.name} just got a “You’ve been matched!” notification.`}
+              </p>
+            </div>
+            <div className="flex flex-wrap justify-center gap-2 border-t-2 border-ink p-4">
+              <button
+                type="button"
+                onClick={() => {
+                  const id = matched.id
+                  setMatched(null)
+                  navigate(`/chat/${encodeURIComponent(id)}`)
+                }}
+                className={buttonClasses()}
+              >
+                <Icon name="chat" accent="sheet" className="size-5" />
+                Say hi
+              </button>
+              <button type="button" onClick={() => setMatched(null)} className={buttonClasses({ variant: 'secondary' })}>
+                Keep browsing
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }
 
-/** Requests waiting for your answer, and news about the ones you sent. Shown at the top of Messages. */
+/** "You've been matched!" (locals) and news about the matches you made (tourists). Top of Messages. */
 function ConnectionInbox() {
-  const { respondToConnection, markConnectionsSeen } = useStore()
-  const { incoming, answers } = useConnectionNews()
-  const [busy, setBusy] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { markConnectionsSeen } = useStore()
+  const { matched, answers } = useConnectionNews()
+  const { answer, busy, error } = useAnswerMatch()
   // Answers are shown for this visit, then marked seen so they don't come back.
   const [shown, setShown] = useState<Connection[]>([])
   const answerIds = answers.map((c) => c.id).join(',')
@@ -276,48 +358,37 @@ function ConnectionInbox() {
     if (answerIds) showAnswers()
   }, [answerIds])
 
-  async function answer(c: Connection, accept: boolean) {
-    setBusy(c.id)
-    setError(null)
-    try {
-      await respondToConnection(c.id, accept)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Couldn’t answer that. Try again.')
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  if (incoming.length === 0 && shown.length === 0) return null
+  if (matched.length === 0 && shown.length === 0) return null
   return (
-    <section aria-labelledby="requests-title" className="space-y-3">
-      {incoming.length > 0 && (
+    <section aria-labelledby="matched-title" className="space-y-3">
+      {matched.length > 0 && (
         <>
-          <h2 id="requests-title" className="flex items-center gap-2 text-2xl">
-            <Icon name="people2" className="size-7" />
-            Requests
-            <span className="border-2 border-ink bg-ink px-1.5 font-sans text-sm text-sheet">{incoming.length}</span>
+          <h2 id="matched-title" className="flex items-center gap-2 text-2xl">
+            <Icon name="heart" className="size-7" />
+            You’ve been matched!
+            {matched.length > 1 && <span className="border-2 border-ink bg-ink px-1.5 font-sans text-sm text-sheet">{matched.length}</span>}
           </h2>
           <ul className="space-y-3">
-            {incoming.map((c) => (
+            {matched.map((c) => (
               <li key={c.id} className="sheet-grain border-2 border-ink shadow-block-sm">
-                <div className="flex items-center gap-3 p-3">
+                <div className="flex items-center gap-3 border-b-2 border-ink bg-saffron p-3">
                   <Avatar avatar={c.person.avatar} size="md" />
                   <p className="min-w-0 flex-1">
                     <strong className="text-lg">{c.person.name}</strong>
-                    <span className="block text-sm">would love to explore with you. Want to connect?</span>
+                    {c.person.demo && <Badge tone="outline" className="ml-2 bg-sheet">Sample</Badge>}
+                    <span className="block text-sm">{matchedCopy(c)}</span>
                   </p>
                 </div>
-                <details className="border-t-2 border-dashed border-ink px-3 py-2 text-sm">
+                <details className="border-b-2 border-dashed border-ink px-3 py-2 text-sm">
                   <summary className="cursor-pointer font-bold">View {c.person.name}’s profile</summary>
                   <div className="pt-3">
                     <PersonDetails person={c.person} />
                   </div>
                 </details>
-                <div className="flex flex-wrap gap-2 border-t-2 border-ink p-3">
+                <div className="flex flex-wrap gap-2 p-3">
                   <button type="button" disabled={busy === c.id} onClick={() => answer(c, true)} className={buttonClasses({ size: 'sm' })}>
-                    <Icon name="check" accent="none" strokeWidth={2.4} className="size-5" />
-                    Connect
+                    <Icon name="chat" accent="sheet" className="size-5" />
+                    Say hi
                   </button>
                   <button type="button" disabled={busy === c.id} onClick={() => answer(c, false)} className={buttonClasses({ variant: 'secondary', size: 'sm' })}>
                     Not now
@@ -338,8 +409,8 @@ function ConnectionInbox() {
           <Avatar avatar={c.person.avatar} size="sm" />
           <span className="min-w-0 flex-1">
             {c.status === 'accepted'
-              ? `${c.person.name} said yes! You’re connected. Say hi below.`
-              : `${c.person.name} can’t meet up this time. Plenty more locals to discover!`}
+              ? `${c.person.name} said yes! You’re matched. Say hi below.`
+              : `${c.person.name} can’t meet up this time. Pick another of your top matches in Discover!`}
           </span>
           <button
             type="button"
@@ -356,7 +427,7 @@ function ConnectionInbox() {
 }
 
 function Thread({ personId, embedded = false }: { personId: string; embedded?: boolean }) {
-  const { sendMessage, markRead, removeFromMessages } = useStore()
+  const { sendMessage, markRead, removeFromMessages, respondToConnection } = useStore()
   const conversation = useConversations().find((c) => c.person.id === personId)
   const navigate = useNavigate()
   const [showProfile, setShowProfile] = useState(false)
@@ -373,6 +444,12 @@ function Thread({ personId, embedded = false }: { personId: string; embedded?: b
     if (unread > 0) void markRead(personId)
   }, [unread, personId, markRead])
 
+  // A local opening a fresh "You've been matched!" conversation has said hi: the notice goes away.
+  const fresh = conversation?.connection?.direction === 'incoming' && !conversation.connection.seen ? conversation.connection.id : null
+  useEffect(() => {
+    if (fresh) void respondToConnection(fresh, true).catch(() => {})
+  }, [fresh, respondToConnection])
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' })
   }, [count])
@@ -387,7 +464,7 @@ function Thread({ personId, embedded = false }: { personId: string; embedded?: b
         )}
         <Card>
           <h1 className="text-2xl">Can’t message them yet</h1>
-          <p className="mt-2">You can message people once you’re connected (a local said yes to your request, or you said yes to theirs) or you’ve teamed up on a hunt.</p>
+          <p className="mt-2">You can message people once you’re matched (you picked them in Discover, or they picked you) or you’ve teamed up on a hunt.</p>
         </Card>
       </div>
     )
@@ -465,7 +542,7 @@ function Thread({ personId, embedded = false }: { personId: string; embedded?: b
         <div role="alertdialog" aria-labelledby="remove-title" className="border-2 border-sienna-deep bg-sienna-soft p-4">
           <p id="remove-title" className="font-bold">Remove {person.name} from your Messages?</p>
           <p className="mt-1 text-sm">
-            You’ll stop seeing each other here, and they won’t be notified. Your messages are kept: if you connect again later,
+            You’ll stop seeing each other here, and they won’t be notified. Your messages are kept: if you match again later,
             this conversation comes back.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -493,7 +570,7 @@ function Thread({ personId, embedded = false }: { personId: string; embedded?: b
         {messages.length === 0 && (
           <li className="m-auto flex flex-col items-center gap-2 text-center font-serif text-lg">
             <Mascot pose="hello" className="h-24" />
-            {conversation.connection ? 'You’re connected!' : 'You’re teammates!'} Say hi to {person.name}.
+            {conversation.connection ? 'You’re matched!' : 'You’re teammates!'} Say hi to {person.name}.
           </li>
         )}
         {messages.map((m) => (

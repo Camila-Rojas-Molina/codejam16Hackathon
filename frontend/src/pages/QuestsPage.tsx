@@ -125,7 +125,7 @@ export default function QuestsPage() {
 
           {/* WEEKLY CHALLENGE + side column (desktop). */}
           <div className="grid gap-6 @3xl:grid-cols-[minmax(0,1fr)_17rem] @6xl:grid-cols-[minmax(0,1fr)_22rem]">
-            <section aria-labelledby="weekly" className="min-w-0 space-y-4">
+            <section aria-labelledby="weekly" data-tour="quests-weekly" className="min-w-0 space-y-4">
               <SectionHead
                 id="weekly"
                 icon="calendar"
@@ -159,7 +159,7 @@ export default function QuestsPage() {
           </div>
 
           {/* DAILY CHALLENGES */}
-          <section aria-labelledby="daily-title" id="daily" className="scroll-mt-24 space-y-4">
+          <section aria-labelledby="daily-title" id="daily" data-tour="quests-daily" className="scroll-mt-24 space-y-4">
             <SectionHead
               id="daily-title"
               icon="sun"

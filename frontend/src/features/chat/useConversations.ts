@@ -58,16 +58,21 @@ export function useConversations(): Conversation[] {
 /** True if you can message this person (they're in your Messages). */
 export const canMessage = (conversations: Conversation[], personId: string) => conversations.some((c) => c.person.id === personId)
 
-/** What needs your attention in Chat: requests waiting for your answer, and news about yours. */
+/**
+ * What needs your attention in Chat:
+ *   matched   locals: "You've been matched!" (a tourist picked you) until you Say hi or say Not now.
+ *             Also first-version requests still waiting for an answer.
+ *   answers   tourists: news about a match you made that you haven't seen (a local's Not now, or
+ *             the yes to a first-version request).
+ */
 export function useConnectionNews() {
   const { connections } = useStore()
   return useMemo(() => {
     const list = connections ?? []
-    const incoming = list.filter((c) => c.direction === 'incoming' && c.status === 'pending')
-    // Answers to your requests you haven't seen yet. Only a yes counts towards the badge; a "not now"
-    // is shown once, quietly.
+    const matched = list.filter((c) => c.direction === 'incoming' && !c.seen && (c.status === 'accepted' || c.status === 'pending'))
     const answers = list.filter((c) => c.direction === 'outgoing' && !c.seen && (c.status === 'accepted' || c.status === 'declined'))
-    const accepted = answers.filter((c) => c.status === 'accepted')
-    return { incoming, answers, badge: incoming.length + accepted.length }
+    // A "not now" is shown once, quietly; it doesn't count towards the badge.
+    const yes = answers.filter((c) => c.status === 'accepted')
+    return { matched, answers, badge: matched.length + yes.length }
   }, [connections])
 }
