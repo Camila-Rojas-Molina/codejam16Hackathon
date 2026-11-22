@@ -94,9 +94,11 @@ export type StoreValue = AppState & {
   removeFromMessages: (personId: string) => Promise<void>
   /** Marks the guided tour completed or skipped, or queues it again (replay). */
   setTutorial: (status: 'pending' | 'completed' | 'skipped') => Promise<ProfileRecord>
-  /** Message threads by person id (loaded from api.ts). */
+  /** Message threads by person id: this device's and the server's (015_messages.sql), merged. */
   threads: Record<string, Thread>
   sendMessage: (person: Person, text: string) => Promise<void>
+  /** Fetches new and newly read server messages. Chat calls it every few seconds while open. */
+  syncMessages: () => Promise<void>
   markRead: (personId: string) => Promise<void>
 }
 

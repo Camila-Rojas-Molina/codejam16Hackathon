@@ -20,7 +20,8 @@ backend/
 │   ├── 011_economy.sql  points, quests and the shop, decided by the server (+ carries over old points)
 │   ├── 012_economy_catalog.sql  GENERATED: the quest and shop catalogues (`npm run gen:economy`)
 │   ├── 013_connections.sql  CHAT matching: a tourist picks a local, the local is notified "You've been matched!"
-│   └── 014_stale_login.sql  clear error (28000) when a deleted login tries to create a profile
+│   ├── 014_stale_login.sql  clear error (28000) when a deleted login tries to create a profile
+│   └── 015_messages.sql  CHAT messages on the server: send, poll for changes, read/unread
 ├── scripts/import_landmarks.mjs  rebuilds 008/009 from Montréal open data (see scripts/README.md)
 └── tests/
     ├── smoke_test.sql          checks the hunt flow, then rolls back
@@ -31,13 +32,14 @@ backend/
     ├── economy_test.sql        checks points, quests, refreshes, the shop and timezones, then rolls back
     ├── stale_login_test.sql    checks a deleted login gets a clear error, then rolls back
     ├── connections_test.sql    checks requests, answers, no duplicates, Discover exclusions, removal
+    ├── messages_test.sql       checks who can message whom, limits, read/unread, the changes feed
     └── local_supabase_stub.sql fake `auth` schema for testing on plain Postgres (never run on Supabase)
 ```
 
 ## Setup (about 10 minutes)
 
 1. Create a free project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor**, then paste and run `001_schema.sql`, `002_seed.sql`, `003_storage.sql`, `004_migo_profiles.sql`, `005_auth.sql`, `006_gallery.sql`, `007_landmarks_geofencing.sql`, `008_montreal_island_boundary.sql`, `009_landmarks_seed.sql`, `010_simple_recommendations.sql`, `011_economy.sql`, `012_economy_catalog.sql`, `013_connections.sql` and `014_stale_login.sql`, in that order (007–010 need PostGIS, see [Exploration](#exploration-landmarks-geofences-and-visits-007009)).
+2. Open **SQL Editor**, then paste and run `001_schema.sql`, `002_seed.sql`, `003_storage.sql`, `004_migo_profiles.sql`, `005_auth.sql`, `006_gallery.sql`, `007_landmarks_geofencing.sql`, `008_montreal_island_boundary.sql`, `009_landmarks_seed.sql`, `010_simple_recommendations.sql`, `011_economy.sql`, `012_economy_catalog.sql`, `013_connections.sql`, `014_stale_login.sql` and `015_messages.sql`, in that order (007–010 need PostGIS, see [Exploration](#exploration-landmarks-geofences-and-visits-007009)).
 3. Optional: paste and run `tests/smoke_test.sql`, `tests/migo_profiles_test.sql`, `tests/auth_test.sql`, `tests/gallery_test.sql`, `tests/explore_test.sql` and `tests/economy_test.sql`. They should say `All backend checks passed`, `All MIGO profile checks passed`, `All auth checks passed`, `All gallery checks passed`, `All exploration checks passed` and `All economy checks passed`.
 4. Set up login in the dashboard (see [Supabase dashboard settings for login](#supabase-dashboard-settings-for-login)).
 5. Go to **Project Settings → API** and copy the Project URL and the `anon` public key into `frontend/.env.local`:
@@ -214,8 +216,45 @@ profile record (unused).
 Rules: one live (pending/accepted) row per pair, enforced by a unique index on the unordered pair,
 plus a per-pair advisory lock, so double taps and two people connecting at once can't duplicate.
 The `connections` table has RLS on and no grants. Errors: `42501` not signed in, `P0002` unknown
-person/request or not yours, `22023` wrong mode / declined recently. Messages themselves still live
-on each device (not on the server yet).
+person/request or not yours, `22023` wrong mode / declined recently. Messages are in
+[`015_messages.sql`](#messages-015_messagessql).
+
+## Messages (`015_messages.sql`)
+
+CHAT conversations, stored on the server so the other person actually gets them. Two people can
+message each other while they're matched (an accepted connection) or hunt teammates (same team in
+`team_members`). After a removal or a Not now, neither can send; the history is kept, so matching
+again brings the conversation back. Signed-in only.
+
+**Set up:** after 013 (and 014), paste and run `015_messages.sql` (safe to run again), then
+optionally `tests/messages_test.sql`, which should say `All message checks passed`. Until it's run,
+the app keeps messages on each device as before (it notices the missing functions and falls back).
+
+| Function | Does |
+|---|---|
+| `migo_send_message(to, text)` | Saves one message (trimmed, 1–500 characters) to someone you're matched with. Returns `{id, with, from, text, at, read, seenByThem}`. |
+| `migo_message_changes(since)` | Every message involving the caller sent or read after `since` (null = the most recent 1000), oldest first, as `{now, messages, people}`. `people` has the public card of everyone in `messages`. |
+| `migo_mark_messages_read(with)` | Marks everything that person sent you as read. Returns how many changed. |
+
+**How the app stays up to date (no Realtime yet):** while Chat is open it calls
+`migo_message_changes` every 3 seconds (and every 30 seconds elsewhere, for the Chat badge),
+passing back the returned `now` minus 10 seconds and merging by id, so a message whose transaction
+committed a moment late is still picked up. Reads change `changed_at` too, so unread counts and the
+"Seen" receipt agree on every device. Instant delivery would mean Supabase Realtime on `messages`
+(it needs a select policy for the two people in the conversation); that can come later.
+
+**Limits:** 500 characters (`MESSAGE_MAX_LENGTH` in the app), and 20 messages per sender per minute
+(`migo_message_rate_limit()`), checked under a per-sender lock. The `messages` table has RLS on and
+no grants; deleting an account deletes the messages it sent and received. Errors: `42501` not
+signed in / not matched, `P0002` unknown person, `22023` empty or too long, `P0001` with hint
+`rate_limited` when sending too fast.
+
+**Two-browser test:** `frontend/scripts/e2e-messaging.mjs` signs up a tourist and a local (needs
+"Confirm email" off), opens each in its own browser, and checks: Match → message → the local's
+"You've been matched!" and unread count → open (unread cleared, tourist sees "Seen") → reply
+arrives within a few seconds → both survive a reload → a stranger can't message. Run it with
+`MIGO_URL=… SUPABASE_URL=… SUPABASE_ANON_KEY=… node frontend/scripts/e2e-messaging.mjs`. It deletes
+its MIGO accounts afterwards; the logins stay in Authentication → Users.
 
 ## Security
 

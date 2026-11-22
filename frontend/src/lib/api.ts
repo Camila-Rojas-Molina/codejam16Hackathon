@@ -3,7 +3,7 @@
 // when it's configured, and to this device otherwise. Screens must not import mockData.
 import { DEFAULT_AVATAR } from './avatars'
 import type { PlacePick } from '../features/places/types'
-import { MESSAGE_MAX_LENGTH, type Connection, type DiscoverEntry, type Message, type Person, type Thread } from '../features/chat/types'
+import { MESSAGE_MAX_LENGTH, type Connection, type Delivery, type DiscoverEntry, type Message, type Person, type Thread } from '../features/chat/types'
 import { addCity, tidyDogs } from '../features/profile/model'
 import { compatibility, toMatchProfile, type Compatibility, type MatchDogs, type MatchProfile } from '../features/profile/matching'
 import type {
@@ -255,7 +255,8 @@ export async function deleteAccount(accountId: string): Promise<void> {
 // configured, else every account on this device (connectionsDb.ts, same rules). MIGO's sample
 // profiles (mockData) live on the device in both cases: sample locals can be picked like anyone, and
 // a local with nobody yet is assigned a sample tourist, so both sides can be tried alone.
-// Messages themselves are still kept on this device (TODO(backend): message delivery).
+// Messages to real people go through Supabase (015_messages.sql) when it's configured; messages to
+// samples, and every message without a backend, stay on this device.
 
 const SAMPLE_IDS = new Set(USERS.map((u) => u.id))
 /** True for MIGO's built-in sample profiles (they can't answer requests or reply). */
@@ -523,17 +524,55 @@ export async function getThreads(accountId: string): Promise<Record<string, Thre
   return out
 }
 
-export async function sendMessage(accountId: string, person: Person, text: string): Promise<Thread> {
-  await delay(120)
+// Supabase is configured but 015_messages.sql hasn't been run yet: messages stay on this device, as
+// they did before, instead of failing.
+let serverMessagesMissing = false
+const isMissingFunction = (err: unknown) => err instanceof backend.BackendError && (err.code === 'PGRST202' || err.status === 404)
+
+/** Where messages to this person go: the server (they get them) or this device. */
+export const messageDelivery = (personId: string): Delivery =>
+  onSupabase() && !serverMessagesMissing && !isSamplePerson(personId) ? 'server' : 'device'
+
+export type MessageSync = Awaited<ReturnType<typeof backend.messageChanges>>
+
+/** Server messages sent or read after `since` (null = the most recent). Null when messages aren't on the server. */
+export async function syncMessages(since: string | null): Promise<MessageSync | null> {
+  if (!onSupabase() || serverMessagesMissing) return null
+  try {
+    return await backend.messageChanges(since)
+  } catch (err) {
+    if (!isMissingFunction(err)) throw err
+    serverMessagesMissing = true
+    return null
+  }
+}
+
+export type SentMessage = { delivery: 'server'; message: backend.ServerMessage } | { delivery: 'device'; thread: Thread }
+
+export async function sendMessage(accountId: string, person: Person, text: string): Promise<SentMessage> {
   const clean = text.trim().slice(0, MESSAGE_MAX_LENGTH)
   if (!clean) throw new Error('Write something first.')
+  if (messageDelivery(person.id) === 'server') {
+    try {
+      return { delivery: 'server', message: await backend.sendChatMessage(person.id, clean) }
+    } catch (err) {
+      if (!isMissingFunction(err)) throw err
+      serverMessagesMissing = true
+    }
+  }
+  await delay(120)
   const existing = (await getThreads(accountId))[person.id]
   const thread: Thread = {
     person: clone(person),
     messages: [...(existing?.messages ?? []), { id: newId('msg'), from: 'me', text: clean, at: Date.now(), read: true }],
   }
   db.putThread(accountId, person.id, thread)
-  return thread
+  return { delivery: 'device', thread }
+}
+
+/** Marks everything this person sent you on the server as read (every device sees it). */
+export async function markServerMessagesRead(personId: string): Promise<void> {
+  if (messageDelivery(personId) === 'server') await backend.markMessagesRead(personId)
 }
 
 export async function markThreadRead(accountId: string, personId: string): Promise<Thread | null> {

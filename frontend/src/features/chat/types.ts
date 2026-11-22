@@ -63,11 +63,22 @@ export type Message = {
   from: 'me' | 'them'
   text: string
   at: number
+  /** Your own messages are always read; theirs once you've opened the conversation. */
   read: boolean
+  /** Server messages you sent: true once they've read it. */
+  seenByThem?: boolean
+  /** Typed on this device before messaging reached the server: the other person never got it. */
+  local?: boolean
 }
 
-/** What's stored per conversation: who it's with and the messages so far. */
-export type Thread = { person: Person; messages: Message[] }
+/**
+ * What's stored per conversation: who it's with and the messages so far.
+ * `server` threads come from Supabase (015_messages.sql); the rest live on this device.
+ */
+export type Thread = { person: Person; messages: Message[]; server?: boolean }
+
+/** Where messages to someone go: Supabase (they get them), or this device (samples, no backend). */
+export type Delivery = 'server' | 'device'
 
 /** A conversation with one person: someone you're connected with, or a hunt teammate. */
 export type Conversation = {
@@ -77,6 +88,7 @@ export type Conversation = {
   messages: Message[]
   unread: number
   last: Message | null
+  delivery: Delivery
 }
 
 export const MESSAGE_MAX_LENGTH = 500

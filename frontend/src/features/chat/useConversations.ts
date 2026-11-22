@@ -1,8 +1,10 @@
 // Everyone in your Messages: people you're connected with (an accepted connection request), hunt
-// teammates (in any mode or trip), and anyone you already have a thread with. Removing someone hides
+// teammates (in any mode or trip), and anyone you have a device thread with. Server threads
+// (015_messages.sql) only show while you're matched: a removed match stops showing. Removing someone hides
 // them (their messages are kept) until a connection is accepted after that time.
 // Sorted by latest message; people you haven't messaged yet come last, newest connection first.
 import { useMemo } from 'react'
+import { messageDelivery } from '../../lib/api'
 import type { User } from '../../lib/types'
 import { useStore } from '../../store/useStore'
 import type { Connection, Conversation, Person } from './types'
@@ -27,7 +29,7 @@ export function useConversations(): Conversation[] {
       if (p) people.set(p.id, { person: personFromUser(p), connection: null, since: 0 })
     }
     for (const t of Object.values(threads)) {
-      if (!people.has(t.person.id)) people.set(t.person.id, { person: t.person, connection: null, since: 0 })
+      if (!t.server && !people.has(t.person.id)) people.set(t.person.id, { person: t.person, connection: null, since: 0 })
     }
     for (const c of connections ?? []) {
       if (c.status !== 'accepted') continue
@@ -47,6 +49,7 @@ export function useConversations(): Conversation[] {
           messages,
           unread: messages.filter((m) => m.from === 'them' && !m.read).length,
           last: messages.at(-1) ?? null,
+          delivery: messageDelivery(person.id),
           since,
         }
       })
