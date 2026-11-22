@@ -1,4 +1,4 @@
-// No map (no Google Maps key, or the Maps script failed): say so plainly, and keep the catalogue
+// No map (the 3D map can't start and there's no Google key, or the Maps script failed): say so plainly, and keep the catalogue
 // usable as a list of every landmark on the island, with the same filters, details and camera link.
 import { useEffect, useMemo, useState } from 'react'
 import { Mascot } from '../../components/illustrations/Mascot'
@@ -16,7 +16,7 @@ import { useLandmarks } from './useLandmarks'
 import { useRefreshOnReturn } from './useRefreshOnReturn'
 import { useSelection } from './useSelection'
 
-export default function CatalogueOnly({ reason, className }: { reason: 'missing-key' | 'load-failed'; className?: string }) {
+export default function CatalogueOnly({ reason, className }: { reason: 'missing-key' | 'load-failed' | 'no-map'; className?: string }) {
   const { landmarks, status, error, load, retry, refresh } = useLandmarks()
   const { selected, selectedId, detail, select, close } = useSelection()
   const [filters, setFilters] = useState<MapFilters>(NO_FILTERS)
@@ -42,13 +42,15 @@ export default function CatalogueOnly({ reason, className }: { reason: 'missing-
           <div className="hatch-soft flex items-center gap-3 border-b-2 border-ink p-3">
             <Mascot pose="search" className="h-20 shrink-0" />
             <div className="sheet-grain min-w-0 border-2 border-ink p-3 shadow-block-sm">
-              <p className="eyebrow">{reason === 'missing-key' ? 'Map key missing' : 'Map didn’t load'}</p>
+              <p className="eyebrow">{reason === 'missing-key' ? 'Map key missing' : reason === 'no-map' ? 'Map unavailable' : 'Map didn’t load'}</p>
               <p className="mt-1 text-sm leading-snug">
                 {reason === 'missing-key' ? (
                   <>
                     The map needs a Google Maps key (<code className="text-xs">VITE_GOOGLE_MAPS_API_KEY</code>). Until it’s set, every landmark is listed
                     below.
                   </>
+                ) : reason === 'no-map' ? (
+                  'The map couldn’t start on this device (it needs WebGL and a connection to the map tiles). Every landmark is listed below meanwhile.'
                 ) : (
                   'Google Maps refused to load here (check the key and its allowed websites). Every landmark is listed below meanwhile.'
                 )}

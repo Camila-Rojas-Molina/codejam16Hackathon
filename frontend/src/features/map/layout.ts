@@ -10,3 +10,14 @@ export const LIST_PANEL =
 
 /** Phones have a coarse pointer: greedy one-finger panning and no zoom buttons (pinch instead). */
 export const isCoarsePointer = () => typeof window !== 'undefined' && Boolean(window.matchMedia?.('(pointer: coarse)').matches)
+
+/** The 3D map needs WebGL (MapLibre 5 prefers WebGL 2 and can use WebGL 1). */
+export function supportsWebGL() {
+  if (typeof document === 'undefined') return false
+  try {
+    const canvas = document.createElement('canvas')
+    return Boolean(canvas.getContext('webgl2') || canvas.getContext('webgl'))
+  } catch {
+    return false
+  }
+}

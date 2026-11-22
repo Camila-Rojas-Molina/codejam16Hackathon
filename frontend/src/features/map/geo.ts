@@ -67,3 +67,31 @@ export function boundsOf(points: LatLng[]): Bounds | null {
   }
   return { west, south, east, north }
 }
+
+/** A circle as a GeoJSON polygon (64 points by default), for engines without a native circle. */
+export function circlePolygon(center: LatLng, radiusM: number, steps = 64): GeoPolygon {
+  const R = 6371008.8
+  const lat = (center.lat * Math.PI) / 180
+  const lng = (center.lng * Math.PI) / 180
+  const d = radiusM / R
+  const ring: number[][] = []
+  for (let i = 0; i <= steps; i++) {
+    const bearing = (i / steps) * 2 * Math.PI
+    const lat2 = Math.asin(Math.sin(lat) * Math.cos(d) + Math.cos(lat) * Math.sin(d) * Math.cos(bearing))
+    const lng2 = lng + Math.atan2(Math.sin(bearing) * Math.sin(d) * Math.cos(lat), Math.cos(d) - Math.sin(lat) * Math.sin(lat2))
+    ring.push([(lng2 * 180) / Math.PI, (lat2 * 180) / Math.PI])
+  }
+  return { type: 'Polygon', coordinates: [ring] }
+}
+
+/** Intersection of two boxes, or null when they don't overlap. */
+export function intersectBounds(a: Bounds, b: Bounds): Bounds | null {
+  const r: Bounds = { west: Math.max(a.west, b.west), south: Math.max(a.south, b.south), east: Math.min(a.east, b.east), north: Math.min(a.north, b.north) }
+  return r.west < r.east && r.south < r.north ? r : null
+}
+
+/** Zoom used after "Locate me". */
+export const LOCATE_ZOOM = 16
+
+/** Close enough to the island to fly there (inside both engines' camera limits). */
+export const nearIsland = (p: LatLng) => inBounds(p, padBounds(ISLAND_BOUNDS, 0.25))
