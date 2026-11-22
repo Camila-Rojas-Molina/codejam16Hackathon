@@ -93,11 +93,11 @@ export default function GalleryPage() {
   const addButtons = online && (
     <div className="flex w-full flex-wrap gap-2 sm:w-auto">
       {camera && (
-        <Button icon="camera" onClick={() => cameraInput.current?.click()} className="flex-1 sm:flex-none">
+        <Button icon="camera" onClick={() => cameraInput.current?.click()} className="flex-1 px-3 whitespace-nowrap sm:flex-none sm:px-5">
           Take photo
         </Button>
       )}
-      <Button icon="plus" variant={camera ? 'secondary' : 'primary'} onClick={() => libraryInput.current?.click()} className="flex-1 sm:flex-none">
+      <Button icon="plus" variant={camera ? 'secondary' : 'primary'} onClick={() => libraryInput.current?.click()} className="flex-1 px-3 whitespace-nowrap sm:flex-none sm:px-5">
         {camera ? 'Upload' : 'Add photo'}
       </Button>
     </div>

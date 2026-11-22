@@ -6,7 +6,7 @@ import { cn } from '../../../lib/cn'
 import { formatDay, photoAlt } from '../grouping'
 import type { GroupBy, Photo, PhotoGroup } from '../types'
 
-export const gridCols = 'grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'
+export const gridCols = 'grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 2xl:grid-cols-5 min-[1800px]:grid-cols-6'
 
 type PhotoGridProps = {
   groups: PhotoGroup[]

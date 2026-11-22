@@ -33,7 +33,8 @@ const fromPick = (p: PlacePick): City => ({
   lng: p.lng,
 })
 
-const cityId = (c: City) => c.placeId ?? `${c.name}|${c.countryCode ?? ''}`
+// Same name and country = same quick pick (an older entry may lack the place id).
+const cityId = (c: City) => `${c.name.trim().toLowerCase()}|${(c.countryCode ?? c.country ?? '').toLowerCase()}`
 
 /** yyyy-mm-dd in local time. */
 const toDateInput = (ms: number) => {
@@ -49,7 +50,7 @@ export default function AddPhotoDialog(props: AddPhotoDialogProps) {
       onClose={props.onCancel}
       labelledBy={titleId}
       closeOnBackdrop={false}
-      className="m-0 h-dvh max-h-none w-screen max-w-none bg-transparent p-0 sm:m-auto sm:h-auto sm:max-h-[92dvh] sm:w-[min(44rem,calc(100vw-3rem))]"
+      className="m-0 h-dvh max-h-none w-screen max-w-none bg-transparent p-0 sm:m-auto sm:h-fit sm:max-h-[92dvh] sm:w-[min(44rem,calc(100vw-3rem))]"
     >
       {props.file && <AddPhotoForm key={`${props.file.name}-${props.file.lastModified}-${props.file.size}`} {...props} file={props.file} titleId={titleId} />}
     </Modal>

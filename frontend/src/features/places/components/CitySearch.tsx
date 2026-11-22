@@ -160,7 +160,7 @@ export default function CitySearch({
                 id={`${listId}-${i}`}
                 role="option"
                 aria-selected={i === active}
-                aria-disabled={taken || undefined}
+                aria-disabled={(taken && !onTaken) || undefined}
                 onMouseDown={(e) => e.preventDefault()}
                 onMouseEnter={() => setActive(i)}
                 onClick={() => choose(p)}

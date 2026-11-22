@@ -206,6 +206,7 @@ export default function RetroAtlas({
   for (let lat = Math.ceil(SOUTH / step) * step; lat < NORTH; lat += step) latLines.push(lat)
 
   function zoomTo(members: AtlasPin[]) {
+    select(null)
     const v = fitView(members.map((m) => project(m.lat, m.lng)), aspect, MIN_VIEW_W)
     // Never a dead end: always at least halve the view.
     const w = Math.min(v.w, target.w / 2)

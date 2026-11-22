@@ -3,7 +3,7 @@
 // ever reaches the screen. Pass `accessories` (profile.rewards.equipped) to dress it in shop items.
 import Icon from '../icons/Icon'
 import { AvatarBackdrop, AvatarWear, type Outfit } from '../illustrations/Accessories'
-import { AVATAR_LIST, avatarFor } from '../../lib/avatars'
+import { AVATAR_CATALOG, AVATAR_LIST, avatarFor } from '../../lib/avatars'
 import { cn } from '../../lib/cn'
 
 type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'fill'
@@ -68,9 +68,12 @@ type AvatarPickerProps = {
  * Put it inside a <fieldset> with a <legend>.
  */
 export function AvatarPicker({ value, onChange, name = 'avatar', options = AVATAR_LIST, className }: AvatarPickerProps) {
+  // Someone still using a retired (legacy) picture sees it first, so their current choice stays visible.
+  const current = AVATAR_CATALOG.find((a) => a.id === value)
+  const list = current && !options.some((o) => o.id === current.id) ? [current, ...options] : options
   return (
-    <div className={cn('grid grid-cols-4 border-t-2 border-l-2 border-ink', options.length % 6 === 0 && 'sm:grid-cols-6', className)}>
-      {options.map((a) => {
+    <div className={cn('grid grid-cols-4 border-t-2 border-l-2 border-ink', list.length % 6 === 0 && 'sm:grid-cols-6', className)}>
+      {list.map((a) => {
         const selected = value === a.id
         return (
           <label
