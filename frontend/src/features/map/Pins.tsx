@@ -3,8 +3,9 @@
 //   visited                teal pin with an ink check
 //   recommended            paper pin with a saffron star badge
 //   recommended + visited  teal pin with check and the star badge
-// Cluster bubbles show a count, a teal ring for the share already visited, and the star badge
-// when any landmark inside is recommended. State is never told by colour alone (glyph + badge).
+// Recommended pins also get a pulsing saffron halo. Cluster bubbles show a count, a teal ring for
+// the share already visited, and a saffron outer ring plus the star when any landmark inside is
+// recommended. State is never told by colour alone (glyph + badge).
 import Icon from '../../components/icons/Icon'
 import { cn } from '../../lib/cn'
 import type { LandmarkCategory } from '../explore/types'
@@ -62,8 +63,13 @@ export function LandmarkPin({ state, category, selected = false, size = 'md', cl
 
 /** A landmark's marker content: the pin inside a 44 px touch target, tip at the bottom centre. */
 export function LandmarkMarker(props: PinProps) {
+  const recommended = props.state === 'recommended' || props.state === 'both'
   return (
-    <span className={cn('flex h-12 w-11 cursor-pointer items-end justify-center transition-transform', props.selected && 'scale-125')} style={{ transformOrigin: '50% 100%' }}>
+    <span className={cn('relative flex h-12 w-11 cursor-pointer items-end justify-center transition-transform', props.selected && 'scale-125')} style={{ transformOrigin: '50% 100%' }}>
+      {/* Recommended: a saffron halo behind the pin head, gently pulsing (still when motion is reduced). */}
+      {recommended && (
+        <span className="absolute top-1.5 left-1/2 size-10 -translate-x-1/2 rounded-full border-[3px] border-saffron bg-saffron/35 motion-safe:animate-pulse" aria-hidden />
+      )}
       <LandmarkPin {...props} />
     </span>
   )
@@ -81,6 +87,8 @@ export function ClusterBubble({ count, visited, recommended }: { count: number; 
       <span className="grid size-[calc(100%-10px)] place-items-center rounded-full border-2 border-ink bg-sheet font-display text-base leading-none text-ink">
         {count > 999 ? '999+' : count}
       </span>
+      {/* Holds at least one recommended landmark: a saffron outer ring, plus the star. */}
+      {recommended && <span className="absolute -inset-1.5 rounded-full border-[3px] border-saffron motion-safe:animate-pulse" aria-hidden />}
       {recommended && <StarBadge className="-top-1 -right-1" />}
     </span>
   )

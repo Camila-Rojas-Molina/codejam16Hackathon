@@ -15,7 +15,8 @@ backend/
 │   ├── 006_gallery.sql  photo gallery: private `photos` table + 'gallery' storage bucket
 │   ├── 007_landmarks_geofencing.sql  Montréal landmarks, PostGIS geofences, camera captures, visits
 │   ├── 008_montreal_island_boundary.sql  Island of Montréal boundary (generated)
-│   └── 009_landmarks_seed.sql  the landmark catalogue (generated)
+│   ├── 009_landmarks_seed.sql  the landmark catalogue (generated)
+│   └── 010_simple_recommendations.sql  rule-based recommendations from Questionnaire B
 ├── scripts/import_landmarks.mjs  rebuilds 008/009 from Montréal open data (see scripts/README.md)
 └── tests/
     ├── smoke_test.sql          checks the hunt flow, then rolls back
@@ -131,7 +132,7 @@ The MAP shows every active Montréal landmark; the camera links a photo to a lan
 
 **Geofences:** a circle (`ST_DWithin` on geography, metres, per-landmark radius) or an area (`ST_Covers`, plus a 10 m edge tolerance). When several match: a circle beats an area, the nearest circle wins unless the next is within max(10 m, accuracy/2) (then the person picks), nested areas resolve to the smallest. The person can always pick another matching place; the server only accepts a pick that is among the matches. Readings outside the island boundary (30 m shore tolerance) are refused and nothing is uploaded.
 
-**Recommendations:** `landmark_recommended_ids(profile_id)` is the hook for the Questionnaire B recommender. It returns nothing today (no recommender exists yet). Replace its body, keeping the signature; 007 only creates it when it's missing, so re-running 007 won't overwrite it. Recommended landmarks only get a badge; nothing is hidden.
+**Recommendations:** `landmark_recommended_ids(profile_id)` is the hook for the Questionnaire B recommender. `010_simple_recommendations.sql` fills it with transparent rules: the person's exploration picks (plus the active trip's activities in Tourist mode) map to landmark categories, and each pick contributes its most prominent unvisited places (about 40 in all; no answers → a few major landmarks). Replace its body with the real recommender, keeping the signature; 007 never overwrites it. Recommended landmarks get a saffron highlight on the map; nothing is hidden.
 
 **Points:** a visit doesn't award points; that's a separate task.
 

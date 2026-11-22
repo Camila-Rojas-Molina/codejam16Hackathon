@@ -20,7 +20,8 @@ function failure(e: GeolocationPositionError): string {
   return 'Your position isn’t available right now. Check that location services are on, then try again.'
 }
 
-export function useLocateMe(onFound: (fix: UserFix) => void) {
+/** The map moves itself when `state.fix` changes (see the engines); `onFound` is optional. */
+export function useLocateMe(onFound?: (fix: UserFix) => void) {
   const [state, setState] = useState<LocateState>({ status: 'idle' })
   const live = useRef(true)
   const found = useRef(onFound)
@@ -50,7 +51,7 @@ export function useLocateMe(onFound: (fix: UserFix) => void) {
         const fix: UserFix = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracyM: Math.round(pos.coords.accuracy) }
         const note = inBounds(fix, ISLAND_BOUNDS) ? null : 'You seem to be off Montréal Island. MIGO’s landmarks are all on the island.'
         setState({ status: 'found', fix, note })
-        found.current(fix)
+        found.current?.(fix)
       },
       (e) => {
         if (live.current) setState({ status: 'error', message: failure(e) })

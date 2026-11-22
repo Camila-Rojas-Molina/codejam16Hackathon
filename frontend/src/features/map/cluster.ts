@@ -20,10 +20,13 @@ function project(p: LatLng, zoom: number) {
   return { x: ((p.lng + 180) / 360) * scale, y: (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * scale }
 }
 
-function grid(points: LandmarkSummary[], zoom: number, cell: number): MapItem[] {
+/** Screen position of a point; a tilted 3D map passes its own (map.project) instead of flat Mercator. */
+export type Projector = (p: LatLng) => { x: number; y: number }
+
+function grid(points: LandmarkSummary[], zoom: number, cell: number, toPx: Projector): MapItem[] {
   const cells = new Map<string, LandmarkSummary[]>()
   for (const l of points) {
-    const { x, y } = project(l, zoom)
+    const { x, y } = toPx(l)
     const key = `${Math.floor(x / cell)}:${Math.floor(y / cell)}`
     const bucket = cells.get(key)
     if (bucket) bucket.push(l)
@@ -58,15 +61,16 @@ function grid(points: LandmarkSummary[], zoom: number, cell: number): MapItem[] 
 }
 
 /** Pins and cluster bubbles for the landmarks in view at this zoom. */
-export function clusterLandmarks(points: LandmarkSummary[], zoom: number): MapItem[] {
+export function clusterLandmarks(points: LandmarkSummary[], zoom: number, projector?: Projector): MapItem[] {
   const z = Math.round(zoom)
+  const toPx: Projector = projector ?? ((p) => project(p, z))
   let cell = z >= CLUSTER_UNTIL_ZOOM ? 0 : CELL_PX
   if (cell === 0 && points.length <= MAX_MARKERS) return points.map((l) => ({ kind: 'landmark', key: l.id, landmark: l }))
   if (cell === 0) cell = CELL_PX / 2
-  let items = grid(points, z, cell)
+  let items = grid(points, z, cell, toPx)
   while (items.length > MAX_MARKERS && cell < 1024) {
     cell *= 2
-    items = grid(points, z, cell)
+    items = grid(points, z, cell, toPx)
   }
   return items
 }

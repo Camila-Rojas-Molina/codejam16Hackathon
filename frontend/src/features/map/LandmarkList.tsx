@@ -34,14 +34,26 @@ export default function LandmarkList({ items, selectedId, onSelect, label, empty
                 type="button"
                 onClick={() => onSelect(l)}
                 aria-current={selected || undefined}
-                className={cn('flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-saffron-soft', selected && 'bg-saffron-soft')}
+                className={cn(
+                  'flex min-h-14 w-full items-center gap-3 border-l-4 px-3 py-2 text-left transition-colors hover:bg-saffron-soft',
+                  l.recommended ? 'border-saffron' : 'border-transparent',
+                  selected && 'bg-saffron-soft',
+                )}
               >
                 <LandmarkPin state={state} category={l.category} selected={selected} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold">{l.name}</span>
                   <span className="block text-xs">
                     {categoryLabel(l.category)} · {l.visited && l.visitedAt ? `Visited ${formatVisited(l.visitedAt)}` : PIN_STATE_LABEL[l.visited ? 'visited' : 'new']}
-                    {l.recommended && ' · Recommended'}
+                    {l.recommended && (
+                      <>
+                        {' · '}
+                        <span className="inline-flex items-center gap-0.5 bg-saffron-soft px-1 font-bold">
+                          <Icon name="star" className="size-3" />
+                          Recommended
+                        </span>
+                      </>
+                    )}
                   </span>
                 </span>
                 <Icon name="arrow-right" accent="none" strokeWidth={2.2} className="size-4" />
