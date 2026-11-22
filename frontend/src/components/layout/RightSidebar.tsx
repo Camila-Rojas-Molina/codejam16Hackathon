@@ -1,4 +1,4 @@
-// The persistent right-hand column (desktop): status, today's quest, the shop, and the latest
+// The persistent right-hand column (wide desktops, xl+): status, today's quest, the shop, and the latest
 // message. Stacked ruled cells, like the side column of a printed menu.
 import { Link } from 'react-router'
 import RecentMessage from '../../features/chat/components/RecentMessage'
@@ -9,7 +9,7 @@ import { AccountStatus, SettingsButton } from './StatusBar'
 
 export default function RightSidebar() {
   return (
-    <aside aria-label="Your status" className="sheet-grain sticky top-0 hidden h-dvh flex-col overflow-y-auto border-l-2 border-ink lg:flex">
+    <aside aria-label="Your status" className="sheet-grain sticky top-0 hidden h-dvh flex-col overflow-y-auto border-l-2 border-ink xl:flex">
       <div className="p-5">
         <AccountStatus />
       </div>

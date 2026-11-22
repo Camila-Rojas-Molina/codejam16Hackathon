@@ -2,7 +2,10 @@
 //   /chat               Messages (default) or ?tab=discover
 //   /chat/:personId     one conversation
 // Live discovery and message delivery aren't built yet (see "People & messages" in api.ts).
-import { useEffect, useEffectEvent, useRef, useState, type FormEvent } from 'react'
+//
+// Phones and tablets: one view at a time (list, discover, or a thread). Laptops and up: two panes,
+// conversations on the left and the open thread (or Discover) on the right.
+import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { MascotSays } from '../components/illustrations/Mascot'
 import Icon from '../components/icons/Icon'
@@ -27,11 +30,20 @@ const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2
 const dayFmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
 const when = (at: number) => (new Date(at).toDateString() === new Date().toDateString() ? timeFmt.format(at) : dayFmt.format(at))
 
+// Two panes from Tailwind's lg breakpoint (64rem).
+const WIDE = '(min-width: 64rem)'
+const subscribeWide = (cb: () => void) => {
+  const mq = window.matchMedia?.(WIDE)
+  mq?.addEventListener('change', cb)
+  return () => mq?.removeEventListener('change', cb)
+}
+const useWide = () => useSyncExternalStore(subscribeWide, () => window.matchMedia?.(WIDE).matches ?? false, () => false)
+
 function Tabs({ tab }: { tab: 'messages' | 'discover' }) {
   const unread = useConversations().reduce((n, c) => n + c.unread, 0)
   const cls = (on: boolean) =>
     cn(
-      'flex min-h-12 flex-1 items-center justify-center gap-2 text-sm font-bold tracking-[0.1em] uppercase transition-colors',
+      'flex min-h-12 flex-1 items-center justify-center gap-1.5 px-2 text-xs font-bold tracking-[0.08em] uppercase transition-colors sm:gap-2 sm:text-sm sm:tracking-[0.1em]',
       on ? 'bg-saffron' : 'hover:bg-saffron-soft',
     )
   return (
@@ -49,7 +61,7 @@ function Tabs({ tab }: { tab: 'messages' | 'discover' }) {
   )
 }
 
-function ConversationList({ conversations }: { conversations: Conversation[] }) {
+function ConversationList({ conversations, current }: { conversations: Conversation[]; current?: string }) {
   if (conversations.length === 0) {
     return (
       <div className="space-y-4">
@@ -73,15 +85,16 @@ function ConversationList({ conversations }: { conversations: Conversation[] }) 
         <li key={person.id}>
           <Link
             to={`/chat/${encodeURIComponent(person.id)}`}
+            aria-current={current === person.id ? 'page' : undefined}
             className={cn(
-              'flex items-center gap-3 border-r-2 border-b-2 border-ink p-3 transition-colors',
-              unread > 0 ? 'bg-saffron' : 'sheet-grain hover:bg-saffron-soft',
+              'relative flex min-h-[4.5rem] items-center gap-3 border-r-2 border-b-2 border-ink p-3 transition-colors',
+              current === person.id ? 'bg-teal-soft shadow-[inset_6px_0_0_var(--color-ink)]' : unread > 0 ? 'bg-saffron' : 'sheet-grain hover:bg-saffron-soft',
             )}
           >
             <Avatar avatar={person.avatar} size="md" />
             <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-2">
-                <span className="truncate text-lg font-bold">{person.name}</span>
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <span className="max-w-full truncate text-lg font-bold">{person.name}</span>
                 <Badge tone={person.mode === 'local' ? 'teal' : 'saffron'} icon={modeMeta(person.mode).icon}>
                   {roleLabel(person.mode)}
                 </Badge>
@@ -171,7 +184,7 @@ function Discover() {
   )
 }
 
-function Thread({ personId }: { personId: string }) {
+function Thread({ personId, embedded = false }: { personId: string; embedded?: boolean }) {
   const { sendMessage, markRead } = useStore()
   const conversation = useConversations().find((c) => c.person.id === personId)
   const navigate = useNavigate()
@@ -193,9 +206,11 @@ function Thread({ personId }: { personId: string }) {
   if (!conversation) {
     return (
       <div className="space-y-4">
-        <Button variant="ghost" icon="arrow-left" className="px-0" onClick={() => navigate('/chat')}>
-          Messages
-        </Button>
+        {!embedded && (
+          <Button variant="ghost" icon="arrow-left" className="px-0" onClick={() => navigate('/chat')}>
+            Messages
+          </Button>
+        )}
         <Card>
           <h1 className="text-2xl">Can’t message them yet</h1>
           <p className="mt-2">You can message people once you’re matched as teammates, or you both show interest.</p>
@@ -224,9 +239,11 @@ function Thread({ personId }: { personId: string }) {
   return (
     <div className="flex flex-1 flex-col gap-4">
       <header className="flex items-center gap-3">
-        <Link to="/chat" aria-label="Back to messages" className="grid size-12 shrink-0 place-items-center border-2 border-ink bg-sheet transition-colors hover:bg-saffron">
-          <Icon name="arrow-left" accent="none" strokeWidth={2.4} className="size-5" />
-        </Link>
+        {!embedded && (
+          <Link to="/chat" aria-label="Back to messages" className="grid size-12 shrink-0 place-items-center border-2 border-ink bg-sheet transition-colors hover:bg-saffron">
+            <Icon name="arrow-left" accent="none" strokeWidth={2.4} className="size-5" />
+          </Link>
+        )}
         <Avatar avatar={person.avatar} size="md" />
         <div className="min-w-0">
           <h1 className="truncate text-3xl leading-none">{person.name}</h1>
@@ -299,17 +316,61 @@ function Thread({ personId }: { personId: string }) {
   )
 }
 
+/** Wide screens, nothing open yet: a prompt in the thread pane. */
+function PickAChat({ hasChats }: { hasChats: boolean }) {
+  return (
+    <div className="sheet-grain hatch-soft grid flex-1 place-items-center border-2 border-ink p-8">
+      <div className="flex max-w-sm flex-col items-center gap-4 text-center">
+        <Mascot pose={hasChats ? 'hello' : 'ponder'} className="h-32" />
+        <p className="font-serif text-xl leading-snug">
+          {hasChats ? 'Pick a conversation to carry on where you left off.' : 'Your conversations will open here.'}
+        </p>
+        <Link to="/chat?tab=discover" className={buttonClasses({ variant: 'secondary' })}>
+          <Icon name="search" className="size-5" />
+          Discover people
+        </Link>
+      </div>
+    </div>
+  )
+}
+
 export default function ChatPage() {
   const { personId } = useParams()
   const [params] = useSearchParams()
   const conversations = useConversations()
-  if (personId) return <Thread personId={personId} />
+  const wide = useWide()
   const tab = params.get('tab') === 'discover' ? 'discover' : 'messages'
+  const header = <PageHeader eyebrow="People" title="Chat" description="Find your kind of people, then plan something together." />
+
+  if (!wide) {
+    if (personId) return <Thread personId={personId} />
+    return (
+      <div className="mx-auto w-full max-w-3xl space-y-6">
+        {header}
+        <Tabs tab={tab} />
+        {tab === 'messages' ? <ConversationList conversations={conversations} /> : <Discover />}
+      </div>
+    )
+  }
+
+  // Two panes: the list stays put while the right-hand pane shows a thread, Discover, or a prompt.
+  const paneTab = personId ? 'messages' : tab
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
-      <PageHeader eyebrow="People" title="Chat" description="Find your kind of people, then plan something together." />
-      <Tabs tab={tab} />
-      {tab === 'messages' ? <ConversationList conversations={conversations} /> : <Discover />}
+    <div className="mx-auto grid w-full max-w-7xl flex-1 grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)] gap-8 2xl:gap-10">
+      <div className="flex min-w-0 flex-col gap-6">
+        {header}
+        <Tabs tab={paneTab} />
+        <ConversationList conversations={conversations} current={personId} />
+      </div>
+      <div className="flex min-w-0 flex-col">
+        {personId ? (
+          <Thread key={personId} personId={personId} embedded />
+        ) : tab === 'discover' ? (
+          <Discover />
+        ) : (
+          <PickAChat hasChats={conversations.length > 0} />
+        )}
+      </div>
     </div>
   )
 }

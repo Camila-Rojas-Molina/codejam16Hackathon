@@ -50,20 +50,49 @@ const layouts: Record<ChoiceLayout, string> = {
   chip: 'min-h-11 items-center gap-2 border-2 border-ink px-3 py-2 text-sm',
 }
 
-/** The tick box: an empty ruled square that fills ink with a saffron tick when chosen. */
+/**
+ * A tick drawn so its bounding box sits exactly in the middle of a 24-unit grid (x 5–19, y 7–17),
+ * so it centres in any square or round box. Use it for every "selected" badge.
+ */
+export function CheckMark({ className, strokeWidth = 3 }: { className?: string; strokeWidth?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={cn('block shrink-0', className)}
+      aria-hidden
+      focusable="false"
+    >
+      <path d="M5 12.5 9.5 17 19 7" />
+    </svg>
+  )
+}
+
+// Box and tick sizes per layout: the tick's SVG is about the size of the box's inside (the stroke
+// itself spans ~60% of it), so it reads clearly without touching the rule.
+const tickBox: Record<ChoiceLayout, string> = {
+  row: 'absolute top-1/2 right-4 size-7 -translate-y-1/2',
+  tile: 'absolute top-2 right-2 size-6',
+  chip: 'size-5',
+}
+const tickMark: Record<ChoiceLayout, string> = { row: 'size-5.5', tile: 'size-5', chip: 'size-4' }
+
+/** The tick box: an empty ruled square (round for single choice) that fills ink with a saffron tick. */
 function Tick({ multiple, layout }: { multiple: boolean; layout: ChoiceLayout }) {
   return (
     <span
       aria-hidden
       className={cn(
-        'grid size-6 shrink-0 place-items-center border-2 border-ink bg-sheet text-saffron transition-colors group-has-checked:bg-ink',
-        layout === 'row' && 'absolute top-1/2 right-4 -translate-y-1/2',
-        layout === 'tile' && 'absolute top-2 right-2 size-5',
-        layout === 'chip' && 'size-5',
+        'grid shrink-0 place-items-center border-2 border-ink bg-sheet text-saffron transition-colors group-has-checked:bg-ink',
+        tickBox[layout],
         !multiple && 'rounded-full',
       )}
     >
-      <Icon name="check" accent="none" strokeWidth={3.2} className="size-4 scale-0 transition-transform duration-200 ease-spring group-has-checked:scale-100" />
+      <CheckMark strokeWidth={3.2} className={cn(tickMark[layout], 'scale-0 transition-transform duration-200 ease-spring group-has-checked:scale-100')} />
     </span>
   )
 }

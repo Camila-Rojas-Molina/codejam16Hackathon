@@ -1,6 +1,7 @@
 // Pure helpers for the profile model: blank values, defaults, validation, normalising stored data.
 import type { PlacePick } from '../places/types'
 import type {
+  AccessorySlot,
   Budget,
   DiscoveredCity,
   PointsEntry,
@@ -18,6 +19,7 @@ import type {
 export function emptyUniversal(): UniversalProfile {
   return {
     homeCity: '',
+    homeCityPlace: null,
     citiesDiscovered: [],
     personality: { energy: null, newPeople: null, planning: null, decisions: null },
     interests: [],
@@ -99,6 +101,7 @@ export function newLocal(universal: UniversalProfile | null): LocalContext {
   return {
     // Usually where they host; they can change it for Local mode without touching their profile.
     homeCity: universal?.homeCity ?? '',
+    homeCityPlace: universal?.homeCityPlace ? { ...universal.homeCityPlace } : null,
     neighbourhood: '',
     languages: universal ? [...universal.languages.spoken] : [],
     knownAreas: [],
@@ -233,6 +236,38 @@ function normBudget(v: unknown): Budget {
   }
 }
 
+/** A stored place, or null if it isn't a complete real place (missing id or coordinates). */
+export function normPlace(v: unknown): PlacePick | null {
+  if (!isObj(v) || typeof v.placeId !== 'string' || !v.placeId || typeof v.name !== 'string' || !v.name.trim()) return null
+  const lat = numOrNull(v.lat)
+  const lng = numOrNull(v.lng)
+  if (lat === null || lng === null || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null
+  return {
+    placeId: v.placeId,
+    name: v.name.trim(),
+    countryCode: str(v.countryCode).toUpperCase(),
+    country: str(v.country),
+    region: typeof v.region === 'string' && v.region ? v.region : undefined,
+    lat,
+    lng,
+  }
+}
+
+/**
+ * Home city as stored: the picked place plus its name as plain text (kept for matching and the SQL
+ * column). Older records have text only: the text is kept and the place stays null until picked.
+ */
+function normHome(v: Record<string, unknown>): { homeCity: string; homeCityPlace: PlacePick | null } {
+  const place = normPlace(v.homeCityPlace)
+  return place ? { homeCity: place.name, homeCityPlace: place } : { homeCity: str(v.homeCity), homeCityPlace: null }
+}
+
+/** The fields to set when someone picks their home city on the map. */
+export const homeCityFields = (place: PlacePick) => ({ homeCity: place.name, homeCityPlace: { ...place } })
+
+/** Text-only home city from before map picking: show it, and ask them to pick it on the map. */
+export const needsHomePick = (h: { homeCity: string; homeCityPlace: PlacePick | null }) => !h.homeCityPlace && h.homeCity.trim().length > 0
+
 function normCity(v: unknown): DiscoveredCity | null {
   if (!isObj(v) || typeof v.name !== 'string' || !v.name.trim()) return null
   const source = v.source === 'trip' || v.source === 'quest' ? v.source : 'manual'
@@ -254,6 +289,9 @@ function normCity(v: unknown): DiscoveredCity | null {
   }
 }
 
+/** Every accessory slot, in drawing order (backdrop first, hats last). */
+export const ACCESSORY_SLOTS: readonly AccessorySlot[] = ['backdrop', 'neck', 'face', 'head']
+
 function normRewards(v: unknown): Rewards {
   if (!isObj(v)) return { ledger: [], owned: [], equipped: {} }
   const ledger = (Array.isArray(v.ledger) ? v.ledger : []).filter(
@@ -261,7 +299,7 @@ function normRewards(v: unknown): Rewards {
   )
   const equipped: Rewards['equipped'] = {}
   if (isObj(v.equipped)) {
-    for (const slot of ['head', 'face', 'neck'] as const) {
+    for (const slot of ACCESSORY_SLOTS) {
       if (typeof v.equipped[slot] === 'string') equipped[slot] = v.equipped[slot] as string
     }
   }
@@ -280,7 +318,7 @@ export function normalizeUniversal(v: unknown): UniversalProfile | null {
   const dg = isObj(v.dogs) ? v.dogs : {}
   const dd = isObj(dg.dog) ? dg.dog : {}
   return {
-    homeCity: str(v.homeCity),
+    ...normHome(v),
     citiesDiscovered: (Array.isArray(v.citiesDiscovered) ? v.citiesDiscovered : [])
       .map(normCity)
       .filter((x): x is DiscoveredCity => x !== null),
@@ -347,7 +385,7 @@ function normTrip(v: unknown): TouristTrip | null {
 function normLocal(v: unknown): LocalContext | null {
   if (!isObj(v)) return null
   return {
-    homeCity: str(v.homeCity),
+    ...normHome(v),
     neighbourhood: str(v.neighbourhood),
     languages: strArr(v.languages),
     knownAreas: strArr(v.knownAreas),
@@ -399,19 +437,32 @@ export const cityLabel = (c: Pick<DiscoveredCity, 'name' | 'country' | 'region'>
 export const isPinned = (c: DiscoveredCity) => c.placeId !== null && c.lat !== null && c.lng !== null
 
 /**
- * Adds a real place unless it's already there (same place id, or same name and country). An older
- * free-text entry with the same name is upgraded in place, keeping when it was first added.
- * Returns the same list if nothing changed.
+ * The city already in the list that is this place: the same place id, or an older entry without an
+ * id that has the same name (accents and case ignored) and the same country, or no country at all.
+ * Two real places can share a name and country (Springfield, US), so ids win when both have one.
+ */
+export function findCity(cities: DiscoveredCity[], place: PlacePick): DiscoveredCity | undefined {
+  const code = place.countryCode.toUpperCase()
+  return (
+    cities.find((c) => c.placeId !== null && c.placeId === place.placeId) ??
+    cities.find((c) => c.placeId === null && cityKey(c.name) === cityKey(place.name) && (!c.countryCode || c.countryCode.toUpperCase() === code))
+  )
+}
+
+/**
+ * Adds a real place unless it's already there (see findCity). An older free-text entry for it is
+ * upgraded in place to the real place, keeping when it was first added. Returns the same list if
+ * nothing changed.
  */
 export function addCity(cities: DiscoveredCity[], place: PlacePick, source: DiscoveredCity['source'] = 'manual', refId?: string): DiscoveredCity[] {
-  const same = (c: DiscoveredCity) =>
-    c.placeId === place.placeId || (cityKey(c.name) === cityKey(place.name) && c.countryCode.toUpperCase() === place.countryCode.toUpperCase())
-  if (cities.some(same)) return cities
+  const code = place.countryCode.toUpperCase()
+  const existing = findCity(cities, place)
+  if (existing && isPinned(existing)) return cities
   const city: DiscoveredCity = {
     id: `city-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
     name: place.name,
     country: place.country,
-    countryCode: place.countryCode.toUpperCase(),
+    countryCode: code,
     region: place.region,
     lat: place.lat,
     lng: place.lng,
@@ -420,8 +471,8 @@ export function addCity(cities: DiscoveredCity[], place: PlacePick, source: Disc
     refId,
     addedAt: Date.now(),
   }
-  const legacy = cities.findIndex((c) => !isPinned(c) && cityKey(c.name) === cityKey(place.name))
-  if (legacy >= 0) return cities.map((c, i) => (i === legacy ? { ...city, id: c.id, addedAt: c.addedAt } : c))
+  // An older free-text entry for this place is upgraded in place.
+  if (existing) return cities.map((c) => (c === existing ? { ...city, id: c.id, addedAt: c.addedAt, source: c.source, refId: c.refId } : c))
   return [...cities, city]
 }
 

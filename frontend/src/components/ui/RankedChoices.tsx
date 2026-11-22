@@ -1,84 +1,172 @@
 // Pick up to N options and put them in order of importance. Order matters: the ranked list is
-// saved as-is and matching weights each position (features/profile/matchingConfig.ts).
-//   * Tap a choice to add it to the bottom of the ranking (or tap again to remove it).
-//   * Drag the grip to reorder (pointer events: mouse, touch and pen).
-//   * Or use the up / down buttons, which also work from the keyboard. Moves are announced.
-import { useId, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+// saved as-is and matching weights each position (features/profile/matchingConfig.ts). The weights
+// stay internal: people just see "1, 2, 3", with the top pick visibly emphasised.
+//   * Tap a choice to add it to the bottom of the ranking (tap again, or ×, to remove it).
+//   * Drag a row by its grip to reorder: pointer events, so mouse, touch and pen all work.
+//   * Keyboard: focus a grip, Space/Enter to pick it up, ↑/↓ to move, Space/Enter to drop, Esc to
+//     cancel. Alt+↑/↓ moves it straight away. Every move is announced.
+import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import type { Option } from '../../features/profile/options'
 import { cn } from '../../lib/cn'
 import Icon from '../icons/Icon'
 
 type RankedChoicesProps<T extends string> = {
   legend: string
+  /** Visually hide the legend when the screen heading already says it. Still read aloud. */
+  hideLegend?: boolean
   options: Option<T>[]
   /** Ranked values, most important first. */
   values: readonly T[]
   onChange: (values: T[]) => void
   max: number
-  /** Relative weight of each position (first = 1), shown so people see the top pick matters most. */
-  weights?: readonly number[]
 }
 
 const ordinal = (n: number) => ['1st', '2nd', '3rd', '4th', '5th', '6th'][n - 1] ?? `${n}th`
 
-export default function RankedChoices<T extends string>({ legend, options, values, onChange, max, weights }: RankedChoicesProps<T>) {
+/** A pointer drag in progress: which item, and where in the row it was grabbed. */
+type Drag<T> = { value: T; pointerId: number; grabY: number; y: number }
+
+export default function RankedChoices<T extends string>({ legend, hideLegend, options, values, onChange, max }: RankedChoicesProps<T>) {
   const id = useId()
   const [announce, setAnnounce] = useState('')
-  const [dragging, setDragging] = useState<T | null>(null)
+  const [drag, setDrag] = useState<Drag<T> | null>(null)
+  // Keyboard "lift": the item picked up with Space/Enter, and the order to restore on Esc.
+  const [lifted, setLifted] = useState<{ value: T; original: T[] } | null>(null)
   const listRef = useRef<HTMLOListElement>(null)
+  const rowRefs = useRef(new Map<T, HTMLLIElement>())
+  const gripRefs = useRef(new Map<T, HTMLButtonElement>())
+  const refocus = useRef<T | null>(null)
   const label = (v: T) => options.find((o) => o.value === v)?.label ?? v
   const full = values.length >= max
+
+  function say(text: string) {
+    // Same text twice in a row wouldn't be re-read; a trailing space makes it new.
+    setAnnounce((prev) => (prev === text ? `${text} ` : text))
+  }
 
   function toggle(v: T) {
     if (values.includes(v)) {
       onChange(values.filter((x) => x !== v))
-      setAnnounce(`${label(v)} removed from your ranking.`)
+      say(`${label(v)} removed from your ranking.`)
     } else if (!full) {
       onChange([...values, v])
-      setAnnounce(`${label(v)} added at position ${values.length + 1} of ${values.length + 1}.`)
+      say(`${label(v)} added at number ${values.length + 1}.`)
     }
   }
 
-  function move(from: number, to: number, say = true) {
-    if (to < 0 || to >= values.length || from === to) return
+  function moveTo(v: T, to: number, announceIt = true) {
+    const from = values.indexOf(v)
+    if (from < 0 || to < 0 || to >= values.length || from === to) return
     const next = [...values]
-    const [item] = next.splice(from, 1)
-    next.splice(to, 0, item)
+    next.splice(from, 1)
+    next.splice(to, 0, v)
     onChange(next)
-    if (say) setAnnounce(`${label(item)} moved to position ${to + 1} of ${next.length}.`)
+    refocus.current = v
+    if (announceIt) say(`${label(v)} moved to number ${to + 1} of ${next.length}.`)
   }
 
-  // Pointer drag: while dragging, swap with whichever row the pointer is over.
-  function onPointerDown(e: ReactPointerEvent<HTMLButtonElement>, v: T) {
+  // ---- Pointer drag ---------------------------------------------------------------------------
+  // The grabbed row follows the pointer; the others reorder around it as its middle crosses theirs.
+
+  function listTop() {
+    const list = listRef.current
+    return list ? list.getBoundingClientRect().top + list.clientTop : 0
+  }
+
+  function onPointerDown(e: ReactPointerEvent<HTMLLIElement>, v: T) {
+    if (e.button !== 0) return
+    const target = e.target as Element
+    if (target.closest('[data-remove]')) return
+    // Touch and pen start from the handle only; elsewhere the finger scrolls the page.
+    if (e.pointerType !== 'mouse' && !target.closest('[data-handle]')) return
+    const row = e.currentTarget
     e.preventDefault()
     e.currentTarget.setPointerCapture(e.pointerId)
-    setDragging(v)
-  }
-  function onPointerMove(e: ReactPointerEvent<HTMLButtonElement>) {
-    if (!dragging || !listRef.current) return
-    const rows = [...listRef.current.querySelectorAll<HTMLElement>('[data-rank-row]')]
-    const from = values.indexOf(dragging)
-    const to = rows.findIndex((row) => {
-      const r = row.getBoundingClientRect()
-      return e.clientY >= r.top && e.clientY <= r.bottom
-    })
-    if (to >= 0 && to !== from) move(from, to, false)
-  }
-  function onPointerUp() {
-    if (dragging) setAnnounce(`${label(dragging)} is now number ${values.indexOf(dragging) + 1} of ${values.length}.`)
-    setDragging(null)
+    setLifted(null)
+    setDrag({ value: v, pointerId: e.pointerId, grabY: e.clientY - row.getBoundingClientRect().top, y: e.clientY })
   }
 
-  const iconBtn =
-    'grid min-h-11 w-11 place-items-center border-l-2 border-ink transition-colors hover:bg-saffron disabled:opacity-30 disabled:hover:bg-transparent'
+  function onPointerMove(e: ReactPointerEvent<HTMLLIElement>) {
+    if (!drag || e.pointerId !== drag.pointerId) return
+    const row = rowRefs.current.get(drag.value)
+    if (!row) return
+    // Where the dragged row's middle is now, in list coordinates.
+    const middle = e.clientY - listTop() - drag.grabY + row.offsetHeight / 2
+    // Its new index: how many of the other rows have their middle above it.
+    let to = 0
+    for (const v of values) {
+      if (v === drag.value) continue
+      const other = rowRefs.current.get(v)
+      if (other && other.offsetTop + other.offsetHeight / 2 < middle) to++
+    }
+    if (to !== values.indexOf(drag.value)) moveTo(drag.value, to, false)
+    setDrag({ ...drag, y: e.clientY })
+  }
+
+  function endDrag(e: ReactPointerEvent<HTMLLIElement>) {
+    if (!drag || e.pointerId !== drag.pointerId) return
+    say(`${label(drag.value)} is now number ${values.indexOf(drag.value) + 1} of ${values.length}.`)
+    setDrag(null)
+  }
+
+  // Position the dragged row under the pointer before paint, so reorders never flash.
+  useLayoutEffect(() => {
+    for (const [v, row] of rowRefs.current) {
+      if (drag && v === drag.value) {
+        // Follow the pointer, but stay within the list.
+        const max = (listRef.current?.clientHeight ?? 0) - row.offsetHeight
+        const top = Math.min(Math.max(drag.y - listTop() - drag.grabY, 0), Math.max(max, 0))
+        const offset = top - row.offsetTop
+        row.style.transform = `translateY(${Math.round(offset)}px)`
+      } else {
+        row.style.transform = ''
+      }
+    }
+  })
+
+  // Keep keyboard focus on the grip that just moved (moving a DOM node can drop its focus).
+  useLayoutEffect(() => {
+    if (refocus.current === null) return
+    const grip = gripRefs.current.get(refocus.current)
+    refocus.current = null
+    if (!drag && grip && document.activeElement !== grip) grip.focus()
+  })
+
+  // ---- Keyboard -------------------------------------------------------------------------------
+
+  function onGripKeyDown(e: KeyboardEvent<HTMLButtonElement>, v: T) {
+    const i = values.indexOf(v)
+    const up = e.key === 'ArrowUp'
+    const down = e.key === 'ArrowDown'
+    if ((up || down) && (e.altKey || lifted?.value === v)) {
+      e.preventDefault()
+      moveTo(v, up ? i - 1 : i + 1)
+      return
+    }
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault()
+      if (lifted?.value === v) {
+        setLifted(null)
+        say(`${label(v)} dropped at number ${i + 1} of ${values.length}.`)
+      } else {
+        setLifted({ value: v, original: [...values] })
+        say(`${label(v)} picked up, number ${i + 1} of ${values.length}. Use the up and down arrows to move it, Space to drop, Escape to cancel.`)
+      }
+      return
+    }
+    if (e.key === 'Escape' && lifted?.value === v) {
+      e.preventDefault()
+      onChange(lifted.original)
+      refocus.current = v
+      setLifted(null)
+      say(`Cancelled. ${label(v)} is back at number ${lifted.original.indexOf(v) + 1}.`)
+    }
+  }
 
   return (
     <div className="space-y-6">
-      <fieldset aria-describedby={`${id}-hint`}>
-        <legend className="eyebrow mb-2">{legend}</legend>
-        <p id={`${id}-hint`} className="-mt-1 mb-3 text-sm">
-          Tap up to {max}. Then put them in order: your <strong>first choice counts the most</strong> when we match you.
-        </p>
+      <fieldset>
+        <legend className={hideLegend ? 'sr-only' : 'eyebrow mb-2'}>{legend}</legend>
         <div className="flex flex-wrap gap-2">
           {options.map((o) => {
             const rank = values.indexOf(o.value)
@@ -96,11 +184,11 @@ export default function RankedChoices<T extends string>({ legend, options, value
                 )}
               >
                 {on ? (
-                  <span className="grid size-5 place-items-center bg-ink text-[0.65rem] font-bold text-saffron" aria-hidden>
+                  <span className="grid size-6 shrink-0 place-items-center bg-ink text-xs leading-none font-bold text-saffron tabular-nums" aria-hidden>
                     {rank + 1}
                   </span>
                 ) : (
-                  o.icon && <Icon name={o.icon} className="size-5" />
+                  o.icon && <Icon name={o.icon} className="size-6" />
                 )}
                 {o.label}
                 {on && <span className="sr-only">, ranked {rank + 1}</span>}
@@ -108,77 +196,96 @@ export default function RankedChoices<T extends string>({ legend, options, value
             )
           })}
         </div>
-        <p className="mt-2 text-sm font-semibold" aria-live="polite">
+        <p className="mt-2 text-sm font-semibold">
           {values.length} of {max} picked
         </p>
       </fieldset>
 
       {values.length > 0 && (
         <div>
-          <p className="eyebrow mb-2" id={`${id}-order`}>
-            Your order of importance
+          <p className="eyebrow mb-2 flex items-center gap-1.5" id={`${id}-order`}>
+            Your ranking
+            {values.length > 1 && (
+              <span className="inline-flex items-center gap-1 font-semibold tracking-normal normal-case" aria-hidden>
+                · drag <Icon name="grip" accent="none" className="size-4" /> to reorder
+              </span>
+            )}
           </p>
-          <ol ref={listRef} aria-labelledby={`${id}-order`} className="border-t-2 border-l-2 border-ink">
+          <ol ref={listRef} aria-labelledby={`${id}-order`} aria-describedby={`${id}-kbd`} className="relative space-y-2">
             {values.map((v, i) => {
               const o = options.find((x) => x.value === v)
-              const w = weights?.[Math.min(i, weights.length - 1)]
+              const top = i === 0
+              const dragging = drag?.value === v
+              const isLifted = lifted?.value === v
               return (
                 <li
                   key={v}
-                  data-rank-row
+                  ref={(el) => {
+                    if (el) rowRefs.current.set(v, el)
+                    else rowRefs.current.delete(v)
+                  }}
+                  onPointerDown={(e) => onPointerDown(e, v)}
+                  onPointerMove={onPointerMove}
+                  onPointerUp={endDrag}
+                  onPointerCancel={endDrag}
                   className={cn(
-                    'flex items-stretch border-r-2 border-b-2 border-ink transition-colors',
-                    i === 0 ? 'bg-saffron' : 'sheet-grain',
-                    dragging === v && 'relative z-10 shadow-block-sm',
+                    'relative flex items-stretch border-2 border-ink',
+                    top ? 'min-h-16 bg-saffron' : 'min-h-14 sheet-grain',
+                    dragging ? 'z-10 shadow-block' : 'transition-[background-color,box-shadow] duration-150',
+                    isLifted && 'shadow-block-sm outline-3 outline-offset-2 outline-ink',
                   )}
                 >
+                  {/* The handle: grip + number. Touch drags start here only, so swiping over the
+                      rest of the list still scrolls the page. A mouse can grab the whole row. */}
                   <button
                     type="button"
-                    aria-label={`Drag to reorder ${label(v)}`}
+                    ref={(el) => {
+                      if (el) gripRefs.current.set(v, el)
+                      else gripRefs.current.delete(v)
+                    }}
+                    data-handle
+                    aria-label={`${label(v)}, ${ordinal(i + 1)} of ${values.length}. Reorder`}
+                    aria-describedby={`${id}-kbd`}
+                    aria-pressed={isLifted}
                     title="Drag to reorder"
-                    onPointerDown={(e) => onPointerDown(e, v)}
-                    onPointerMove={onPointerMove}
-                    onPointerUp={onPointerUp}
-                    onPointerCancel={onPointerUp}
-                    className={cn('grid w-10 shrink-0 touch-none place-items-center border-r-2 border-ink', dragging === v ? 'cursor-grabbing' : 'cursor-grab')}
+                    onKeyDown={(e) => onGripKeyDown(e, v)}
+                    onBlur={() => isLifted && refocus.current !== v && setLifted(null)}
+                    className={cn('flex shrink-0 touch-none items-center gap-2 py-2 pr-1 pl-2 focus-visible:-outline-offset-4', dragging ? 'cursor-grabbing' : 'cursor-grab')}
                   >
-                    <Icon name="grip" accent="none" className="size-5" />
-                  </button>
-                  <span className={cn('grid w-14 shrink-0 place-items-center border-r-2 border-ink font-display leading-none', i === 0 ? 'text-3xl' : 'text-2xl')} aria-hidden>
-                    {i + 1}
-                  </span>
-                  <div className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2">
-                    {o?.icon && <Icon name={o.icon} accent={i === 0 ? 'sheet' : 'saffron'} className="hidden size-7 sm:block" />}
-                    <div className="min-w-0">
-                      <p className="font-bold">
-                        <span className="sr-only">{ordinal(i + 1)}: </span>
-                        {label(v)}
-                      </p>
-                      <p className="text-xs font-semibold">
-                        {i === 0 ? 'Most important' : w !== undefined ? `Counts ${Math.round(w * 100)}% as much as your first` : ordinal(i + 1)}
-                      </p>
-                      {w !== undefined && (
-                        <span className="mt-1 block h-1.5 w-full max-w-40 border border-ink bg-sheet" aria-hidden>
-                          <span className="block h-full bg-ink" style={{ width: `${w * 100}%` }} />
-                        </span>
+                    <Icon name="grip" accent="none" className="size-5 shrink-0 opacity-70" />
+                    <span
+                      className={cn(
+                        'grid shrink-0 place-items-center border-2 border-ink font-display leading-none tabular-nums',
+                        top ? 'size-11 bg-ink text-2xl text-saffron' : 'size-9 bg-sheet text-lg',
                       )}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0">
-                    <button type="button" className={iconBtn} onClick={() => move(i, i - 1)} disabled={i === 0} aria-label={`Move ${label(v)} up`}>
-                      <Icon name="arrow-up" accent="none" strokeWidth={2.2} className="size-4" />
-                    </button>
-                    <button type="button" className={iconBtn} onClick={() => move(i, i + 1)} disabled={i === values.length - 1} aria-label={`Move ${label(v)} down`}>
-                      <Icon name="arrow-down" accent="none" strokeWidth={2.2} className="size-4" />
-                    </button>
-                    <button type="button" className={iconBtn} onClick={() => toggle(v)} aria-label={`Remove ${label(v)}`}>
-                      <Icon name="close" accent="none" strokeWidth={2.2} className="size-4" />
-                    </button>
-                  </div>
+                      aria-hidden
+                    >
+                      {i + 1}
+                    </span>
+                  </button>
+                  <span className={cn('flex min-w-0 flex-1 items-center gap-3 py-2 pr-2 pl-2 select-none', dragging ? 'cursor-grabbing' : 'cursor-grab')} aria-hidden>
+                    {o?.icon && <Icon name={o.icon} accent={top ? 'sheet' : 'saffron'} className="size-7 max-[359px]:hidden" />}
+                    <span className="min-w-0">
+                      <span className={cn('block leading-tight font-bold', top && 'text-lg')}>{label(v)}</span>
+                      {top && <span className="eyebrow mt-0.5 block">Top pick</span>}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    data-remove
+                    className="grid w-11 shrink-0 place-items-center transition-colors hover:bg-ink hover:text-sheet"
+                    onClick={() => toggle(v)}
+                    aria-label={`Remove ${label(v)}`}
+                  >
+                    <Icon name="close" accent="none" strokeWidth={2.2} className="size-4" />
+                  </button>
                 </li>
               )
             })}
           </ol>
+          <p id={`${id}-kbd`} className="sr-only">
+            Space to pick up, arrow keys to move, Space to drop. Or Alt plus arrow keys.
+          </p>
         </div>
       )}
       <p className="sr-only" aria-live="assertive">

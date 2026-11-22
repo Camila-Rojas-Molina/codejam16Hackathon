@@ -5,7 +5,8 @@ import { cn } from '../../../lib/cn'
 import { useStore } from '../../../store/useStore'
 import { MODE_OPTIONS } from '../../onboarding/options'
 import { activeTrip, formatTripDates, isModeReady } from '../model'
-import { useModeSwitcher } from '../useModeSwitcher'
+import { modeOptionClasses, useModeSwitcher } from '../useModeSwitcher'
+import { ModeCheck } from './ModeToggle'
 
 type ModeSwitchProps = {
   /** Where a first-time setup should return to after saving. */
@@ -21,8 +22,8 @@ export default function ModeSwitch({ returnTo, className }: ModeSwitchProps) {
 
   return (
     <div className={className}>
-      <div role="group" aria-label="Exploring mode" className="sheet-grain flex border-2 border-ink">
-        {MODE_OPTIONS.map((m, i) => {
+      <div role="group" aria-label="Exploring mode" className="grid grid-cols-2 gap-2">
+        {MODE_OPTIONS.map((m) => {
           const active = activeMode === m.mode
           const ready = isModeReady(profile, m.mode)
           return (
@@ -33,18 +34,14 @@ export default function ModeSwitch({ returnTo, className }: ModeSwitchProps) {
               aria-busy={pending === m.mode || undefined}
               onClick={() => choose(m.mode, { returnTo })}
               className={cn(
-                'flex min-h-12 flex-1 items-center justify-center gap-2 px-3 text-sm font-bold tracking-[0.1em] uppercase transition-colors',
-                i > 0 && 'border-l-2 border-ink',
-                active ? m.activeClass : 'text-ink hover:bg-saffron-soft',
+                modeOptionClasses(m.mode, active),
+                'flex min-h-12 flex-wrap items-center justify-center gap-x-2 gap-y-1 px-3 py-2 text-sm font-bold tracking-[0.1em] uppercase',
               )}
             >
+              {active && <ModeCheck />}
               <Icon name={m.icon} accent={m.accent} className="size-5" />
               <span>{m.title}</span>
-              {!ready && (
-                <span className="border-2 border-ink bg-sheet px-1.5 text-[0.6rem]">
-                  Set up
-                </span>
-              )}
+              {!ready && <span className="border-2 border-ink bg-sheet px-1.5 text-[0.6rem]">Set up</span>}
             </button>
           )
         })}

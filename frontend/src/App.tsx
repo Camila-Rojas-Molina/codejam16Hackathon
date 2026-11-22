@@ -5,6 +5,7 @@ import DashboardLayout from './components/layout/DashboardLayout'
 import AccessibilityPage from './pages/AccessibilityPage'
 import ChatPage from './pages/ChatPage'
 import DogsPage from './pages/DogsPage'
+import GalleryPage from './pages/GalleryPage'
 import HuntsPage from './pages/HuntsPage'
 import LocalSetupPage from './pages/LocalSetupPage'
 import LoginPage from './pages/LoginPage'
@@ -52,6 +53,7 @@ export default function App() {
           {/* The main app: left nav, centre section, right status sidebar. */}
           <Route element={<DashboardLayout />}>
             <Route path="map" element={<MapPage />} />
+            <Route path="gallery" element={<GalleryPage />} />
             <Route path="quests" element={<QuestsPage />} />
             <Route path="chat" element={<ChatPage />} />
             <Route path="chat/:personId" element={<ChatPage />} />

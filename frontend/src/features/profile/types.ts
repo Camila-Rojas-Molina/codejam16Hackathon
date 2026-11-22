@@ -9,6 +9,7 @@
 // Single-choice answers are `T | null` so an unfinished draft has the same shape as a saved profile.
 // `validation.ts` decides what "complete" means; `privacy.ts` decides what other people can see.
 import type { Role } from '../../lib/types'
+import type { PlacePick } from '../places/types'
 
 /** Tourist or Local. Contextual, switchable at any time; never an account type. */
 export type ExploreMode = Role
@@ -146,8 +147,13 @@ export type DogAnswer = {
 }
 
 export type UniversalProfile = {
-  /** The city the person lives in. Typed by them, never inferred from GPS. */
+  /**
+   * The city the person lives in, as plain text (= homeCityPlace.name). Kept for matching and the
+   * SQL `home_city` column. Never inferred from GPS.
+   */
   homeCity: string
+  /** The real place picked on the map. Null on older profiles that only have typed text. */
+  homeCityPlace: PlacePick | null
   /** Places they've explored. Part of the universal profile, so no mode can overwrite it. */
   citiesDiscovered: DiscoveredCity[]
   personality: {
@@ -227,8 +233,10 @@ export type Availability = 'weekday-day' | 'weekday-evening' | 'weekend-day' | '
 export type HostDuration = 'quick' | 'couple-hours' | 'half-day' | 'full-day'
 
 export type LocalContext = {
-  /** Typed by the person. Never inferred from GPS. */
+  /** Picked by the person (= homeCityPlace.name). Never inferred from GPS. */
   homeCity: string
+  /** The real place picked on the map. Null on older local profiles that only have typed text. */
+  homeCityPlace: PlacePick | null
   neighbourhood: string
   languages: string[]
   knownAreas: string[]
@@ -245,7 +253,8 @@ export type LocalContext = {
 
 // ---- Rewards & social --------------------------------------------------------------------------
 
-export type AccessorySlot = 'head' | 'face' | 'neck'
+/** Where a shop item goes on your avatar: worn pieces, plus the backdrop behind the picture. */
+export type AccessorySlot = 'head' | 'face' | 'neck' | 'backdrop'
 
 /** One change to the points balance. The balance is the sum of the ledger. */
 export type PointsEntry = {
@@ -262,7 +271,7 @@ export type Rewards = {
   ledger: PointsEntry[]
   /** Shop item ids the person owns. */
   owned: string[]
-  /** What Migo is wearing, one item per slot. */
+  /** What your avatar is wearing, one item per slot. (Saved under the same key as when Migo wore them.) */
   equipped: Partial<Record<AccessorySlot, string>>
 }
 

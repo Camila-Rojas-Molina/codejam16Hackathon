@@ -1,5 +1,5 @@
 // PROFILE: one person, one account, two ways to explore.
-//   Overview       your card, cities discovered (atlas), both modes, points
+//   Overview       your card, home city and cities discovered (atlas), both modes, points
 //   My answers     the questionnaire (each answer editable)
 //   Avatar & Migo  name, avatar and Migo's wardrobe
 // Every profile box is straight-edged: ruled cells, square corners.
@@ -12,14 +12,15 @@ import Badge from '../components/ui/Badge'
 import Button, { ArrowCell } from '../components/ui/Button'
 import { arrowLabel, arrowRowClasses, buttonClasses } from '../components/ui/buttonStyles'
 import Card from '../components/ui/Card'
-import { TextField } from '../components/ui/Fields'
+import { PrivacyNote, TextField } from '../components/ui/Fields'
 import { NAME_MAX_LENGTH, modeMeta } from '../features/onboarding/options'
 import CityCollection from '../features/places/components/CityCollection'
+import HomeCityPicker from '../features/places/components/HomeCityPicker'
 import SummaryList from '../features/profile/components/SummaryList'
 import UniversalSummary from '../features/profile/components/UniversalSummary'
 import { localItems, stepIdOf } from '../features/profile/contextSummary'
 import { hasUniversalProfile, type SetupNavState } from '../features/profile/flow'
-import { activeTrip, cityLabel, formatTripDates, pointsBalance, pointsEarned } from '../features/profile/model'
+import { activeTrip, cityLabel, formatTripDates, homeCityFields, needsHomePick, pointsBalance, pointsEarned } from '../features/profile/model'
 import {
   ACCESSIBILITY_OPTIONS,
   ATTRACTION_OPTIONS,
@@ -41,6 +42,14 @@ const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'overview', label: 'Overview', icon: 'id' },
   { id: 'answers', label: 'My answers', icon: 'clipboard' },
   { id: 'style', label: 'Avatar & Migo', icon: 'smile' },
+]
+
+const JUMPS: { id: string; label: string; icon: IconName }[] = [
+  { id: 'seen', label: 'Public card', icon: 'eye' },
+  { id: 'home', label: 'Home', icon: 'house' },
+  { id: 'cities', label: 'Cities', icon: 'globe' },
+  { id: 'modes', label: 'Modes', icon: 'shuffle' },
+  { id: 'points', label: 'Points', icon: 'coin' },
 ]
 
 function SectionTitle({ id, icon, children }: { id: string; icon: IconName; children: string }) {
@@ -71,7 +80,7 @@ function ChipList({ items, label }: { items: string[]; label: string }) {
 // ---- Overview -----------------------------------------------------------------------------------
 
 function Overview() {
-  const { account, profile, addCity, removeCity, clearLocal } = useStore()
+  const { account, profile, addCity, removeCity, clearLocal, saveUniversal } = useStore()
   const navigate = useNavigate()
   const [confirmLocal, setConfirmLocal] = useState(false)
   if (!account || !profile?.universal) return null
@@ -85,20 +94,39 @@ function Overview() {
   const ledger = [...profile.rewards.ledger].reverse().slice(0, 5)
   const mode = view.mode ? modeMeta(view.mode) : null
 
+  const homeMissing = !universal.homeCityPlace
+
   return (
-    <div className="space-y-12">
-      {!universal.homeCity.trim() && (
+    <div className="@container space-y-12">
+      {homeMissing && (
         <Card tone="saffron-soft" className="flex flex-wrap items-center gap-4">
           <Icon name="house" className="size-8" />
-          <p className="flex-1 font-semibold">Where do you live? Add your home city so visitors can find you as a local.</p>
-          <Link to="/onboarding/questions?step=home" className={buttonClasses()}>
-            Add home city
-          </Link>
+          <p className="min-w-0 flex-1 font-semibold">
+            {needsHomePick(universal)
+              ? `Pin ${universal.homeCity.trim()} on the map so visitors can find you as a local.`
+              : 'Where do you live? Add your home city so visitors can find you as a local.'}
+          </p>
+          <a href="#home" className={buttonClasses()}>
+            {needsHomePick(universal) ? 'Pick on map' : 'Add home city'}
+          </a>
         </Card>
       )}
 
+      <nav aria-label="On this page" className="-mt-4 flex flex-wrap gap-2">
+        {JUMPS.map((j) => (
+          <a
+            key={j.id}
+            href={`#${j.id}`}
+            className="flex min-h-11 items-center gap-1.5 border-2 border-ink bg-sheet px-3 text-xs font-bold tracking-[0.1em] uppercase transition-colors hover:bg-saffron-soft"
+          >
+            <Icon name={j.icon} className="size-5" />
+            {j.label}
+          </a>
+        ))}
+      </nav>
+
       {/* What other people see */}
-      <section aria-labelledby="public-card">
+      <section id="seen" aria-labelledby="public-card" className="scroll-mt-24">
         <SectionTitle id="public-card" icon="eye">
           What matches see
         </SectionTitle>
@@ -123,23 +151,23 @@ function Overview() {
               </div>
             </div>
           </header>
-          <div className="space-y-4 p-5">
+          <div className="grid gap-4 p-5 @xl:grid-cols-2 @xl:gap-x-8">
             {view.tourist && (
-              <p className="flex items-center gap-2 font-semibold">
+              <p className="flex items-center gap-2 font-semibold @xl:col-span-2">
                 <Icon name="plane" className="size-5" />
                 Visiting {view.tourist.destination}
                 {view.tourist.when && ` · ${view.tourist.when}`}
               </p>
             )}
             {view.local && (
-              <p className="flex items-center gap-2 font-semibold">
+              <p className="flex items-center gap-2 font-semibold @xl:col-span-2">
                 <Icon name="pin" accent="teal" className="size-5" />
                 Local in {view.local.homeCity}
                 {view.local.knownAreas.length > 0 && ` · knows ${view.local.knownAreas.join(', ')}`}
               </p>
             )}
             {(energy || pace) && (
-              <p className="flex flex-wrap items-center gap-x-4 gap-y-1 font-semibold">
+              <p className="flex flex-wrap items-center gap-x-4 gap-y-1 font-semibold @xl:col-span-2">
                 {energy && (
                   <span className="inline-flex items-center gap-1.5">
                     {energy.icon && <Icon name={energy.icon} className="size-5" />}
@@ -165,7 +193,7 @@ function Overview() {
                 {view.dog ? `Exploring with ${view.dog.name || 'their dog'}` : view.dogStance === 'loves-dogs' ? 'Loves dogs' : 'Fine with dogs'}
               </p>
             )}
-            {view.idealAdventureNote && <p className="font-serif text-xl leading-snug">“{view.idealAdventureNote}”</p>}
+            {view.idealAdventureNote && <p className="font-serif text-xl leading-snug @xl:col-span-2">“{view.idealAdventureNote}”</p>}
             {view.accessibilityNeeds && <ChipList label="Access needs (shared)" items={labelsFor(ACCESSIBILITY_OPTIONS, view.accessibilityNeeds)} />}
           </div>
           <p className="flex items-center gap-2 border-t-2 border-ink px-5 py-3 text-sm">
@@ -175,21 +203,41 @@ function Overview() {
         </article>
       </section>
 
+      {/* Home city: where they live. Separate from the cities they've explored. */}
+      <section id="home" aria-labelledby="home-title" className="scroll-mt-24">
+        <SectionTitle id="home-title" icon="house">
+          Home city
+        </SectionTitle>
+        <p className="mb-4">Where you live, so visitors can meet you as a local. Picked by you, never from your location.</p>
+        <HomeCityPicker
+          label="Your home city"
+          place={universal.homeCityPlace}
+          legacyText={universal.homeCity}
+          onPick={(place) => saveUniversal({ ...universal, ...homeCityFields(place) })}
+          hint={
+            <div className="space-y-2">
+              <PrivacyNote kind="public">Matches see the city only, never a neighbourhood or address.</PrivacyNote>
+              <p>Separate from the cities you’ve explored below. Moving? Change it any time.</p>
+            </div>
+          }
+        />
+      </section>
+
       {/* Cities discovered */}
       <section id="cities" aria-labelledby="cities-title" className="scroll-mt-24">
         <SectionTitle id="cities-title" icon="globe">
           Cities discovered
         </SectionTitle>
         <p className="mb-4">Pin every city you’ve explored. They’re public, so matches can find common ground.</p>
-        <CityCollection cities={universal.citiesDiscovered} onAdd={addCity} onRemove={removeCity} />
+        <CityCollection cities={universal.citiesDiscovered} home={universal.homeCityPlace} onAdd={addCity} onRemove={removeCity} />
       </section>
 
       {/* Both modes */}
-      <section aria-labelledby="modes-title">
+      <section id="modes" aria-labelledby="modes-title" className="scroll-mt-24">
         <SectionTitle id="modes-title" icon="shuffle">
           Your two modes
         </SectionTitle>
-        <div className="grid border-2 border-ink xl:grid-cols-2">
+        <div className="grid border-2 border-ink @xl:grid-cols-2">
           <div className="bg-saffron-soft p-5">
             <p className="eyebrow flex items-center gap-2">
               <Icon name="suitcase" className="size-5" />
@@ -219,7 +267,7 @@ function Overview() {
             </div>
           </div>
 
-          <div className="border-t-2 border-ink bg-teal-soft p-5 xl:border-t-0 xl:border-l-2">
+          <div className="border-t-2 border-ink bg-teal-soft p-5 @xl:border-t-0 @xl:border-l-2">
             <p className="eyebrow flex items-center gap-2">
               <Icon name="pin" accent="teal" className="size-5" />
               Local mode
@@ -265,7 +313,21 @@ function Overview() {
           </div>
         </div>
         {profile.local && (
-          <SummaryList className="mt-6" title={`Hosting in ${profile.local.homeCity}`} items={localItems(profile.local)} onEdit={() => navigate('/mode/local', { state: editLocal })} />
+          <details className="group mt-6 border-2 border-ink">
+            <summary className="sheet-grain flex min-h-12 cursor-pointer list-none items-center gap-3 px-4 py-2 font-bold [&::-webkit-details-marker]:hidden">
+              <Icon name="clipboard" className="size-5" />
+              <span className="flex-1">Your hosting details</span>
+              <span className="text-xs tracking-[0.1em] uppercase group-open:hidden">Show</span>
+              <span className="hidden text-xs tracking-[0.1em] uppercase group-open:inline">Hide</span>
+              <Icon name="chevron-down" accent="none" className="size-5 transition-transform group-open:rotate-180" />
+            </summary>
+            <SummaryList
+              className="border-x-0 border-b-0"
+              title={`Hosting in ${profile.local.homeCity}`}
+              items={localItems(profile.local)}
+              onEdit={() => navigate('/mode/local', { state: editLocal })}
+            />
+          </details>
         )}
       </section>
 

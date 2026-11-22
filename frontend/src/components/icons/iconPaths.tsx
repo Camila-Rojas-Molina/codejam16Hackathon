@@ -311,6 +311,17 @@ export const ICONS = {
       <path d="m6.5 16.5 3.5-4 2.5 2.5 2-2 3 3.5" />
     </>
   ),
+  // Two snapshots, one tilted behind the other: the GALLERY tab.
+  gallery: (
+    <>
+      <path d="m8.6 3.2 11.8 2.1-2.2 12.4-11.8-2.1z" {...P} />
+      <path d="M3.5 7.5H16v13H3.5z" {...P} />
+      <path d="M3.5 7.5H16v9H3.5z" stroke="none" {...A} />
+      <path d="M3.5 7.5H16v13H3.5zM3.5 16.5H16" />
+      <path d="m3.5 16.5 4-4.2 2.6 2.6 1.5-1.4 3 3" />
+      <circle cx="12.4" cy="10.6" r="1.2" {...K} />
+    </>
+  ),
   mask: (
     <>
       <path d="M5 5h14v6a7 7 0 0 1-14 0z" {...A} />

@@ -1,18 +1,72 @@
 // SETTINGS: account, privacy, app preferences and data.
-import { startTransition, useState } from 'react'
+import { startTransition, useId, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import Button from '../components/ui/Button'
 import { buttonClasses } from '../components/ui/buttonStyles'
 import Card from '../components/ui/Card'
 import { PrivacyNote, Toggle } from '../components/ui/Fields'
 import PageHeader from '../components/ui/PageHeader'
-import Icon from '../components/icons/Icon'
+import Icon, { type IconName } from '../components/icons/Icon'
 import { Mascot } from '../components/illustrations/Mascot'
 import { ACCESSIBILITY_OPTIONS, labelsFor } from '../features/profile/options'
 import { profileStorage } from '../lib/api'
+import { cn } from '../lib/cn'
+import { useTheme, type ThemePreference } from '../lib/theme'
 import { useStore } from '../store/useStore'
 
 const sectionTitle = 'mb-4 flex items-center gap-3 text-3xl'
+
+const THEME_CHOICES: { value: ThemePreference; label: string; blurb: string; icon: IconName }[] = [
+  { value: 'system', label: 'System', blurb: 'Match my device', icon: 'half-circle' },
+  { value: 'light', label: 'Day', blurb: 'Cream paper', icon: 'sun' },
+  { value: 'dark', label: 'Night', blurb: 'Night paper', icon: 'moon' },
+]
+
+/** Day / Night / System: real radio buttons drawn as a row of ruled cells, like Choices tiles. */
+function AppearancePicker() {
+  const { preference, theme, setPreference } = useTheme()
+  const name = useId()
+  return (
+    <fieldset aria-describedby={`${name}-hint`}>
+      <legend className="eyebrow mb-2">Day or night</legend>
+      <div className="grid grid-cols-3 border-t-2 border-l-2 border-ink">
+        {THEME_CHOICES.map((c) => (
+          <label
+            key={c.value}
+            className={cn(
+              'group relative flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 border-r-2 border-b-2 border-ink px-2 py-3 text-center text-ink transition-colors select-none',
+              'sheet-grain hover:bg-saffron-soft has-checked:bg-saffron has-checked:hover:bg-saffron',
+              'has-focus-visible:outline-3 has-focus-visible:-outline-offset-[6px] has-focus-visible:outline-ink',
+            )}
+          >
+            <input
+              type="radio"
+              name={name}
+              value={c.value}
+              checked={preference === c.value}
+              onChange={() => setPreference(c.value)}
+              className="sr-only"
+            />
+            <Icon name={c.icon} className="size-8" accent={c.value === 'dark' ? 'teal' : 'saffron'} />
+            <span className="leading-tight font-bold">{c.label}</span>
+            <span className="hidden text-xs leading-snug font-medium sm:block">{c.blurb}</span>
+            <span
+              aria-hidden
+              className="absolute top-2 right-2 grid size-6 place-items-center rounded-full border-2 border-ink bg-sheet text-saffron transition-colors group-has-checked:bg-ink"
+            >
+              <Icon name="check" accent="none" strokeWidth={3.2} className="size-4 scale-0 transition-transform duration-200 ease-spring group-has-checked:scale-100" />
+            </span>
+          </label>
+        ))}
+      </div>
+      <p id={`${name}-hint`} className="mt-3 text-sm">
+        {preference === 'system'
+          ? `Following your device, which is set to ${theme === 'dark' ? 'Night' : 'Day'} right now.`
+          : `Always ${theme === 'dark' ? 'Night' : 'Day'} on this device. Pick System to follow your device again.`}
+      </p>
+    </fieldset>
+  )
+}
 
 export default function SettingsPage() {
   const { account, profile, saveUniversal, saveTrip, deleteAccount, demoMode, setDemoMode, session, signOut } = useStore()
@@ -172,6 +226,16 @@ export default function SettingsPage() {
               people. They’re never shown to anyone. Public answers are marked on your profile.
             </PrivacyNote>
           </p>
+        </Card>
+      </section>
+
+      <section aria-labelledby="s-appearance">
+        <h2 id="s-appearance" className={sectionTitle}>
+          <Icon name="half-moon" className="size-8" />
+          Appearance
+        </h2>
+        <Card>
+          <AppearancePicker />
         </Card>
       </section>
 

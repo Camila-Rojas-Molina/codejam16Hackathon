@@ -3,6 +3,7 @@
 // switches once the setup is saved. Nothing else about the profile changes.
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
+import { cn } from '../../lib/cn'
 import { useStore } from '../../store/useStore'
 import { modeMeta } from '../onboarding/options'
 import type { SetupNavState } from './flow'
@@ -35,4 +36,21 @@ export function useModeSwitcher() {
   }
 
   return { choose, pending, message, activeMode: profile?.activeMode ?? null }
+}
+
+// The look of one mode option, shared by ModeToggle, ModeSwitch and ModePage. Both start as equal
+// sheet buttons; hover gives a light tint (Tourist saffron, Local teal), and the chosen mode gets
+// the full fill plus a thicker ink rule (and a tick, drawn by the component). Ink text throughout
+// (≥7:1). Tailwind only applies hover: on devices that can hover, so taps never leave a tint behind.
+const modeTones: Record<ExploreMode, { hover: string; selected: string }> = {
+  tourist: { hover: 'hover:bg-saffron-soft', selected: 'bg-saffron' },
+  local: { hover: 'hover:bg-teal-soft/60', selected: 'bg-teal-soft' },
+}
+
+export function modeOptionClasses(mode: ExploreMode, selected: boolean) {
+  return cn(
+    'relative border-2 border-ink text-ink transition-[background-color,box-shadow,transform] duration-200 ease-out',
+    'active:translate-x-px active:translate-y-px aria-busy:cursor-wait',
+    selected ? cn(modeTones[mode].selected, 'inset-ring-2 inset-ring-ink') : cn('bg-sheet', modeTones[mode].hover),
+  )
 }

@@ -1,5 +1,6 @@
 // A ruled table of answers, each tagged Public or Private, with optional Change buttons.
-// Square cells throughout: profile boxes are always straight-edged.
+// Square cells throughout: profile boxes are always straight-edged. One column on phones; two
+// columns once the list itself is wide enough (a container query, so it works in any layout).
 import Icon, { type IconName } from '../../../components/icons/Icon'
 import Badge from '../../../components/ui/Badge'
 import { cn } from '../../../lib/cn'
@@ -37,12 +38,21 @@ type SummaryListProps = {
 
 export default function SummaryList({ title, items, onEdit, lifted = false, className }: SummaryListProps) {
   return (
-    <section className={cn('sheet-grain border-2 border-ink text-ink', lifted && 'shadow-block', className)}>
+    <section className={cn('sheet-grain @container border-2 border-ink text-ink', lifted && 'shadow-block', className)}>
       <h2 className="bg-saffron px-5 pt-4 pb-3 text-2xl">{title}</h2>
       <div className="hatch-band" aria-hidden />
-      <dl>
+      <dl className="grid @2xl:grid-cols-2">
         {items.map((item, i) => (
-          <div key={item.id} className={cn('flex items-stretch', i > 0 && 'border-t-2 border-ink')}>
+          <div
+            key={item.id}
+            className={cn(
+              'flex items-stretch border-ink',
+              i > 0 && 'border-t-2',
+              i === 1 && '@2xl:border-t-0',
+              i % 2 === 1 && '@2xl:border-l-2',
+              i === items.length - 1 && i % 2 === 0 && '@2xl:col-span-2',
+            )}
+          >
             {item.icon && (
               <span className="hidden w-14 shrink-0 place-items-center border-r-2 border-ink bg-saffron-soft sm:grid" aria-hidden>
                 <Icon name={item.icon} className="size-7" />

@@ -1,7 +1,9 @@
 // QUESTS: the daily challenge plus any other challenges, grouped by cadence, with progress,
 // rewards and completion. Sections only appear when they have challenges in them.
+// The cards sit two to a row once the page has the width for it (a container query, so it follows
+// the space the dashboard leaves, not the window).
 import { useEffect } from 'react'
-import { useLocation } from 'react-router'
+import { Link, useLocation } from 'react-router'
 import Icon from '../components/icons/Icon'
 import { Mascot } from '../components/illustrations/Mascot'
 import PageHeader from '../components/ui/PageHeader'
@@ -9,6 +11,7 @@ import { pointsBalance, pointsEarned } from '../features/profile/model'
 import { CADENCE_LABELS, type Cadence } from '../features/quests/challenges'
 import QuestCard from '../features/quests/components/QuestCard'
 import { useChallenges } from '../features/quests/useChallenges'
+import { cn } from '../lib/cn'
 import { useStore } from '../store/useStore'
 
 const ORDER: Cadence[] = ['daily', 'weekly', 'seasonal', 'special', 'starter']
@@ -32,11 +35,19 @@ export default function QuestsPage() {
   }, [target])
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-10">
+    <div className="@container mx-auto w-full max-w-6xl space-y-8 sm:space-y-10">
       <PageHeader
         eyebrow="Challenges & rewards"
         title="Quests"
-        description="Complete challenges, earn points, treat Migo in the shop."
+        description={
+          <>
+            Complete challenges, earn points, treat Migo in the{' '}
+            <Link to="/shop" className="font-semibold underline decoration-2 underline-offset-2 hover:decoration-sienna">
+              shop
+            </Link>
+            .
+          </>
+        }
         aside={
           <div className="flex items-end gap-3">
             <Mascot pose="play" className="hidden h-28 sm:block" />
@@ -69,7 +80,7 @@ export default function QuestsPage() {
               </h2>
               <p className="text-sm">{BLURB[cadence]}</p>
             </div>
-            <div className="space-y-5">
+            <div className={cn('grid gap-5', items.length > 1 && '@2xl:grid-cols-2')}>
               {items.map((state) => (
                 <QuestCard key={state.challenge.id} state={state} highlight={target === `quest-${state.challenge.id}`} />
               ))}

@@ -11,11 +11,13 @@ backend/
 │   ├── 002_seed.sql     McGill hunts, partner pool, leaderboard teams
 │   ├── 003_storage.sql  'selfies' storage bucket
 │   ├── 004_migo_profiles.sql  one account, two modes: questionnaire, trips, local profile
-│   └── 005_auth.sql     login (Supabase Auth): links profiles to logins, owner checks
+│   ├── 005_auth.sql     login (Supabase Auth): links profiles to logins, owner checks
+│   └── 006_gallery.sql  photo gallery: private `photos` table + 'gallery' storage bucket
 └── tests/
     ├── smoke_test.sql          checks the hunt flow, then rolls back
     ├── migo_profiles_test.sql  checks accounts/profiles and mode switching, then rolls back
     ├── auth_test.sql           checks the login/owner rules, then rolls back
+    ├── gallery_test.sql        checks the gallery owner rules, ordering and delete, then rolls back
     └── local_supabase_stub.sql fake `auth` schema for testing on plain Postgres (never run on Supabase)
 ```
 
@@ -77,6 +79,24 @@ Call these from `frontend/src/lib/backend.ts`. Each one is a Postgres function.
 base + speed bonus (base × time left / time limit × 0.5) + 50 for meeting someone new
      + first finder bonus: 1st team 100, 2nd 50, 3rd 25, then 0
 ```
+
+## Gallery (`006_gallery.sql`)
+
+Photos people take while exploring, shown on the app's `/gallery` page. Needs a login: the page explains this instead of uploading when Supabase isn't configured or nobody is signed in.
+
+**Set up:** after `005_auth.sql`, paste and run `006_gallery.sql` in the SQL Editor (safe to run again), then optionally `tests/gallery_test.sql`, which should say `All gallery checks passed`. The file also creates the `gallery` storage bucket and its policies. That part only runs where Supabase's `storage` schema exists, so on a local Postgres (stub, 001, 002, 004, 005, 006, then the tests) it prints `skipped the gallery bucket` and the test covers the database side only.
+
+**How a photo is saved** (`frontend/src/lib/backend.ts`, `uploadPhoto`): the browser shrinks the picture to at most 1600 px (JPEG), uploads it to `gallery/<auth uid>/<random id>.jpg` with the user's access token, then calls `gallery_add_photo` with that path. Photos are shown from the public URL `/storage/v1/object/public/gallery/<path>`.
+
+| Function | Does |
+|---|---|
+| `gallery_add_photo(profile_id, storage_path, meta)` | Saves a photo row. Signed-in only, and the profile must belong to that login. `storage_path` must be `<your auth uid>/<name>.jpg\|jpeg\|png\|webp`. `meta` (all optional): `city_name`, `country`, `country_code`, `lat`, `lng`, `place_id`, `caption` (≤ 200 characters), `quest_id`, `hunt_id`, `taken_at` (never later than now; default now), `width`, `height`. Returns the photo. |
+| `gallery_list(profile_id)` | The profile's photos as a JSON array, newest `taken_at` first. |
+| `gallery_delete_photo(profile_id, photo_id)` | Deletes the row and returns its `storage_path`, so the app deletes the file through the Storage API. |
+
+Errors: `42501` not signed in / `Not your account` / not your folder, `22023` bad details, `23505` path already saved, `P0002` unknown profile or photo.
+
+**Rules:** the `photos` table has RLS on and no grants, so it's only reachable through these functions (owner rule as in 005). Storage policies let a signed-in user upload, replace, list and delete files only under their own `<auth uid>/` folder. The bucket is public-read (8 MB per file, JPEG/PNG/WebP), like `selfies`: file names are random, but anyone who has a photo's URL can open it. Gap: deleting the whole account removes the photo rows but not the files; clean those up from **Storage** in the dashboard (or delete them from the app first).
 
 ## Security
 

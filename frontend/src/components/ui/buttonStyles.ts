@@ -44,10 +44,46 @@ export function buttonClasses({
 }
 
 /**
- * The menu "price row" button: a label cell joined to a saffron ↗ cell. Wrap the label in
- * <span className={arrowLabel}> and add <ArrowCell /> after it.
+ * The arrow button: ONE ruled button with its label on the left and a ↗ glyph on the right. The
+ * whole surface is the target and there is no inner divider, so it never reads as two buttons.
+ *   <Link className={arrowButtonClasses({ tone: 'saffron' })}>
+ *     <span className={arrowLabel}>Start exploring</span>
+ *     <ArrowCell />
+ *   </Link>
+ * Tones: `sheet` (default, secondary), `saffron` (main call to action), `teal` and `sandy` for
+ * shortcuts that sit near each other and need to look different. Filled tones invert to ink on
+ * hover like the primary button; the glyph nudges toward where it goes.
  */
-export const arrowRowClasses =
-  'group/arrow inline-flex min-h-12 items-stretch border-2 border-ink sheet-grain text-ink font-sans font-bold uppercase tracking-[0.08em] text-sm ' +
-  'transition-colors hover:bg-saffron-soft active:translate-x-px active:translate-y-px'
-export const arrowLabel = 'flex flex-1 items-center px-4'
+export type ArrowTone = 'sheet' | 'saffron' | 'teal' | 'sandy'
+
+const arrowTones: Record<ArrowTone, string> = {
+  sheet: 'sheet-grain text-ink hover:bg-saffron-soft',
+  saffron: 'bg-saffron text-ink hover:bg-ink hover:text-saffron',
+  teal: 'bg-teal-soft text-ink hover:bg-ink hover:text-teal-soft',
+  sandy: 'bg-sandy-soft text-ink hover:bg-ink hover:text-sandy-soft',
+}
+
+const arrowBase =
+  'group/arrow inline-flex items-stretch border-2 border-ink font-sans font-bold uppercase tracking-[0.08em] text-left ' +
+  'cursor-pointer select-none transition-[background-color,color,box-shadow,transform] duration-200 ease-out ' +
+  'active:translate-x-px active:translate-y-px active:shadow-none ' +
+  'aria-disabled:pointer-events-none aria-disabled:opacity-55 disabled:cursor-not-allowed disabled:opacity-55'
+
+const arrowSizes: Record<ButtonSize, string> = {
+  sm: 'min-h-12 text-xs',
+  md: 'min-h-12 text-sm',
+  lg: 'min-h-16 text-base',
+}
+
+export function arrowButtonClasses({
+  tone = 'sheet',
+  size = 'md',
+  fullWidth = false,
+  className,
+}: { tone?: ArrowTone; size?: ButtonSize; fullWidth?: boolean; className?: string } = {}) {
+  return cn(arrowBase, arrowTones[tone], arrowSizes[size], fullWidth && 'w-full', className)
+}
+
+/** The default (sheet) arrow button. Kept as a constant for existing call sites. */
+export const arrowRowClasses = arrowButtonClasses()
+export const arrowLabel = 'flex min-w-0 flex-1 items-center py-2 pl-4'
