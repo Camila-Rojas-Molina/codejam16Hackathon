@@ -357,7 +357,8 @@ async function assignSampleTourist(accountId: string, server: Connection[]): Pro
 
 /** Every match you're part of (both ways, live and closed), newest first. */
 export async function getConnections(accountId: string): Promise<Connection[]> {
-  const server = onSupabase() ? await backend.myConnections() : []
+  // Same here: without 013 on the server, device and sample matches keep working.
+  const server = onSupabase() ? await backend.myConnections().catch(() => []) : []
   await assignSampleTourist(accountId, server).catch(() => {})
   const device = conn.forAccount(accountId).map((r) => conn.asConnection(r, accountId, deviceCard))
   return [...server, ...device].sort((a, b) => b.updatedAt - a.updatedAt)
@@ -379,7 +380,12 @@ export async function discoverLocals(
 
   const people: DiscoverEntry[] = []
   if (onSupabase()) {
-    for (const p of await backend.discoverLocals()) people.push({ person: { ...p, demo: false }, pending: p.pending })
+    // If the server can't list people (e.g. 013_connections.sql not run yet), still show the samples.
+    const server = await backend.discoverLocals().catch((err: unknown) => {
+      console.warn('[discover] server list unavailable', err)
+      return []
+    })
+    for (const p of server) people.push({ person: { ...p, demo: false }, pending: p.pending })
   } else {
     for (const account of db.listAccounts()) {
       if (account.id === accountId) continue
