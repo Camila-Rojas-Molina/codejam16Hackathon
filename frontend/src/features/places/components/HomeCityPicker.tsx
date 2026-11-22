@@ -101,7 +101,7 @@ export default function HomeCityPicker({
             <CitySearch
               key={prefill ?? 'home'}
               label={place ? `New ${markerLabel.toLowerCase()}` : label}
-              placeholder="Search for your city, e.g. Montréal"
+              placeholder="Start typing your city"
               initialQuery={prefill ?? ''}
               autoFocus={changing || prefill !== null}
               onPick={pick}

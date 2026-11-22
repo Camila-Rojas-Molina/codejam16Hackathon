@@ -60,7 +60,7 @@ const KEPT_AVATARS: AvatarArt[] = [
     id: 'strawberry',
     src: '/assets/avatars/strawberry.png',
     alt: 'Strawberry in sunglasses',
-    anchors: { head: { x: 0.51, y: 0.2, w: 0.4 }, face: { x: 0.5, y: 0.4, w: 0.34 }, neck: { x: 0.51, y: 0.58, w: 0.32 } },
+    anchors: { head: { x: 0.51, y: 0.215, w: 0.4 }, face: { x: 0.5, y: 0.4, w: 0.34 }, neck: { x: 0.51, y: 0.58, w: 0.32 } },
   },
   {
     id: 'banana',
@@ -90,7 +90,7 @@ const LEGACY_AVATARS: AvatarArt[] = [
     src: '/assets/avatars/redheart.png',
     alt: 'Red heart',
     legacy: true,
-    anchors: { head: { x: 0.5, y: 0.28, w: 0.46 }, face: { x: 0.5, y: 0.48, w: 0.26 }, neck: { x: 0.5, y: 0.7, w: 0.3 } },
+    anchors: { head: { x: 0.5, y: 0.28, w: 0.46 }, face: { x: 0.5, y: 0.48, w: 0.26 }, neck: { x: 0.5, y: 0.64, w: 0.3 } },
   },
   {
     id: 'sunburst',

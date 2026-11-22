@@ -88,7 +88,7 @@ export function AvatarPicker({ value, onChange, name = 'avatar', options = AVATA
             <img src={a.src} alt="" draggable={false} className={cn(AVATAR_ART_FRAME, 'object-contain transition-transform', selected && '-rotate-3')} />
             <span className="sr-only">{a.alt}</span>
             {selected && (
-              <span className="absolute top-0 right-0 grid size-6 place-items-center border-b-2 border-l-2 border-ink bg-ink text-saffron" aria-hidden>
+              <span className="absolute top-0 right-0 grid size-6 place-items-center bg-ink text-saffron" aria-hidden>
                 <Icon name="check" accent="none" strokeWidth={3.2} className="size-4" />
               </span>
             )}

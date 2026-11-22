@@ -33,7 +33,7 @@ function ItemActions({ item, rewards, onDone, compact = false }: { item: ShopIte
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const owned = rewards.owned.includes(item.id)
-  const wearing = rewards.equipped[item.slot] === item.id
+  const wearing = owned && rewards.equipped[item.slot] === item.id
   const short = item.price - pointsBalance(rewards)
 
   async function run(action: () => Promise<unknown>, done: string) {
@@ -111,7 +111,7 @@ function PriceTag({ price }: { price: number }) {
 /** Owned / wearing / locked / price, the same everywhere. */
 function ItemStatus({ item, rewards }: { item: ShopItem; rewards: Rewards }) {
   const owned = rewards.owned.includes(item.id)
-  const wearing = rewards.equipped[item.slot] === item.id
+  const wearing = owned && rewards.equipped[item.slot] === item.id
   if (wearing)
     return (
       <Badge tone="ink" icon="check">
@@ -288,7 +288,7 @@ export default function ShopPage() {
                   filter === f ? 'bg-ink text-sheet' : 'sheet-grain text-ink hover:bg-saffron-soft',
                 )}
               >
-                {f === 'all' ? 'Everything' : SLOT_LABELS[f]}
+                {f === 'all' ? 'All' : SLOT_LABELS[f]}
               </button>
             ))}
           </div>

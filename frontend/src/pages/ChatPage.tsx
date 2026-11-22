@@ -43,7 +43,7 @@ function Tabs({ tab }: { tab: 'messages' | 'discover' }) {
   const unread = useConversations().reduce((n, c) => n + c.unread, 0)
   const cls = (on: boolean) =>
     cn(
-      'flex min-h-12 flex-1 items-center justify-center gap-2 text-sm font-bold tracking-[0.1em] uppercase transition-colors',
+      'flex min-h-12 flex-1 items-center justify-center gap-1.5 px-2 text-xs font-bold tracking-[0.08em] uppercase transition-colors sm:gap-2 sm:text-sm sm:tracking-[0.1em]',
       on ? 'bg-saffron' : 'hover:bg-saffron-soft',
     )
   return (
@@ -93,8 +93,8 @@ function ConversationList({ conversations, current }: { conversations: Conversat
           >
             <Avatar avatar={person.avatar} size="md" />
             <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-2">
-                <span className="truncate text-lg font-bold">{person.name}</span>
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <span className="max-w-full truncate text-lg font-bold">{person.name}</span>
                 <Badge tone={person.mode === 'local' ? 'teal' : 'saffron'} icon={modeMeta(person.mode).icon}>
                   {roleLabel(person.mode)}
                 </Badge>
@@ -356,7 +356,7 @@ export default function ChatPage() {
   // Two panes: the list stays put while the right-hand pane shows a thread, Discover, or a prompt.
   const paneTab = personId ? 'messages' : tab
   return (
-    <div className="mx-auto grid w-full max-w-7xl flex-1 grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)] gap-8 2xl:gap-10">
+    <div className="mx-auto grid w-full max-w-7xl flex-1 grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)] gap-8 2xl:gap-10">
       <div className="flex min-w-0 flex-col gap-6">
         {header}
         <Tabs tab={paneTab} />

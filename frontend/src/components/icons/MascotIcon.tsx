@@ -53,12 +53,14 @@ export default function MascotIcon({ accent = 'saffron', label, className }: Mas
     >
       <defs>
         <filter id={id} x="-10%" y="-10%" width="120%" height="120%" colorInterpolationFilters="sRGB">
+          {/* Soften first, so the artwork's fine stippling drops out and only real lines remain. */}
+          <feGaussianBlur in="SourceGraphic" stdDeviation="0.12" result="soft" />
           {/* Darkness (1 − luminance), kept only where the artwork is. */}
-          <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -0.2126 -0.7152 -0.0722 0 1" result="dark" />
+          <feColorMatrix in="soft" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -0.2126 -0.7152 -0.0722 0 1" result="dark" />
           <feComposite in="dark" in2="SourceAlpha" operator="in" result="darkIn" />
           {/* Linework: only the darkest tones, snapped to a crisp edge. */}
           <feComponentTransfer in="darkIn" result="lineAlpha">
-            <feFuncA type="linear" slope="6.5" intercept="-4" />
+            <feFuncA type="linear" slope="6.5" intercept="-3.75" />
           </feComponentTransfer>
           {/* Thicken it a touch so it holds up at 1x. */}
           <feMorphology in="lineAlpha" operator="dilate" radius="0.18" result="lineMask" />
