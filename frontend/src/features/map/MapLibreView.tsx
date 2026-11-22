@@ -17,6 +17,7 @@ import { pinDescription, pinState } from './landmarkMeta'
 import { isCoarsePointer } from './layout'
 import MapFrame from './MapFrame'
 import MapLibreMarker from './MapLibreMarker'
+import WeatherClouds from './WeatherClouds'
 import { FIRST_BUILDING_LAYER, OPTIONAL_SOURCES, TERRAIN, TEXTURES, buildMapStyle, readPalette, textureImage, type MapPalette } from './mapStyle'
 import { ClusterBubble, LandmarkMarker, UserDot } from './Pins'
 import type { LatLng } from './types'
@@ -278,6 +279,7 @@ export default function MapLibreView({ className, onFail }: { className?: string
 
       {map && (
         <>
+          <WeatherClouds map={map} />
           {ex.items.map((item) =>
             item.kind === 'landmark' ? (
               <MapLibreMarker
