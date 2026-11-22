@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import Icon from '../components/icons/Icon'
 import { ICON_NAMES } from '../components/icons/iconPaths'
 import { Mascot, type MascotPose } from '../components/illustrations/Mascot'
+import Avatar from '../components/ui/Avatar'
 import { BrushSwatch, Sparkle, Starburst } from '../components/illustrations/Stickers'
 import Badge from '../components/ui/Badge'
 import Button, { ArrowCell } from '../components/ui/Button'
@@ -114,9 +115,9 @@ export default function StyleguidePage() {
           ))}
         </ul>
         <div className="flex flex-wrap items-end gap-6">
-          <Mascot pose="cheer" accessories={{ head: 'explorer-hat', face: 'shades', neck: 'scarf' }} className="h-40" label="Migo dressed up" />
-          <Mascot pose="cheer" accessories={{ head: 'flower-crown', neck: 'camera' }} className="h-40" label="Migo in a flower crown" />
-          <Mascot pose="cheer" accessories={{ head: 'beret' }} className="h-40" label="Migo in a beret" />
+          <Avatar avatar="banana" size="fill" className="w-40" accessories={{ head: 'explorer-hat', face: 'shades', neck: 'scarf' }} />
+          <Avatar avatar="strawberry" size="fill" className="w-40" accessories={{ head: 'flower-crown', neck: 'camera' }} />
+          <Avatar avatar="running-heart" size="fill" className="w-40" accessories={{ head: 'beret' }} />
         </div>
       </Section>
 

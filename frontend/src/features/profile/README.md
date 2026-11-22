@@ -60,7 +60,7 @@ buttons, to reorder). Old saved lists simply count in the order they were saved.
 - `matchingConfig.ts`: all the tunable numbers in one place.
   - `DIMENSION_WEIGHTS`: how much each dimension counts (qualities count as much as interests and
     languages).
-  - `QUALITY_RANK_WEIGHTS = [1, 0.55, 0.3, 0.15, 0.08]`: how much each ranked quality counts. The
+  - `QUALITY_RANK_WEIGHTS = [1, 0.5, 0.25, 0.15, 0.08]`: how much each ranked quality counts. The
     first choice outweighs the second and third together.
   - The qualities score asks "how well does this person fit what I ranked highest?" in both directions
     and averages the two. How strongly someone shows a quality is read from their own answers

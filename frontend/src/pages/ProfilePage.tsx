@@ -1,13 +1,13 @@
 // PROFILE: one person, one account, two ways to explore.
 //   Overview       your card, home city and cities discovered (atlas), both modes, points
 //   My answers     the questionnaire (each answer editable)
-//   Avatar & Migo  name, avatar and Migo's wardrobe
+//   Avatar         name, avatar and your avatar's wardrobe
 // Every profile box is straight-edged: ruled cells, square corners.
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router'
 import Icon, { type IconName } from '../components/icons/Icon'
 import { Mascot } from '../components/illustrations/Mascot'
-import Avatar from '../components/ui/Avatar'
+import Avatar, { AvatarPicker } from '../components/ui/Avatar'
 import Badge from '../components/ui/Badge'
 import Button, { ArrowCell } from '../components/ui/Button'
 import { arrowLabel, arrowRowClasses, buttonClasses } from '../components/ui/buttonStyles'
@@ -33,7 +33,7 @@ import {
 } from '../features/profile/options'
 import { publicProfile } from '../features/profile/privacy'
 import { SHOP_ITEMS, SLOT_LABELS } from '../features/rewards/shop'
-import { AVATAR_LIST, resolveAvatar } from '../lib/avatars'
+import { resolveAvatar } from '../lib/avatars'
 import { cn } from '../lib/cn'
 import { useStore } from '../store/useStore'
 
@@ -41,7 +41,7 @@ type Tab = 'overview' | 'answers' | 'style'
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'overview', label: 'Overview', icon: 'id' },
   { id: 'answers', label: 'My answers', icon: 'clipboard' },
-  { id: 'style', label: 'Avatar & Migo', icon: 'smile' },
+  { id: 'style', label: 'Avatar', icon: 'smile' },
 ]
 
 const JUMPS: { id: string; label: string; icon: IconName }[] = [
@@ -54,8 +54,8 @@ const JUMPS: { id: string; label: string; icon: IconName }[] = [
 
 function SectionTitle({ id, icon, children }: { id: string; icon: IconName; children: string }) {
   return (
-    <h2 id={id} className="mb-4 flex items-center gap-3 text-3xl">
-      <Icon name={icon} className="size-8" />
+    <h2 id={id} className="mb-4 flex items-center gap-3 text-2xl sm:text-3xl">
+      <Icon name={icon} className="size-7 sm:size-8" />
       {children}
     </h2>
   )
@@ -101,7 +101,7 @@ function Overview() {
       {homeMissing && (
         <Card tone="saffron-soft" className="flex flex-wrap items-center gap-4">
           <Icon name="house" className="size-8" />
-          <p className="min-w-0 flex-1 font-semibold">
+          <p className="min-w-[min(100%,16rem)] flex-1 basis-56 font-semibold">
             {needsHomePick(universal)
               ? `Pin ${universal.homeCity.trim()} on the map so visitors can find you as a local.`
               : 'Where do you live? Add your home city so visitors can find you as a local.'}
@@ -375,7 +375,7 @@ function Overview() {
   )
 }
 
-// ---- Avatar & Migo ------------------------------------------------------------------------------
+// ---- Avatar -------------------------------------------------------------------------------------
 
 function Style() {
   const { account, profile, updateAccount, setEquipped } = useStore()
@@ -414,21 +414,7 @@ function Style() {
             <TextField label="Name" value={name} onChange={setName} maxLength={NAME_MAX_LENGTH} autoComplete="given-name" />
             <fieldset>
               <legend className="eyebrow mb-2">Avatar</legend>
-              <div className="grid grid-cols-4 border-t-2 border-l-2 border-ink sm:grid-cols-8 lg:grid-cols-4 xl:grid-cols-8">
-                {AVATAR_LIST.map((a) => (
-                  <label
-                    key={a.id}
-                    className="relative grid cursor-pointer place-items-center border-r-2 border-b-2 border-ink p-1.5 transition-colors hover:bg-saffron-soft has-checked:bg-saffron has-focus-visible:outline-3 has-focus-visible:-outline-offset-[6px] has-focus-visible:outline-ink"
-                  >
-                    <input type="radio" name="avatar" value={a.id} checked={avatar === a.id} onChange={() => setAvatar(a.id)} className="peer sr-only" />
-                    <img src={a.src} alt="" className="aspect-square w-full object-contain" />
-                    <span className="sr-only">{a.alt}</span>
-                    <span className="absolute top-1 right-1 hidden size-5 place-items-center bg-ink text-saffron peer-checked:grid" aria-hidden>
-                      <Icon name="check" accent="none" strokeWidth={3.2} className="size-4" />
-                    </span>
-                  </label>
-                ))}
-              </div>
+              <AvatarPicker value={avatar} onChange={setAvatar} name="profile-avatar" />
             </fieldset>
             <div className="flex items-center gap-3">
               <Button type="submit" disabled={!dirty || !name.trim() || busy}>
@@ -444,15 +430,15 @@ function Style() {
 
       <section aria-labelledby="wardrobe-title">
         <SectionTitle id="wardrobe-title" icon="shop">
-          Migo’s wardrobe
+          Your avatar’s wardrobe
         </SectionTitle>
         <div className="sheet-grain grid border-2 border-ink sm:grid-cols-[auto_1fr]">
           <div className="grid place-items-center border-b-2 border-ink bg-teal-soft p-6 sm:border-r-2 sm:border-b-0">
-            <Mascot pose="cheer" accessories={profile.rewards.equipped} className="h-52" label="Migo wearing your accessories" />
+            <Avatar size="fill" className="w-44 border-0 bg-transparent" avatar={account.avatar} accessories={profile.rewards.equipped} />
           </div>
           <div className="p-5">
             {owned.length === 0 ? (
-              <p>Migo’s wardrobe is empty. Earn points from quests and pick something out in the shop.</p>
+              <p>Your wardrobe is empty. Earn points from quests, then tap your points to dress up your avatar in the shop.</p>
             ) : (
               <ul className="border-t-2 border-l-2 border-ink">
                 {owned.map((item) => {
@@ -505,7 +491,7 @@ export default function ProfilePage() {
     <div className="mx-auto w-full max-w-4xl space-y-8">
       <header className="sheet-grain flex items-stretch border-2 border-ink">
         <div className="grid shrink-0 place-items-center border-r-2 border-ink bg-saffron-soft p-3">
-          <Avatar avatar={account.avatar} size="xl" className="border-0 bg-transparent" />
+          <Avatar avatar={account.avatar} size="xl" className="border-0 bg-transparent" accessories={profile.rewards.equipped} />
         </div>
         <div className="min-w-0 flex-1 p-5">
           <p className="eyebrow">Your profile</p>
@@ -528,7 +514,7 @@ export default function ProfilePage() {
           </p>
         </div>
         <div className="relative hidden w-40 shrink-0 place-items-center overflow-hidden border-l-2 border-ink bg-teal-soft sm:grid">
-          <Mascot pose="cheer" accessories={profile.rewards.equipped} className="h-32" />
+          <Mascot pose="cheer" className="h-32" />
         </div>
       </header>
 

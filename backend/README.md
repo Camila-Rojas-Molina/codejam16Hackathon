@@ -24,7 +24,7 @@ backend/
 ## Setup (about 10 minutes)
 
 1. Create a free project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor**, then paste and run `001_schema.sql`, `002_seed.sql`, `003_storage.sql`, `004_migo_profiles.sql` and `005_auth.sql`, in that order.
+2. Open **SQL Editor**, then paste and run `001_schema.sql`, `002_seed.sql`, `003_storage.sql`, `004_migo_profiles.sql`, `005_auth.sql` and `006_gallery.sql`, in that order.
 3. Optional: paste and run `tests/smoke_test.sql`, `tests/migo_profiles_test.sql` and `tests/auth_test.sql`. They should say `All backend checks passed`, `All MIGO profile checks passed` and `All auth checks passed`.
 4. Set up login in the dashboard (see [Supabase dashboard settings for login](#supabase-dashboard-settings-for-login)).
 5. Go to **Project Settings → API** and copy the Project URL and the `anon` public key into `frontend/.env.local`:
@@ -34,7 +34,7 @@ backend/
    ```
    Never commit `.env.local`. Add the same two variables in Vercel for the deployed app.
 
-To test on a local Postgres instead, run `tests/local_supabase_stub.sql` first (it fakes Supabase's `auth` schema and `auth.uid()`), then 001, 002, 004, 005 and the three tests. Skip 003 (it needs Supabase storage).
+To test on a local Postgres instead, run `tests/local_supabase_stub.sql` first (it fakes Supabase's `auth` schema and `auth.uid()`), then 001, 002, 004, 005, 006 and the four tests. Skip 003 (it needs Supabase storage).
 
 All migration files can be run again safely after changes. Running `002_seed.sql` again also puts the demo partners back in the match queue.
 
@@ -96,7 +96,7 @@ Photos people take while exploring, shown on the app's `/gallery` page. Needs a 
 
 Errors: `42501` not signed in / `Not your account` / not your folder, `22023` bad details, `23505` path already saved, `P0002` unknown profile or photo.
 
-**Rules:** the `photos` table has RLS on and no grants, so it's only reachable through these functions (owner rule as in 005). Storage policies let a signed-in user upload, replace, list and delete files only under their own `<auth uid>/` folder. The bucket is public-read (8 MB per file, JPEG/PNG/WebP), like `selfies`: file names are random, but anyone who has a photo's URL can open it. Gap: deleting the whole account removes the photo rows but not the files; clean those up from **Storage** in the dashboard (or delete them from the app first).
+**Rules:** the `photos` table has RLS on and no grants, so it's only reachable through these functions (owner rule as in 005). Storage policies let a signed-in user upload, replace, list and delete files only under their own `<auth uid>/` folder. The bucket is public-read (8 MB per file, JPEG/PNG/WebP), like `selfies`: file names are random, but anyone who has a photo's URL can open it. Deleting the account from the app deletes the user's photo files first, then the account (which removes the rows). If that file cleanup fails (e.g. offline), leftover files can be removed from **Storage** in the dashboard.
 
 ## Security
 

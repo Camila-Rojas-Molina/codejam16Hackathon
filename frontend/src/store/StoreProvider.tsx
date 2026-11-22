@@ -3,6 +3,7 @@ import type { Thread } from '../features/chat/types'
 import type { ProfileRecord } from '../features/profile/types'
 import { todayKey } from '../features/quests/challenges'
 import * as api from '../lib/api'
+import * as backend from '../lib/backend'
 import * as auth from '../lib/auth'
 import { StoreContext, type StoreValue } from './context'
 import { currentUser, loadState, reducer, saveState } from './state'
@@ -159,7 +160,17 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
       saveLocal: async (local, opts) => commit(await api.saveLocalContext(requireId(), local, opts)),
       clearLocal: async () => commit(await api.clearLocalContext(requireId())),
       deleteAccount: async (then) => {
-        await api.deleteAccount(requireId())
+        const id = requireId()
+        // Photos first: deleting the account removes their rows, but not the files in storage.
+        if (AUTH_ENABLED) {
+          try {
+            const photos = await backend.listPhotos(id)
+            await Promise.all(photos.map((p) => backend.deletePhoto(id, p.id)))
+          } catch {
+            // Best effort: the account is still deleted; leftover files can be removed in Supabase.
+          }
+        }
+        await api.deleteAccount(id)
         // One transition with the caller's navigation (`then`), so guards never see a
         // signed-out page and bounce to /login first.
         startTransition(() => {

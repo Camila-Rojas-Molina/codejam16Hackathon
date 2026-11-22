@@ -504,6 +504,7 @@ export const QUESTIONS: QuestionStep[] = [
       <CityCollection
         label="Search for a city you’ve explored"
         cities={d.citiesDiscovered}
+        home={d.homeCityPlace}
         onAdd={(place) => update((x) => ({ ...x, citiesDiscovered: addCity(x.citiesDiscovered, place) }))}
         onRemove={(cityId) => update((x) => ({ ...x, citiesDiscovered: x.citiesDiscovered.filter((c) => c.id !== cityId) }))}
       />
@@ -636,7 +637,7 @@ export function summaryRows(u: UniversalProfile): SummaryRow[] {
     // "Prefers no dogs" is a private filter; every other answer is public (see privacy.ts).
     { stepId: 'dogs', section: 'style', label: 'Four-legged amigos', value: dogValue, icon: 'paw', visibility: dogs.stance === 'no-dogs' ? 'private' : 'public' },
     { stepId: 'languages', section: 'style', label: 'Languages', value: langs, icon: 'chat', visibility: 'public' },
-    { stepId: 'cities', section: 'style', label: 'Cities discovered', value: list(u.citiesDiscovered.map(cityLabel), 'None yet'), icon: 'globe', visibility: 'public' },
+    { stepId: 'cities', section: 'style', label: 'Cities discovered', value: u.citiesDiscovered.length > 0 ? u.citiesDiscovered.map(cityLabel).join(' · ') : 'None yet', icon: 'globe', visibility: 'public' },
     {
       stepId: 'accessibility',
       section: 'style',

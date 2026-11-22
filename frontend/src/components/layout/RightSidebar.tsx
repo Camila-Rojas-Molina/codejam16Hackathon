@@ -21,7 +21,7 @@ export default function RightSidebar() {
           <Icon name="shop" className="size-9 transition-transform group-hover/arrow:-rotate-6" />
           <span>
             <span className="block font-display text-xl leading-none uppercase">Shop</span>
-            <span className="mt-1 block text-sm leading-tight">Treat Migo with your points</span>
+            <span className="mt-1 block text-sm leading-tight">Dress up your avatar</span>
           </span>
         </span>
         <ArrowCell />

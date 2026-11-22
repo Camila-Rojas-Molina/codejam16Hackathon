@@ -84,7 +84,7 @@ export default function HomeCityPicker({
           {legacy && prefill === null && (
             <div className="flex flex-wrap items-center gap-3 border-2 border-dashed border-ink bg-saffron-soft px-3 py-2.5">
               <Icon name="pin" accent="sienna" className="size-6" />
-              <p className="min-w-0 flex-1 text-sm font-semibold">
+              <p className="min-w-0 flex-1 basis-48 text-sm font-semibold">
                 You told us “{legacy}”. Pick it on the map so visitors can find you.
               </p>
               <button

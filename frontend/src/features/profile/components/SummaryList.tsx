@@ -54,7 +54,7 @@ export default function SummaryList({ title, items, onEdit, lifted = false, clas
             )}
           >
             {item.icon && (
-              <span className="hidden w-14 shrink-0 place-items-center border-r-2 border-ink bg-saffron-soft sm:grid" aria-hidden>
+              <span className="hidden w-14 shrink-0 place-items-center border-r-2 border-ink bg-saffron-soft sm:grid @2xl:w-11" aria-hidden>
                 <Icon name={item.icon} className="size-7" />
               </span>
             )}
@@ -69,7 +69,7 @@ export default function SummaryList({ title, items, onEdit, lifted = false, clas
               <button
                 type="button"
                 onClick={() => onEdit(item.id)}
-                className="flex w-20 shrink-0 flex-col items-center justify-center gap-1 border-l-2 sm:w-24 sm:flex-row border-ink text-xs font-bold tracking-[0.1em] uppercase transition-colors hover:bg-saffron"
+                className="flex w-20 shrink-0 flex-col items-center justify-center gap-1 border-l-2 border-ink text-xs font-bold tracking-[0.1em] uppercase transition-colors hover:bg-saffron sm:w-24 sm:flex-row @2xl:w-20 @2xl:flex-col"
                 aria-label={`Change ${item.label}`}
               >
                 <Icon name="pencil" className="size-4" />

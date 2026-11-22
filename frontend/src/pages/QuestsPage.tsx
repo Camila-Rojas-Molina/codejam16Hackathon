@@ -41,7 +41,7 @@ export default function QuestsPage() {
         title="Quests"
         description={
           <>
-            Complete challenges, earn points, treat Migo in the{' '}
+            Complete challenges, earn points, dress up your avatar in the{' '}
             <Link to="/shop" className="font-semibold underline decoration-2 underline-offset-2 hover:decoration-sienna">
               shop
             </Link>
