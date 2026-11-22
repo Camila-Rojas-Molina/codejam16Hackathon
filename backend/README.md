@@ -28,6 +28,7 @@ backend/
     ├── gallery_test.sql        checks the gallery owner rules, ordering and delete, then rolls back
     ├── explore_test.sql        checks geofences, the island boundary, visits and owner rules, then rolls back
     ├── economy_test.sql        checks points, quests, refreshes, the shop and timezones, then rolls back
+    ├── stale_login_test.sql    checks a deleted login gets a clear error, then rolls back
     ├── connections_test.sql    checks requests, answers, no duplicates, Discover exclusions, removal
     └── local_supabase_stub.sql fake `auth` schema for testing on plain Postgres (never run on Supabase)
 ```
@@ -35,7 +36,7 @@ backend/
 ## Setup (about 10 minutes)
 
 1. Create a free project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor**, then paste and run `001_schema.sql`, `002_seed.sql`, `003_storage.sql`, `004_migo_profiles.sql`, `005_auth.sql`, `006_gallery.sql`, `007_landmarks_geofencing.sql`, `008_montreal_island_boundary.sql`, `009_landmarks_seed.sql`, `010_simple_recommendations.sql`, `011_economy.sql` and `012_economy_catalog.sql`, in that order (007–010 need PostGIS, see [Exploration](#exploration-landmarks-geofences-and-visits-007009)).
+2. Open **SQL Editor**, then paste and run `001_schema.sql`, `002_seed.sql`, `003_storage.sql`, `004_migo_profiles.sql`, `005_auth.sql`, `006_gallery.sql`, `007_landmarks_geofencing.sql`, `008_montreal_island_boundary.sql`, `009_landmarks_seed.sql`, `010_simple_recommendations.sql`, `011_economy.sql`, `012_economy_catalog.sql` and `013_stale_login.sql`, in that order (007–010 need PostGIS, see [Exploration](#exploration-landmarks-geofences-and-visits-007009)).
 3. Optional: paste and run `tests/smoke_test.sql`, `tests/migo_profiles_test.sql`, `tests/auth_test.sql`, `tests/gallery_test.sql`, `tests/explore_test.sql` and `tests/economy_test.sql`. They should say `All backend checks passed`, `All MIGO profile checks passed`, `All auth checks passed`, `All gallery checks passed`, `All exploration checks passed` and `All economy checks passed`.
 4. Set up login in the dashboard (see [Supabase dashboard settings for login](#supabase-dashboard-settings-for-login)).
 5. Go to **Project Settings → API** and copy the Project URL and the `anon` public key into `frontend/.env.local`:
