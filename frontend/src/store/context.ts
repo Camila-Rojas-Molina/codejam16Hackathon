@@ -19,8 +19,20 @@ export type StoreValue = AppState & {
   clearMatch: () => void
   completeHunt: (result: { huntId: string; score: ScoreBreakdown; secondsLeft: number; selfieUrl?: string }) => void
   setDemoMode: (on: boolean) => void
-  /** Signs out on this device without deleting anything. */
+  /** Signs out on this device without deleting anything (also ends the login when authEnabled). */
   reset: () => void
+
+  // Login (Supabase Auth, email + password)
+  /** True when Supabase is configured: then a login is required. False = device-only mode, no login. */
+  authEnabled: boolean
+  /** The signed-in login (null when signed out, or always null when authEnabled is false). */
+  session: { email: string } | null
+  /** Creates a login. needsConfirmation = the user must click the email link, then log in. */
+  signUp: (email: string, password: string) => Promise<{ needsConfirmation: boolean }>
+  /** Logs in and loads that login's profile. hasProfile=false → send them to /onboarding. */
+  signIn: (email: string, password: string) => Promise<{ hasProfile: boolean }>
+  /** Logs out and clears this device's cached account, profile and match. */
+  signOut: () => Promise<void>
 
   // Account & profile. Each one saves through api.ts, then updates the store.
   createAccount: (input: { name: string; avatar: string }) => Promise<Account>

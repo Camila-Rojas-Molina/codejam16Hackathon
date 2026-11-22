@@ -10,23 +10,29 @@ backend/
 │   ├── 001_schema.sql   tables, scoring, matching, GPS check, security
 │   ├── 002_seed.sql     McGill hunts, partner pool, leaderboard teams
 │   ├── 003_storage.sql  'selfies' storage bucket
-│   └── 004_migo_profiles.sql  one account, two modes: questionnaire, trips, local profile
+│   ├── 004_migo_profiles.sql  one account, two modes: questionnaire, trips, local profile
+│   └── 005_auth.sql     login (Supabase Auth): links profiles to logins, owner checks
 └── tests/
     ├── smoke_test.sql          checks the hunt flow, then rolls back
-    └── migo_profiles_test.sql  checks accounts/profiles and mode switching, then rolls back
+    ├── migo_profiles_test.sql  checks accounts/profiles and mode switching, then rolls back
+    ├── auth_test.sql           checks the login/owner rules, then rolls back
+    └── local_supabase_stub.sql fake `auth` schema for testing on plain Postgres (never run on Supabase)
 ```
 
 ## Setup (about 10 minutes)
 
 1. Create a free project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor**, then paste and run `001_schema.sql`, `002_seed.sql`, `003_storage.sql` and `004_migo_profiles.sql`, in that order.
-3. Optional: paste and run `tests/smoke_test.sql` and `tests/migo_profiles_test.sql`. They should say `All backend checks passed` and `All MIGO profile checks passed`.
-4. Go to **Project Settings → API** and copy the Project URL and the `anon` public key into `frontend/.env.local`:
+2. Open **SQL Editor**, then paste and run `001_schema.sql`, `002_seed.sql`, `003_storage.sql`, `004_migo_profiles.sql` and `005_auth.sql`, in that order.
+3. Optional: paste and run `tests/smoke_test.sql`, `tests/migo_profiles_test.sql` and `tests/auth_test.sql`. They should say `All backend checks passed`, `All MIGO profile checks passed` and `All auth checks passed`.
+4. Set up login in the dashboard (see [Supabase dashboard settings for login](#supabase-dashboard-settings-for-login)).
+5. Go to **Project Settings → API** and copy the Project URL and the `anon` public key into `frontend/.env.local`:
    ```
    VITE_SUPABASE_URL=https://xxxx.supabase.co
    VITE_SUPABASE_ANON_KEY=eyJ...
    ```
    Never commit `.env.local`. Add the same two variables in Vercel for the deployed app.
+
+To test on a local Postgres instead, run `tests/local_supabase_stub.sql` first (it fakes Supabase's `auth` schema and `auth.uid()`), then 001, 002, 004, 005 and the three tests. Skip 003 (it needs Supabase storage).
 
 All migration files can be run again safely after changes. Running `002_seed.sql` again also puts the demo partners back in the match queue.
 
@@ -56,11 +62,14 @@ Call these from `frontend/src/lib/backend.ts`. Each one is a Postgres function.
 
 | Function | Does |
 |---|---|
-| `migo_create_account(name, avatar)` | Registration. No role: Tourist/Local is a mode, picked later. |
+| `migo_create_account(name, avatar)` | Registration. No role: Tourist/Local is a mode, picked later. When signed in, the profile is linked to the login; a second profile for the same login fails with `23505` `This login already has a profile`. |
+| `migo_my_profile()` | The signed-in user's profile, same shape as `migo_get_profile` (`{account, record}`). `null` if not signed in or no profile yet (then show registration). |
 | `migo_get_profile(profile_id)` | The account and its saved record (`null` record before the first save, `null` if the account is gone). |
 | `migo_update_account(profile_id, name, avatar)` | Name and avatar. |
 | `migo_save_record(profile_id, record)` | Saves the whole record and keeps `profiles.role` (= active mode) and `has_dog` in sync, so `find_partner` keeps working. |
-| `migo_delete_account(profile_id)` | Deletes the player and everything attached. |
+| `migo_delete_account(profile_id)` | Deletes the player and everything attached, and the login itself if the profile belongs to the caller's login. |
+
+**Owner rule** (`005_auth.sql`): a profile created while signed in has `auth_user_id` set. Then `migo_get_profile`, `migo_update_account`, `migo_save_record` and `migo_delete_account` only work with that login's access token; anyone else (another user, or no login) gets errcode `42501` `Not your account`. Profiles without a login (demo/seed data and accounts made before login) work as before.
 
 **Scoring** (same as `frontend/src/features/scoring/score.ts`, plus the first finder bonus):
 
@@ -72,8 +81,13 @@ base + speed bonus (base × time left / time limit × 0.5) + 50 for meeting some
 ## Security
 
 - The browser can read `hunts`, `teams` and `leaderboard`, and can call the four functions above. It cannot write to any table directly, so points are always calculated on the server.
-- There's no login yet. A player is identified by the profile id stored in their browser, so someone with technical skills could act as another player. That's fine for a hackathon demo, but add Supabase Auth before real use.
+- Login is Supabase Auth (email + password). The app sends the user's access token, so `auth.uid()` identifies them and the `migo_*` functions only let a login touch its own profile. Gaps: profiles created without a login are still identified only by their id, and the hunt functions from `001_schema.sql` (`find_partner`, `get_hunts`, `submit_selfie`) don't check the login yet.
 - `migo_save_record` accepts the whole record from the browser, including the points ledger and owned items. Before real use, move claiming rewards and buying items into their own functions that check them on the server (the rules are in `frontend/src/lib/api.ts` under "Points, challenges & shop").
+
+## Supabase dashboard settings for login
+
+- **Authentication → Sign In / Providers → Email**: enabled. For the hackathon turn **off "Confirm email"**, otherwise sign-up doesn't return a session and the app has to show a "check your email" step.
+- **Authentication → URL Configuration**: Site URL = `https://migo.pqapp.dev`; add `http://localhost:5173` to Redirect URLs for local development.
 
 ## For the team
 

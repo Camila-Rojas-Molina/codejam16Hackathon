@@ -6,7 +6,7 @@ import { Mascot } from '../components/illustrations/Mascot'
 import { Sparkle, Starburst } from '../components/illustrations/Stickers'
 import Screen from '../components/layout/Screen'
 import { ArrowCell } from '../components/ui/Button'
-import { arrowLabel, arrowRowClasses } from '../components/ui/buttonStyles'
+import { arrowLabel, arrowRowClasses, buttonClasses } from '../components/ui/buttonStyles'
 import Logo from '../components/ui/Logo'
 import { hasUniversalProfile } from '../features/profile/flow'
 import { TAGLINE } from '../lib/config'
@@ -20,10 +20,12 @@ const steps: { n: string; title: string; text: string; icon: IconName }[] = [
 ]
 
 export default function WelcomePage() {
-  const { account, profile } = useStore()
+  const { account, profile, authEnabled, session } = useStore()
 
   // Returning player: straight into the app (never repeat onboarding).
   if (account) return <Navigate to={hasUniversalProfile(profile) ? '/map' : '/onboarding/questions'} replace />
+  // Logged in but no profile yet (e.g. just confirmed their email): name & avatar next.
+  if (authEnabled && session) return <Navigate to="/onboarding" replace />
 
   return (
     <Screen className="gap-6 md:max-w-4xl">
@@ -72,10 +74,22 @@ export default function WelcomePage() {
         </ol>
       </section>
 
-      <Link to="/onboarding" className={cn(arrowRowClasses, 'min-h-16 w-full text-base')}>
-        <span className={arrowLabel}>Start exploring</span>
-        <ArrowCell />
-      </Link>
+      {authEnabled ? (
+        <div className="space-y-3">
+          <Link to="/signup" className={cn(arrowRowClasses, 'min-h-16 w-full text-base')}>
+            <span className={arrowLabel}>Get started</span>
+            <ArrowCell />
+          </Link>
+          <Link to="/login" className={buttonClasses({ variant: 'secondary', size: 'lg', fullWidth: true })}>
+            I already have an account
+          </Link>
+        </div>
+      ) : (
+        <Link to="/onboarding" className={cn(arrowRowClasses, 'min-h-16 w-full text-base')}>
+          <span className={arrowLabel}>Start exploring</span>
+          <ArrowCell />
+        </Link>
+      )}
       <p className="text-center font-serif text-lg">One account, two ways to explore. It takes about four minutes to set up.</p>
     </Screen>
   )
