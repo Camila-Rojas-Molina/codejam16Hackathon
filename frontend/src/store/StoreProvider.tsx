@@ -109,14 +109,14 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<readonly string[]>([])
   const inFlight = useRef(new Map<string, Promise<void>>())
   // The device economy measures quest progress from the profile and hunts: give it the latest.
-  const factsRef = useRef<DeviceFacts>({ profile: state.profile, huntResults: [] })
+  const factsRef = useRef<DeviceFacts>({ profile: state.profile, account: state.account, huntResults: [] })
   const huntResults = useMemo(
     () => [...Object.values(state.results), ...Object.values(state.parked).flatMap((s) => Object.values(s.results))],
     [state.results, state.parked],
   )
   useEffect(() => {
-    factsRef.current = { profile: state.profile, huntResults }
-  }, [state.profile, huntResults])
+    factsRef.current = { profile: state.profile, account: state.account, huntResults }
+  }, [state.profile, state.account, huntResults])
 
   const signedIn = Boolean(sessionUserId)
   const economyApi = useMemo<EconomyApi | null>(() => {
@@ -151,7 +151,7 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
 
   // Load after sign-in / app open, and again when something that can move a quest on changes
   // (profile saved, a hunt finished). Also when the tab comes back, and right after the daily reset.
-  const progressKey = `${state.profile?.updatedAt ?? 0}:${huntResults.length}`
+  const progressKey = `${state.profile?.updatedAt ?? 0}:${huntResults.length}:${state.account?.avatar ?? ''}`
   useEffect(() => {
     void reloadEconomy()
   }, [reloadEconomy, progressKey])
