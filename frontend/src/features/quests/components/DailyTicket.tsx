@@ -40,14 +40,15 @@ export default function DailyTicket({
       id={`quest-${a.id}`}
       aria-labelledby={`quest-${a.id}-title`}
       className={cn(
-        'flex scroll-mt-24 items-stretch border-2 border-ink',
+        '@container scroll-mt-24 border-2 border-ink',
         state === 'claimed' ? 'bg-teal-soft' : 'sheet-grain',
         highlight && 'shadow-block outline-4 outline-offset-4 outline-saffron',
       )}
     >
-      {/* Stub: reward, separated by a perforated rule. */}
-      <div className="flex w-20 shrink-0 flex-col items-center justify-center gap-1 border-r-2 border-dashed border-ink bg-saffron-soft px-1 py-3 text-center sm:w-24">
-        <Icon name={view.icon} className="size-9" />
+      <div className="flex h-full flex-col @[19rem]:flex-row">
+      {/* Stub: reward, separated by a perforated rule (beside the body, or on top when narrow). */}
+      <div className="flex shrink-0 items-center gap-2 border-b-2 border-dashed border-ink bg-saffron-soft px-4 py-2 @[19rem]:w-20 @[19rem]:flex-col @[19rem]:justify-center @[19rem]:gap-1 @[19rem]:border-r-2 @[19rem]:border-b-0 @[19rem]:px-1 @[19rem]:py-3 @[19rem]:text-center">
+        <Icon name={view.icon} className="size-8 @[19rem]:size-9" />
         <span className="font-display text-xl leading-none tabular-nums">+{a.reward}</span>
         <span className="eyebrow text-[0.6rem]">points</span>
       </div>
@@ -85,6 +86,7 @@ export default function DailyTicket({
           )}
         </div>
         <ErrorText className="mt-0">{error}</ErrorText>
+      </div>
       </div>
     </article>
   )

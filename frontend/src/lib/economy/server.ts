@@ -14,8 +14,18 @@ export function browserTimezone(): string {
   }
 }
 
-// Profiles whose timezone has been sent during this page session (the server rate-limits changes).
-const timezoneSent = new Set<string>()
+// Once per browser session (survives reloads in this tab) per profile: the server rate-limits changes.
+const TZ_KEY = 'migo:tz-sent:v1'
+function timezoneTried(profileId: string, tz: string): boolean {
+  try {
+    const sent = JSON.parse(sessionStorage.getItem(TZ_KEY) ?? '{}') as Record<string, string>
+    if (sent[profileId] === tz) return true
+    sessionStorage.setItem(TZ_KEY, JSON.stringify({ ...sent, [profileId]: tz }))
+    return false
+  } catch {
+    return false
+  }
+}
 
 function toState(raw: unknown): EconomyState {
   const state = normalizeEconomyState(raw, 'server')
@@ -27,12 +37,16 @@ function toState(raw: unknown): EconomyState {
 export function serverEconomy(profileId: string): EconomyApi {
   const api: EconomyApi = {
     async load() {
-      // Once per session, before the first read: days and weeks are computed in this timezone.
-      if (!timezoneSent.has(profileId)) {
-        timezoneSent.add(profileId)
-        await api.setTimezone(browserTimezone()).catch(() => {
-          // Rate-limited or offline: the server keeps the timezone it already has.
-        })
+      const state = toState(await backend.economyState(profileId))
+      // Days and weeks are computed in the saved timezone: update it when this browser's differs
+      // (once per session), then read again so periods and resets match.
+      const tz = browserTimezone()
+      if (state.timezone === tz || timezoneTried(profileId, tz)) return state
+      try {
+        await api.setTimezone(tz)
+      } catch {
+        // Rate-limited or offline: the server keeps the timezone it already has.
+        return state
       }
       return toState(await backend.economyState(profileId))
     },

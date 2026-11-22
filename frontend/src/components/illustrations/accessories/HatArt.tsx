@@ -4,7 +4,7 @@
 // inside of the brim). The hat grows upwards (negative y). The part that touches the head is about
 // 64 units wide (x −32…32); brims reach x ±52. Floating pieces (halo, rain cloud) treat (0, 0) as
 // the top of the head and hover above it.
-import { C, LINE, line, shine, heartPath } from './palette'
+import { C, LINE, line, shine, heartPath, starPath } from './palette'
 
 /** A five-petal flower (flower crown, lei). */
 export function Flower({ x, y, fill, sw, r = 5 }: { x: number; y: number; fill: string; sw: number; r?: number }) {
@@ -81,11 +81,11 @@ export function HatArt({ art, sw }: { art: string; sw: number }) {
     case 'baseball-cap':
       return (
         <g>
-          <path d="M-32 1 C-34 -40 30 -44 33 1 C12 4 -12 4 -32 1 Z" fill={C.teal} {...s} />
-          <path d="M-12 2 C-14 -22 -6 -36 1 -40 C9 -36 16 -22 15 2" fill={C.sheet} {...s} />
-          <path d="M-24 -26 C-18 -34 -12 -37 -8 -38" {...shine(sw)} />
-          <path d="M1.5 -26 L4 -20.5 L10 -20 L5.5 -16 L7 -10 L1.5 -13 L-4 -10 L-2.5 -16 L-7 -20 L-1 -20.5 Z" fill={C.sienna} {...line(sw * 0.7)} />
-          <circle cx="1" cy="-41" r="4" fill={C.saffron} {...s} />
+          <path d="M-32 1 C-34 -34 30 -37 33 1 C12 4 -12 4 -32 1 Z" fill={C.teal} {...s} />
+          <path d="M-11 2 C-12 -18 -6 -30 1 -34 C8 -30 14 -18 14 2" fill={C.sheet} {...s} />
+          <path d="M-24 -20 C-19 -27 -14 -30 -10 -31" {...shine(sw)} />
+          <path d={starPath(1.5, -15, 7.5, 0.48)} fill={C.sienna} {...line(sw * 0.7)} />
+          <circle cx="1" cy="-35" r="3.6" fill={C.saffron} {...s} />
           <path d="M10 0 C28 -9 52 -7 61 3 C49 12 26 11 8 6 Z" fill={C.saffron} {...s} />
           <path d="M22 3 C34 1 46 2 54 4" fill="none" {...line(sw * 0.6)} />
         </g>
@@ -119,11 +119,11 @@ export function HatArt({ art, sw }: { art: string; sw: number }) {
     case 'bucket-hat':
       return (
         <g>
-          <path d="M-25 -6 L-21 -34 C-8 -40 8 -40 21 -34 L25 -6 Z" fill={C.tealSoft} {...s} />
-          <path d="M-12 -38 L-13 -6 M0 -40 L0 -6 M12 -38 L13 -6" fill="none" stroke={C.teal} strokeWidth={sw * 1.6} strokeLinecap="round" />
-          <path d="M-21 -34 C-8 -40 8 -40 21 -34" fill="none" {...s} />
-          <path d="M-27 -8 C-12 -4 12 -4 27 -8 L44 8 C16 16 -16 16 -44 8 Z" fill={C.teal} {...s} />
-          <path d="M-34 6 C-12 11 12 11 34 6" fill="none" stroke={C.sheet} strokeWidth={sw * 0.8} strokeDasharray={`${sw * 2} ${sw * 1.6}`} strokeLinecap="round" />
+          <path d="M-25 -6 C-24 -16 -23 -24 -20 -28 C-8 -33 8 -33 20 -28 C23 -24 24 -16 25 -6 Z" fill={C.tealSoft} {...s} />
+          <path d="M-11 -31 L-12 -7 M0 -32 L0 -6 M11 -31 L12 -7" fill="none" stroke={C.teal} strokeWidth={sw * 1.6} strokeLinecap="round" />
+          <path d="M-25 -6 C-24 -16 -23 -24 -20 -28 C-8 -33 8 -33 20 -28 C23 -24 24 -16 25 -6" fill="none" {...s} />
+          <path d="M-27 -8 C-12 -4 12 -4 27 -8 L42 7 C16 15 -16 15 -42 7 Z" fill={C.teal} {...s} />
+          <path d="M-33 5 C-12 10 12 10 33 5" fill="none" stroke={C.sheet} strokeWidth={sw * 0.8} strokeDasharray={`${sw * 2} ${sw * 1.6}`} strokeLinecap="round" />
         </g>
       )
     case 'crown':
@@ -197,12 +197,12 @@ export function HatArt({ art, sw }: { art: string; sw: number }) {
     case 'antenna-bopper':
       return (
         <g>
-          <path d="M-18 -18 L-24 -26 L-16 -30 L-24 -36 L-18 -42 L-26 -48" fill="none" {...line(sw * 1.1)} />
-          <path d="M18 -18 L24 -26 L16 -30 L24 -36 L18 -42 L26 -48" fill="none" {...line(sw * 1.1)} />
+          <path d="M-17 -17 L-22 -23 L-15 -27 L-22 -32 L-17 -36 L-23 -40" fill="none" {...line(sw * 1.1)} />
+          <path d="M17 -17 L22 -23 L15 -27 L22 -32 L17 -36 L23 -40" fill="none" {...line(sw * 1.1)} />
           <Band d="M-38 4 C-36 -26 36 -26 38 4" fill={C.sienna} sw={sw} k={1.8} />
-          <path d={heartPath(-28, -54, 16)} fill={C.sienna} {...s} />
-          <path d={heartPath(28, -54, 16)} fill={C.sienna} {...s} />
-          <path d="M-33 -58 L-31 -60 M23 -58 L25 -60" {...shine(sw)} />
+          <path d={heartPath(-24, -46, 15)} fill={C.sienna} {...s} />
+          <path d={heartPath(24, -46, 15)} fill={C.sienna} {...s} />
+          <path d="M-29 -50 L-27 -52 M19 -50 L21 -52" {...shine(sw)} />
         </g>
       )
     case 'rain-cloud':

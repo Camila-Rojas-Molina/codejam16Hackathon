@@ -17,6 +17,7 @@ import Button, { ArrowCell } from '../components/ui/Button'
 import { arrowLabel, arrowRowClasses } from '../components/ui/buttonStyles'
 import { inputBase, Toggle } from '../components/ui/Fields'
 import PageHeader from '../components/ui/PageHeader'
+import PointsSummary from '../features/economy/components/PointsSummary'
 import type { ShopSlot } from '../features/economy/types'
 import Modal from '../features/gallery/components/Modal'
 import { pointsBalance } from '../features/profile/model'
@@ -107,7 +108,7 @@ function GradeBadge({ item }: { item: ShopItemDef }) {
 }
 
 /** Equipped ✓ / Owned / Affordable / Locked "N more points" / Doesn't fit. */
-function StateLine({ item, inv, avatar }: { item: ShopItemDef; inv: Inventory; avatar: string }) {
+function StateLine({ item, inv, avatar, compact = false }: { item: ShopItemDef; inv: Inventory; avatar: string; compact?: boolean }) {
   if (!fitsAvatar(item, avatar))
     return (
       <p className="flex items-center gap-1.5 text-sm font-bold">
@@ -123,6 +124,8 @@ function StateLine({ item, inv, avatar }: { item: ShopItemDef; inv: Inventory; a
       </Badge>
     )
   if (state === 'owned') return <Badge tone="teal">Owned</Badge>
+  // On tiles the Buy button already says it.
+  if (state === 'affordable' && compact) return null
   if (state === 'affordable')
     return (
       <p className="flex items-center gap-1.5 text-sm font-bold">
@@ -252,7 +255,7 @@ function ItemTile({ item, inv, avatar, trying, onTry, actions }: TileProps) {
         </div>
         <p className="hidden text-sm sm:block">{item.description}</p>
         <div className="mt-auto space-y-2 pt-1">
-          <StateLine item={item} inv={inv} avatar={avatar} />
+          <StateLine item={item} inv={inv} avatar={avatar} compact />
           <ItemAction item={item} inv={inv} avatar={avatar} actions={actions} compact />
         </div>
       </div>
@@ -300,13 +303,13 @@ function FittingRoom({ inv, avatar, name, tryOn, focusId, onRemoveTry, onReset, 
         {changed && <span className="text-xs font-bold tracking-wider uppercase">Preview only</span>}
       </div>
 
-      <div className="flex items-center gap-3 p-2.5 sm:p-3 lg:flex-col lg:items-stretch lg:gap-4 lg:p-4">
+      <div className="flex flex-wrap items-center gap-3 p-2.5 sm:p-3 lg:flex-col lg:flex-nowrap lg:items-stretch lg:gap-4 lg:p-4">
         <div className={cn('shrink-0 transition-[width]', expanded ? 'w-44 sm:w-52' : 'w-[4.5rem] sm:w-24', 'lg:w-full')}>
           <Avatar avatar={avatar} accessories={outfit} size="fill" className="w-full" name={changed ? `${name}, trying things on` : name} />
         </div>
 
         {/* Phones: a one-line summary + the focused item's action. */}
-        <div className="min-w-0 flex-1 lg:hidden">
+        <div className={cn('min-w-0 flex-1 lg:hidden', expanded && 'hidden')}>
           <p className="eyebrow text-[0.62rem]" aria-hidden>
             Fitting room{changed ? ' · preview' : ''}
           </p>
@@ -336,7 +339,7 @@ function FittingRoom({ inv, avatar, name, tryOn, focusId, onRemoveTry, onReset, 
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
           aria-controls={panelId}
-          className="grid size-11 shrink-0 place-items-center self-start border-2 border-ink sheet-grain hover:bg-saffron-soft lg:hidden"
+          className="ml-auto grid size-11 shrink-0 place-items-center self-start border-2 border-ink sheet-grain hover:bg-saffron-soft lg:hidden"
         >
           <Icon name="chevron-down" accent="none" className={cn('size-5 transition-transform', expanded && 'rotate-180')} />
           <span className="sr-only">{expanded ? 'Show less of the fitting room' : 'Show more of the fitting room'}</span>
@@ -598,7 +601,7 @@ const chip = (on: boolean) =>
 // ---- Page --------------------------------------------------------------------------------------
 
 export default function ShopPage() {
-  const { account, purchase, setEquipped, recordVisit, economy, economyError } = useStore()
+  const { account, purchase, setEquipped, recordVisit, economyError } = useStore()
   const inv = useInventory()
   const avatar = account?.avatar ?? DEFAULT_AVATAR
   const avatarName = avatarShortName(avatar)
@@ -716,7 +719,7 @@ export default function ShopPage() {
       <PageHeader
         eyebrow="Your avatar’s wardrobe"
         title="Shop"
-        description="Hats, hair, specs, backdrops and more for your avatar. Try anything on for free, buy with points from quests, then put it on."
+        description="Try anything on for free, buy with quest points, then put it on."
         aside={
           <div className="relative hidden place-items-center sm:grid">
             <Starburst tone="saffron" className="absolute size-36" />
@@ -726,18 +729,16 @@ export default function ShopPage() {
       />
 
       <div className="flex flex-wrap items-stretch gap-2 sm:gap-3">
-        <p className="inline-flex items-center gap-2 border-2 border-ink bg-saffron px-3 py-1.5 font-bold sm:px-4 sm:py-2">
-          <Icon name="coin" accent="sheet" className="size-6 sm:size-7" />
-          <span className="font-display text-xl leading-none tabular-nums sm:text-2xl" data-testid="shop-balance">
-            {inv.balance.toLocaleString()}
+        <div data-testid="shop-balance" className="min-w-0 flex-1 sm:flex-none">
+          <PointsSummary compact className="h-full" />
+        </div>
+        <Link to="/quests#points-title" className={cn(arrowRowClasses, 'flex-1 sm:flex-none')}>
+          <span className={arrowLabel}>
+            <span className="sm:hidden">History</span>
+            <span className="max-sm:hidden">Earn more · points history</span>
           </span>
-          points<span className="hidden sm:inline"> to spend</span>
-        </p>
-        <Link to="/quests" className={cn(arrowRowClasses, 'flex-1 sm:flex-none')}>
-          <span className={arrowLabel}>Earn more · history</span>
           <ArrowCell />
         </Link>
-        {!economy && !economyError && <p className="self-center text-sm font-semibold">Updating your points…</p>}
       </div>
       {economyError && (
         <p role="alert" className="border-2 border-sienna-deep bg-sienna-soft px-3 py-2 text-sm font-semibold">
@@ -784,9 +785,10 @@ export default function ShopPage() {
             ))}
           </div>
 
-          <div role="group" aria-label="Show" className="flex flex-wrap gap-1.5 sm:gap-2">
+          {/* Phones: one swipeable row of chips instead of two wrapped rows. */}
+          <div role="group" aria-label="Show" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:gap-2 sm:overflow-visible sm:px-0 sm:pb-0">
             {OWNERSHIP.map((o) => (
-              <button key={o} type="button" aria-pressed={ownership === o} onClick={() => setOwnership(o)} className={chip(ownership === o)}>
+              <button key={o} type="button" aria-pressed={ownership === o} onClick={() => setOwnership(o)} className={cn(chip(ownership === o), 'shrink-0 whitespace-nowrap')}>
                 {OWNERSHIP_LABELS[o]}
               </button>
             ))}

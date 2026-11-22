@@ -105,8 +105,8 @@ export default function QuestsPage() {
         <>
           {economyError && <ErrorText>{economyError}</ErrorText>}
 
-          {/* Phone: the balance up top. Desktop shows the full summary beside the weekly hero. */}
-          <div className="space-y-2 @4xl:hidden">
+          {/* Narrow: the balance up top. Wide shows the full summary beside the weekly hero. */}
+          <div className="space-y-2 @3xl:hidden">
             <PointsSummary compact />
             {economy.source === 'device' && (
               <p className="flex items-start gap-2 text-xs font-semibold">
@@ -124,7 +124,7 @@ export default function QuestsPage() {
           )}
 
           {/* WEEKLY CHALLENGE + side column (desktop). */}
-          <div className="grid gap-6 @4xl:grid-cols-[minmax(0,1fr)_20rem] @6xl:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="grid gap-6 @3xl:grid-cols-[minmax(0,1fr)_17rem] @6xl:grid-cols-[minmax(0,1fr)_22rem]">
             <section aria-labelledby="weekly" className="min-w-0 space-y-4">
               <SectionHead
                 id="weekly"
@@ -143,7 +143,7 @@ export default function QuestsPage() {
               )}
             </section>
 
-            <aside aria-label="Your points" className="hidden space-y-4 @4xl:block">
+            <aside aria-label="Your points" className="hidden space-y-4 @3xl:block">
               <PointsSummary />
               <div className="sheet-grain space-y-2 border-2 border-ink p-4 text-sm">
                 <p className="eyebrow">Today</p>
@@ -175,7 +175,7 @@ export default function QuestsPage() {
               aside={<RefreshIndicator available={economy.dailyRefreshAvailable} />}
             />
             {board.daily.length > 0 ? (
-              <div className="grid gap-4 @2xl:grid-cols-2 @5xl:grid-cols-3">
+              <div className="grid gap-4 @3xl:grid-cols-3">
                 {board.daily.map((v) => (
                   <DailyTicket key={v.a.id} view={v} canRefresh={economy.dailyRefreshAvailable} highlight={target === `quest-${v.a.id}`} />
                 ))}
@@ -204,7 +204,7 @@ export default function QuestsPage() {
               }
             />
             {board.adventures.length > 0 ? (
-              <div className="grid gap-5 @2xl:grid-cols-2 @5xl:grid-cols-3">
+              <div className="grid gap-5 @3xl:grid-cols-3">
                 {board.adventures.map((v) => (
                   <AdventurePostcard key={v.a.id} view={v} person={person} city={board.city} highlight={target === `quest-${v.a.id}`} />
                 ))}
@@ -215,7 +215,7 @@ export default function QuestsPage() {
           </section>
 
           {/* GETTING STARTED + history & points activity */}
-          <div className="grid gap-8 @4xl:grid-cols-2">
+          <div className="grid gap-8 @3xl:grid-cols-2">
             <section aria-labelledby="starter-title" id="starter" className={cn('scroll-mt-24 space-y-4')}>
               <SectionHead id="starter-title" icon="clipboard" title="Getting started" blurb="One-time rewards for trying each part of MIGO." />
               <StarterChecklist todo={board.starter} done={board.starterDone} highlightId={target} />

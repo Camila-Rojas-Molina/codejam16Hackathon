@@ -149,8 +149,8 @@ function personOf(profile: ProfileRecord | null, huntResults: HuntResult[]): Que
   return {
     mode: profile?.activeMode ?? null,
     interests: [...new Set([...(u?.interests ?? []), ...(trip?.interests ?? [])])],
-    accessibility: [...new Set([...(u?.accessibility.needs ?? []), ...(trip?.accessibility.needs ?? [])])],
-    pace: u?.exploration.pace ?? null,
+    accessibility: [...new Set([...(u?.accessibility?.needs ?? []), ...(trip?.accessibility?.needs ?? [])])],
+    pace: u?.exploration?.pace ?? null,
     // Device hunts only exist with a team of two (the store needs a team to finish one).
     hasTeamedUp: huntResults.length > 0,
   }
@@ -261,11 +261,11 @@ const newEntryId = () => `pts-${Date.now().toString(36)}-${Math.random().toStrin
 
 const REFRESH_ERRORS: Record<string, string> = {
   'not-found': 'Quest not found',
-  'not-today': 'That challenge is from another day',
+  'not-today': 'This challenge has expired',
   'not-active': 'That quest is no longer active',
-  'already-done': 'That challenge is finished: claim it instead',
+  'already-done': 'This challenge is done: claim it instead',
   'no-refresh-left': 'Daily refresh already used',
-  'nothing-else': 'No other daily challenge is available right now',
+  'nothing-else': 'No other daily challenges to swap in',
 }
 
 // ---- The API -----------------------------------------------------------------------------------
@@ -298,11 +298,11 @@ export function deviceEconomy(accountId: string, facts: () => DeviceFacts): Econ
         // Already paid (repeat click, second tab): nothing changes.
         if (a.status === 'completed' || book.ledger.some((e) => e.ref === ref)) return
         const live = withProgress(a, factsOf(book, f, accountId), book.timezone, now)
-        if (live.status === 'expired') throw new Error('That quest has expired')
+        if (live.status === 'expired') throw new Error('This quest has expired')
         if (a.status !== 'active') throw new Error('That quest is no longer active')
         const def = questDef(a.defId)
         if (!def) throw new Error('Quest not found')
-        if (!live.claimable) throw new Error('Quest not finished yet')
+        if (!live.claimable) throw new Error('Not finished yet')
         a.status = 'completed'
         a.completedAt = new Date(now).toISOString()
         // The reward stored when it was handed out (from the catalogue), never a caller's number.
@@ -323,7 +323,7 @@ export function deviceEconomy(accountId: string, facts: () => DeviceFacts): Econ
     purchase: async (itemId) =>
       transact((book, now) => {
         const item = shopItem(itemId)
-        if (!item) throw new Error('Item not found')
+        if (!item) throw new Error('Unknown item')
         const ref = `purchase:${item.id}`
         // Already owned (or already paid for): buying again changes nothing.
         if (book.owned.includes(item.id)) return
@@ -331,7 +331,7 @@ export function deviceEconomy(accountId: string, facts: () => DeviceFacts): Econ
           book.owned.push(item.id)
           return
         }
-        if (item.retired) throw new Error('That item is no longer sold')
+        if (item.retired) throw new Error('This item is no longer sold')
         if (balanceOf(book) < item.price) throw new Error('Not enough points')
         book.ledger.push({ id: newEntryId(), amount: -item.price, kind: 'purchase', ref, label: item.name, at: new Date(now).toISOString() })
         book.owned.push(item.id)
@@ -346,8 +346,8 @@ export function deviceEconomy(accountId: string, facts: () => DeviceFacts): Econ
           return
         }
         const item = shopItem(itemId)
-        if (!item || !book.owned.includes(item.id)) throw new Error('You don’t own that item')
-        if (item.slot !== slot) throw new Error('That item doesn’t go in that slot')
+        if (!item || !book.owned.includes(item.id)) throw new Error("You don't own this item")
+        if (item.slot !== slot) throw new Error(`That item goes in the ${item.slot} slot`)
         book.equipped[slot] = item.id
       }),
 

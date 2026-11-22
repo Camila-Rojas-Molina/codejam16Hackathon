@@ -34,16 +34,10 @@ export default function AdventurePostcard({
     >
       {/* Top strip: postmark (place) and the stamp (reward). */}
       <div className="flex items-start justify-between gap-3 p-4 pb-0">
-        <div className="min-w-0 space-y-2">
-          <p className="eyebrow flex items-center gap-1.5">
-            <Icon name="sparkle" accent="saffron" className="size-4" />
-            {whySuggested(def, person, city)}
-          </p>
-          <p className="inline-flex max-w-full items-center gap-1.5 rounded-full border-2 border-dashed border-ink px-3 py-0.5 text-xs font-bold">
-            <Icon name="pin" accent="sienna" className="size-4 shrink-0" />
-            <span className="truncate">{city ?? 'Wherever you are'}</span>
-          </p>
-        </div>
+        <p className="mt-1 inline-flex min-w-0 items-center gap-1.5 rounded-full border-2 border-dashed border-ink px-3 py-0.5 text-xs font-bold">
+          <Icon name="pin" accent="sienna" className="size-4 shrink-0" />
+          <span className="truncate">{city ?? 'Wherever you are'}</span>
+        </p>
         <div className="grid w-20 shrink-0 rotate-2 place-items-center border-2 border-dashed border-ink bg-sheet p-1.5 text-center shadow-block-sm" aria-label={`${a.reward} points`}>
           <Icon name={view.icon} className="size-8" />
           <span className="font-display text-lg leading-none tabular-nums">+{a.reward}</span>
@@ -52,6 +46,10 @@ export default function AdventurePostcard({
       </div>
 
       <div className="flex flex-1 flex-col gap-3 p-4">
+        <p className="eyebrow -mt-1 flex items-start gap-1.5">
+          <Icon name="sparkle" accent="saffron" className="size-4 shrink-0" />
+          {whySuggested(def, person, city)}
+        </p>
         <h3 id={`quest-${a.id}-title`} className="text-2xl leading-tight break-words">
           {view.title}
         </h3>

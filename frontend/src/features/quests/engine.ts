@@ -465,7 +465,7 @@ function pick(
   let bestScore = -Infinity
   for (const d of pool) {
     let s = personalScore(d, person) + unit(`${salt}|${d.id}`) * JITTER[category]
-    if (category === 'daily' && taken.some((t) => t.condition.type === d.condition.type)) s -= 1.5
+    if (category === 'daily' && taken.some((t) => t.condition.type === d.condition.type)) s -= 2.5
     if (category === 'adventure') {
       const theme = d.interests?.[0]
       if (theme && taken.some((t) => t.interests?.[0] === theme)) s -= 2
