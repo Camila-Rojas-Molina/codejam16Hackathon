@@ -19,11 +19,12 @@ export { forgetDeviceEconomy } from './device'
 
 /**
  * The economy for one account. `signedIn` = there is a Supabase login on this device.
- * `facts` feeds the device economy what it needs to measure quest progress (ignored on the server,
+ * `facts` (a ref, read at call time) feeds the device economy what it needs to measure quest progress (ignored on the server,
  * which reads its own stored data).
  */
-export function economyFor(accountId: string, opts: { signedIn: boolean; facts: () => DeviceFacts }): EconomyApi {
-  return isBackendConfigured() && opts.signedIn ? serverEconomy(accountId) : deviceEconomy(accountId, opts.facts)
+export function economyFor(accountId: string, opts: { signedIn: boolean; facts: { readonly current: DeviceFacts } }): EconomyApi {
+  const { facts } = opts
+  return isBackendConfigured() && opts.signedIn ? serverEconomy(accountId) : deviceEconomy(accountId, () => facts.current)
 }
 
 /** Which implementation economyFor() would pick (shown in Settings / dev notes). */

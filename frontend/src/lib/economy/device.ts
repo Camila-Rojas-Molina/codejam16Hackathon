@@ -13,24 +13,21 @@
 //
 // The first load for an account carries over the old device ledger, owned and equipped items from
 // its profile record (record.rewards), so existing balances, wardrobes and claims survive.
-import type { EconomyApi, EconomyState, LedgerEntry, QuestAssignment, ShopSlot } from '../../features/economy/types'
-import { activeTrip, isModeReady } from '../../features/profile/model'
-import { hasUniversalProfile } from '../../features/profile/flow'
-import type { Account, ProfileRecord } from '../../features/profile/types'
-import { questDef } from '../../features/quests/catalog'
 import {
-  assignmentProgress,
-  dailyRefreshAvailable,
-  issueAssignments,
-  periodsAt,
-  refreshDailyAssignment,
-  type IssueInput,
-  type QuestFacts,
-  type QuestPerson,
-  type VisitPage,
-} from '../../features/quests/engine'
+  DAILY_REFRESHES,
+  QUEST_SLOTS,
+  type EconomyApi,
+  type EconomyState,
+  type LedgerEntry,
+  type QuestAssignment,
+  type QuestCategory,
+  type QuestDef,
+  type ShopSlot,
+} from '../../features/economy/types'
+import type { Account, ProfileRecord } from '../../features/profile/types'
+import { questDef, questDefsIn } from '../../features/quests/catalog'
+import { evaluateProgress, issueAssignments, type ProgressFacts, type VisitPage } from '../../features/quests/engine'
 import { shopItem } from '../../features/rewards/shop'
-import { AVATAR_CATALOG } from '../avatars'
 import * as db from '../profileDb'
 import { readJSON, writeJSON } from '../storage'
 import type { HuntResult } from '../types'
@@ -56,6 +53,8 @@ type Book = {
   assignments: StoredAssignment[]
   /** Page visits, at most one per page per local day (a few weeks kept). */
   visits: { page: VisitPage; at: number }[]
+  /** Local day ('2026-11-23') → daily refreshes used. */
+  refreshes: Record<string, number>
   timezone: string
   /** When record.rewards was carried over (once). */
   migratedAt: string
@@ -119,7 +118,7 @@ function migrate(record: ProfileRecord | null): Book {
     // Kept if still owned and (when the item is known) worn in its own slot.
     if (id && owned.includes(id) && (shopItem(id)?.slot ?? slot) === slot) equipped[slot] = id
   }
-  return { v: 1, ledger, owned, equipped, assignments: [], visits: [], timezone: localTimezone(), migratedAt: new Date().toISOString() }
+  return { v: 1, ledger, owned, equipped, assignments: [], visits: [], refreshes: {}, timezone: localTimezone(), migratedAt: new Date().toISOString() }
 }
 
 function readBook(accountId: string, facts: DeviceFacts): Book {
@@ -131,6 +130,7 @@ function readBook(accountId: string, facts: DeviceFacts): Book {
       equipped: saved.equipped && typeof saved.equipped === 'object' ? saved.equipped : {},
       assignments: Array.isArray(saved.assignments) ? saved.assignments : [],
       visits: Array.isArray(saved.visits) ? saved.visits : [],
+      refreshes: saved.refreshes && typeof saved.refreshes === 'object' ? saved.refreshes : {},
     }
   }
   // First time: carry over the record's rewards (the store's copy if it's this account's, else storage).
@@ -140,90 +140,203 @@ function readBook(accountId: string, facts: DeviceFacts): Book {
   return book
 }
 
+// ---- Local time periods ------------------------------------------------------------------------
+// The device's own clock and timezone (Date's local-time methods). The server uses the saved one.
+
+const pad = (n: number) => String(n).padStart(2, '0')
+const dayKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
+const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)
+/** Monday 00:00 of d's week. */
+const startOfWeek = (d: Date) => addDays(startOfDay(d), -((d.getDay() + 6) % 7))
+
+/** ISO week, e.g. "2026-W48". */
+function isoWeek(d: Date): string {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7))
+  const week = Math.ceil(((t.getTime() - Date.UTC(t.getUTCFullYear(), 0, 1)) / DAY_MS + 1) / 7)
+  return `${t.getUTCFullYear()}-W${pad(week)}`
+}
+
+type Window = { from: number; to: number }
+const ALL_TIME: Window = { from: -Infinity, to: Infinity }
+const inWindow = (ms: number, w: Window) => ms >= w.from && ms < w.to
+
+type Periods = { today: string; week: string; day: Window; weekWindow: Window }
+
+function periodsAt(now: Date): Periods {
+  const day = startOfDay(now)
+  const monday = startOfWeek(now)
+  return {
+    today: dayKey(now),
+    week: isoWeek(now),
+    day: { from: day.getTime(), to: addDays(day, 1).getTime() },
+    weekWindow: { from: monday.getTime(), to: addDays(monday, 7).getTime() },
+  }
+}
+
+/** The window an assignment counts in: its own period (from its expiry), all time for starters. */
+function windowOf(a: StoredAssignment): Window {
+  if (a.category === 'starter' || !a.expiresAt) return ALL_TIME
+  const to = new Date(a.expiresAt)
+  return { from: addDays(to, a.category === 'daily' ? -1 : -7).getTime(), to: to.getTime() }
+}
+
 // ---- Facts for the engine ----------------------------------------------------------------------
 
 const balanceOf = (book: Book) => book.ledger.reduce((n, e) => n + e.amount, 0)
+const isPurchase = (e: LedgerEntry) => e.amount < 0 && (e.kind === 'purchase' || e.ref.startsWith('legacy:item:'))
 
-function personOf(profile: ProfileRecord | null, huntResults: HuntResult[]): QuestPerson {
-  const u = profile?.universal
-  const trip = profile?.activeMode === 'tourist' ? activeTrip(profile) : null
-  return {
-    mode: profile?.activeMode ?? null,
-    interests: [...new Set([...(u?.interests ?? []), ...(trip?.interests ?? [])])],
-    accessibility: [...new Set([...(u?.accessibility.needs ?? []), ...(trip?.accessibility.needs ?? [])])],
-    pace: u?.exploration.pace ?? null,
-    // Device hunts only exist with a team of two (the store needs a team to finish one).
-    hasTeamedUp: huntResults.length > 0,
-  }
-}
-
-function factsOf(book: Book, f: DeviceFacts, accountId: string): QuestFacts {
+/** Everything evaluateProgress() counts, limited to one window. */
+function factsIn(book: Book, f: DeviceFacts, accountId: string, w: Window): ProgressFacts {
   const profile = f.profile?.accountId === accountId ? f.profile : null
-  const u = profile?.universal
-  const purchases = book.ledger
-    .filter((e) => e.amount < 0 && (e.kind === 'purchase' || e.ref.startsWith('legacy:item:')))
-    .map((e) => ({ itemId: e.ref.replace(/^(legacy:item:|purchase:)/, ''), at: Date.parse(e.at) || 0 }))
+  const visits: ProgressFacts['visits'] = {}
+  for (const v of book.visits) if (inWindow(v.at, w)) visits[v.page] = (visits[v.page] ?? 0) + 1
   return {
-    huntResults: f.huntResults.map((r) => ({ huntId: r.huntId, completedAt: r.completedAt, withPartner: true })),
-    // Gallery photos need the server: nothing to count on this device.
+    profile,
+    account: f.account?.id === accountId ? f.account : null,
+    // Device hunts only exist with a team of two (the store needs a team to finish one).
+    hunts: f.huntResults.filter((r) => inWindow(r.completedAt, w)).map((r) => ({ huntId: r.huntId, at: r.completedAt, withPartner: true })),
+    // Gallery photos need the server: there is nothing to count on this device.
     photos: [],
-    cities: (u?.citiesDiscovered ?? []).map((c) => ({ placeId: c.placeId && c.lat !== null ? c.placeId : null, addedAt: c.addedAt })),
-    profile: {
-      questionnaireComplete: hasUniversalProfile(profile),
-      homeCityPinned: !!u?.homeCityPlace,
-      avatarChosen: !!f.account && AVATAR_CATALOG.some((a) => a.id === f.account?.avatar),
-      bothModesReady: isModeReady(profile, 'tourist') && isModeReady(profile, 'local'),
-    },
-    visits: book.visits,
-    completedQuests: book.assignments
-      .filter((a) => a.status === 'completed' && a.completedAt)
-      .map((a) => ({ defId: a.defId, category: a.category, completedAt: Date.parse(a.completedAt as string) || 0 })),
-    purchases,
-    equipped: Object.values(book.equipped).filter((id): id is string => !!id),
+    newCities: (profile?.universal?.citiesDiscovered ?? [])
+      .filter((c) => c.placeId && c.lat !== null && inWindow(c.addedAt, w))
+      .map((c) => ({ placeId: c.placeId as string, at: c.addedAt })),
+    visits,
+    questsCompleted: book.assignments
+      .filter((a) => a.status === 'completed' && a.completedAt && inWindow(Date.parse(a.completedAt), w))
+      .map((a) => ({ category: a.category, at: Date.parse(a.completedAt as string) })),
+    purchases: book.ledger.filter((e) => isPurchase(e) && inWindow(Date.parse(e.at) || 0, w)).length,
+    equipped: Object.values(book.equipped).filter(Boolean).length,
   }
 }
 
-function issueInput(book: Book, f: DeviceFacts, accountId: string, now: number): IssueInput {
-  return { now, timezone: book.timezone, seed: accountId, person: personOf(f.profile, f.huntResults), existing: book.assignments }
+function withProgress(a: StoredAssignment, book: Book, f: DeviceFacts, accountId: string, nowMs: number): QuestAssignment {
+  const def = questDef(a.defId)
+  const { progress, target } = def ? evaluateProgress(def, factsIn(book, f, accountId, windowOf(a))) : { progress: 0, target: 1 }
+  const live = a.status === 'active' && (!a.expiresAt || Date.parse(a.expiresAt) > nowMs)
+  const status = a.status === 'active' && !live ? 'expired' : a.status
+  return { ...a, status, progress: status === 'completed' ? target : progress, target, claimable: live && !!def && progress >= target }
+}
+
+// ---- Assignments -------------------------------------------------------------------------------
+
+type PeriodCategory = Exclude<QuestCategory, 'starter'>
+
+/** How far back a quest counts as recently offered (avoided while anything else fits). */
+const RECENT_DAYS: Record<PeriodCategory, number> = { daily: 3, weekly: 28, adventure: 14 }
+
+function newAssignment(def: QuestDef, periodKey: string, now: Date, expiresAt: Date | null): StoredAssignment {
+  return {
+    id: `${periodKey}:${def.id}`,
+    defId: def.id,
+    category: def.category,
+    periodKey,
+    status: 'active',
+    target: 1,
+    assignedAt: now.toISOString(),
+    expiresAt: expiresAt ? expiresAt.toISOString() : null,
+    completedAt: null,
+    // The catalogue's reward when it was handed out: what a claim pays.
+    reward: def.reward,
+  }
 }
 
 /** A claim under the first challenge system ('challenge:<id>:<period>') counts as completed. */
-function legacyClaim(book: Book, a: StoredAssignment): LedgerEntry | undefined {
-  const day = a.periodKey.startsWith('d:') ? a.periodKey.split(':')[1] : null
-  const period = a.category === 'starter' ? 'once' : day
-  return period ? book.ledger.find((e) => e.ref === `legacy:challenge:${a.defId}:${period}`) : undefined
+function legacyClaim(book: Book, defId: string, period: string): LedgerEntry | undefined {
+  return book.ledger.find((e) => e.ref === `legacy:challenge:${defId}:${period}`)
 }
 
-/** Fills this period's slots and expires last period's. Returns true when the book changed. */
-function ensureAssignments(book: Book, f: DeviceFacts, accountId: string, now: number): boolean {
-  const { issue, expire } = issueAssignments(issueInput(book, f, accountId, now))
-  if (issue.length === 0 && expire.length === 0) return false
-  const expired = new Set(expire)
-  for (const a of book.assignments) if (expired.has(a.id)) a.status = 'expired'
-  for (const fresh of issue) {
-    if (book.assignments.some((a) => a.id === fresh.id)) continue
-    const { progress: _p, claimable: _c, ...stored } = fresh
-    const old = legacyClaim(book, stored)
-    if (old) Object.assign(stored, { status: 'completed', completedAt: old.at })
-    book.assignments.push(stored)
+/** Def ids picking must skip: everything active, plus everything already handed out in `periodPrefix`. */
+function excludedIds(book: Book, periodPrefix: string, nowMs: number): string[] {
+  return [
+    ...new Set(
+      book.assignments
+        .filter((a) => (a.status === 'active' && (!a.expiresAt || Date.parse(a.expiresAt) > nowMs)) || a.periodKey.startsWith(periodPrefix))
+        .map((a) => a.defId),
+    ),
+  ]
+}
+
+function recentIds(book: Book, category: PeriodCategory, nowMs: number): string[] {
+  const since = nowMs - RECENT_DAYS[category] * DAY_MS
+  return book.assignments.filter((a) => a.category === category && Date.parse(a.assignedAt) >= since).map((a) => a.defId)
+}
+
+function pickFor(book: Book, f: DeviceFacts, accountId: string, category: PeriodCategory, periodKey: string, periodPrefix: string, nowMs: number, salt = '') {
+  return issueAssignments({
+    category,
+    count: 1,
+    profile: f.profile?.accountId === accountId ? f.profile : null,
+    exclude: excludedIds(book, periodPrefix, nowMs),
+    recent: recentIds(book, category, nowMs),
+    seed: `${accountId}:${periodKey}${salt}`,
+    person: { hasTeamedUp: f.huntResults.length > 0 },
+  })[0]
+}
+
+/**
+ * This period's quests: every starter quest (once), one weekly, three daily slots and three
+ * adventures. Active ones past their period become expired. Returns true when the book changed.
+ */
+function ensureAssignments(book: Book, f: DeviceFacts, accountId: string, now: Date): boolean {
+  const nowMs = now.getTime()
+  const p = periodsAt(now)
+  let changed = false
+
+  for (const a of book.assignments) {
+    if (a.status === 'active' && a.expiresAt && Date.parse(a.expiresAt) <= nowMs) {
+      a.status = 'expired'
+      changed = true
+    }
   }
-  // Keep the book small: expired/replaced quests go after a few weeks (completed ones stay).
-  const cutoff = now - 35 * DAY_MS
+
+  // Starter quests: one each, never expire (quests added to the catalogue later appear too).
+  for (const def of questDefsIn('starter')) {
+    if (book.assignments.some((a) => a.category === 'starter' && a.defId === def.id)) continue
+    const a = newAssignment(def, 'starter', now, null)
+    const old = legacyClaim(book, def.id, 'once')
+    if (old) Object.assign(a, { status: 'completed', completedAt: old.at })
+    book.assignments.push(a)
+    changed = true
+  }
+
+  const fill = (category: PeriodCategory, periodPrefix: string, keys: string[], expires: Date) => {
+    for (const periodKey of keys) {
+      // A slot is filled by its live quest; a replaced one has its successor in the same slot.
+      if (book.assignments.some((a) => a.periodKey === periodKey && a.status !== 'replaced')) continue
+      const def = pickFor(book, f, accountId, category, periodKey, periodPrefix, nowMs)
+      if (!def) continue
+      const a = newAssignment(def, periodKey, now, expires)
+      // The first version's "Hunt of the day" claimed today still counts as done.
+      const old = category === 'daily' ? legacyClaim(book, def.id, p.today) : undefined
+      if (old) Object.assign(a, { status: 'completed', completedAt: old.at })
+      book.assignments.push(a)
+      changed = true
+    }
+  }
+  const slots = (prefix: string, n: number) => Array.from({ length: n }, (_, i) => `${prefix}${i + 1}`)
+  const weekEnd = new Date(p.weekWindow.to)
+  fill('weekly', `w:${p.week}`, [`w:${p.week}`], weekEnd)
+  fill('daily', `d:${p.today}:`, slots(`d:${p.today}:`, QUEST_SLOTS.daily), new Date(p.day.to))
+  fill('adventure', `a:${p.week}:`, slots(`a:${p.week}:`, QUEST_SLOTS.adventure), weekEnd)
+
+  // Keep the book small: expired/replaced quests and old visits go after five weeks (completed stay).
+  const cutoff = nowMs - 35 * DAY_MS
+  const before = book.assignments.length + book.visits.length + Object.keys(book.refreshes).length
   book.assignments = book.assignments.filter((a) => a.status === 'completed' || a.status === 'active' || Date.parse(a.assignedAt) > cutoff)
   book.visits = book.visits.filter((v) => v.at > cutoff)
-  return true
+  book.refreshes = p.today in book.refreshes ? { [p.today]: book.refreshes[p.today] } : {}
+  if (book.assignments.length + book.visits.length + Object.keys(book.refreshes).length !== before) changed = true
+  return changed
 }
 
-function withProgress(a: StoredAssignment, facts: QuestFacts, timezone: string): QuestAssignment {
-  const { progress, target } = assignmentProgress({ ...a, progress: 0, target: 1 }, facts, timezone)
-  const done = a.status === 'completed'
-  return { ...a, progress: done ? target : progress, target, claimable: a.status === 'active' && progress >= target }
-}
+// ---- State -------------------------------------------------------------------------------------
 
-function toState(book: Book, f: DeviceFacts, accountId: string, now: number): EconomyState {
-  const facts = factsOf(book, f, accountId)
-  const all = book.assignments.map((a) => withProgress(a, facts, book.timezone))
-  const periods = periodsAt(now, book.timezone)
+function toState(book: Book, f: DeviceFacts, accountId: string, now: Date): EconomyState {
+  const nowMs = now.getTime()
+  const p = periodsAt(now)
+  const all = book.assignments.map((a) => withProgress(a, book, f, accountId, nowMs))
   return {
     balance: balanceOf(book),
     earnedTotal: book.ledger.filter((e) => e.amount > 0).reduce((n, e) => n + e.amount, 0),
@@ -236,9 +349,9 @@ function toState(book: Book, f: DeviceFacts, accountId: string, now: number): Ec
       .filter((a) => a.status === 'completed')
       .sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''))
       .slice(0, HISTORY_LIMIT),
-    dailyRefreshAvailable: dailyRefreshAvailable(book.assignments, now, book.timezone),
-    nextDailyReset: new Date(periods.day.end).toISOString(),
-    nextWeeklyReset: new Date(periods.week.end).toISOString(),
+    dailyRefreshAvailable: (book.refreshes[p.today] ?? 0) < DAILY_REFRESHES,
+    nextDailyReset: new Date(p.day.to).toISOString(),
+    nextWeeklyReset: new Date(p.weekWindow.to).toISOString(),
     timezone: book.timezone,
     source: 'device',
   }
@@ -246,23 +359,14 @@ function toState(book: Book, f: DeviceFacts, accountId: string, now: number): Ec
 
 const newEntryId = () => `pts-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 
-const REFRESH_ERRORS: Record<string, string> = {
-  'not-found': 'Quest not found',
-  'not-today': 'That challenge is from another day',
-  'not-active': 'That quest is no longer active',
-  'already-done': 'That challenge is finished: claim it instead',
-  'no-refresh-left': 'Daily refresh already used',
-  'nothing-else': 'No other daily challenge is available right now',
-}
-
 // ---- The API -----------------------------------------------------------------------------------
 
 /** EconomyApi kept on this device for one account. `facts` returns the store's latest profile and hunts. */
 export function deviceEconomy(accountId: string, facts: () => DeviceFacts): EconomyApi {
   // Each call reads, changes and writes the book synchronously, so two tabs can't interleave.
-  const transact = (change?: (book: Book, now: number, f: DeviceFacts) => void): EconomyState => {
+  const transact = (change?: (book: Book, now: Date, f: DeviceFacts) => void): EconomyState => {
     const f = facts()
-    const now = Date.now()
+    const now = new Date()
     const book = readBook(accountId, f)
     // Days and weeks follow this device's clock and timezone.
     const tz = localTimezone()
@@ -284,27 +388,33 @@ export function deviceEconomy(accountId: string, facts: () => DeviceFacts): Econ
         const ref = `quest:${a.id}`
         // Already paid (repeat click, second tab): nothing changes.
         if (a.status === 'completed' || book.ledger.some((e) => e.ref === ref)) return
-        if (a.status === 'expired' || (a.expiresAt && Date.parse(a.expiresAt) <= now)) throw new Error('That quest has expired')
+        if (a.status === 'expired') throw new Error('That quest has expired')
         if (a.status !== 'active') throw new Error('That quest is no longer active')
         const def = questDef(a.defId)
         if (!def) throw new Error('Quest not found')
-        if (!withProgress(a, factsOf(book, f, accountId), book.timezone).claimable) throw new Error('Quest not finished yet')
+        if (!withProgress(a, book, f, accountId, now.getTime()).claimable) throw new Error('Quest not finished yet')
         a.status = 'completed'
-        a.completedAt = new Date(now).toISOString()
-        // The reward stored when it was assigned (from the catalogue), never a caller's number.
+        a.completedAt = now.toISOString()
+        // The reward stored when it was handed out (from the catalogue), never a caller's number.
         book.ledger.push({ id: newEntryId(), amount: a.reward, kind: 'quest', ref, label: def.title, at: a.completedAt })
       }),
 
     refreshDaily: async (id) =>
       transact((book, now, f) => {
-        const old = book.assignments.find((x) => x.id === id)
-        const claimable = old ? withProgress(old, factsOf(book, f, accountId), book.timezone).claimable : false
-        const result = refreshDailyAssignment(issueInput(book, f, accountId, now), id, { claimable })
-        if (!result.ok) throw new Error(REFRESH_ERRORS[result.reason] ?? 'Couldn’t refresh that challenge')
-        const replaced = book.assignments.find((x) => x.id === result.replace)
-        if (replaced) replaced.status = 'replaced'
-        const { progress: _p, claimable: _c, ...stored } = result.issue
-        book.assignments.push(stored)
+        const a = book.assignments.find((x) => x.id === id)
+        const p = periodsAt(now)
+        if (!a || a.category !== 'daily') throw new Error('Quest not found')
+        if (!a.periodKey.startsWith(`d:${p.today}:`)) throw new Error('That challenge is from another day')
+        if (a.status !== 'active') throw new Error('That quest is no longer active')
+        if ((book.refreshes[p.today] ?? 0) >= DAILY_REFRESHES) throw new Error('Daily refresh already used')
+        // Swapping a finished challenge would throw its reward away.
+        if (withProgress(a, book, f, accountId, now.getTime()).claimable) throw new Error('That challenge is finished: claim it instead')
+        // Everything handed out today is excluded (the one being replaced too), so the swap is new.
+        const next = pickFor(book, f, accountId, 'daily', a.periodKey, `d:${p.today}:`, now.getTime(), ':refresh')
+        if (!next) throw new Error('No other daily challenge is available right now')
+        a.status = 'replaced'
+        book.refreshes[p.today] = (book.refreshes[p.today] ?? 0) + 1
+        book.assignments.push(newAssignment(next, a.periodKey, now, new Date(p.day.to)))
       }),
 
     purchase: async (itemId) =>
@@ -320,7 +430,7 @@ export function deviceEconomy(accountId: string, facts: () => DeviceFacts): Econ
         }
         if (item.retired) throw new Error('That item is no longer sold')
         if (balanceOf(book) < item.price) throw new Error('Not enough points')
-        book.ledger.push({ id: newEntryId(), amount: -item.price, kind: 'purchase', ref, label: item.name, at: new Date(now).toISOString() })
+        book.ledger.push({ id: newEntryId(), amount: -item.price, kind: 'purchase', ref, label: item.name, at: now.toISOString() })
         book.owned.push(item.id)
         // Not equipped: wearing it is a separate choice.
       }),
@@ -340,9 +450,10 @@ export function deviceEconomy(accountId: string, facts: () => DeviceFacts): Econ
 
     recordVisit: async (page) => {
       transact((book, now) => {
-        const today = periodsAt(now, book.timezone).day
-        if (book.visits.some((v) => v.page === page && v.at >= today.start && v.at < today.end)) return
-        book.visits.push({ page, at: now })
+        const { day } = periodsAt(now)
+        // One a day per page is all the quests need.
+        if (book.visits.some((v) => v.page === page && inWindow(v.at, day))) return
+        book.visits.push({ page, at: now.getTime() })
       })
     },
 

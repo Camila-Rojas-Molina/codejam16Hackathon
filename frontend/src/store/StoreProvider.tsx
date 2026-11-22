@@ -119,11 +119,12 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
   }, [state.profile, state.account, huntResults])
 
   const signedIn = Boolean(sessionUserId)
-  const economyApi = useMemo<EconomyApi | null>(() => {
+  // Built where it's used (effects and handlers), so the device economy reads the latest facts.
+  const getEconomy = useCallback((): EconomyApi | null => {
     if (!accountId) return null
     // With Supabase on, the account is only usable with its login (see the profile effect above).
     if (AUTH_ENABLED && !signedIn) return null
-    return economyFor(accountId, { signedIn, facts: () => factsRef.current })
+    return economyFor(accountId, { signedIn, facts: factsRef })
   }, [accountId, signedIn])
 
   // Every economy request takes a number when it starts; an answer older than the one already shown
@@ -140,6 +141,7 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
   )
 
   const reloadEconomy = useCallback(async () => {
+    const economyApi = getEconomy()
     if (!economyApi) return
     const t = ++seq.current.next
     try {
@@ -147,37 +149,45 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       setEconomyError(errorText(err))
     }
-  }, [economyApi, applyEconomy])
+  }, [getEconomy, applyEconomy])
 
   // Load after sign-in / app open, and again when something that can move a quest on changes
   // (profile saved, a hunt finished). Also when the tab comes back, and right after the daily reset.
   const progressKey = `${state.profile?.updatedAt ?? 0}:${huntResults.length}:${state.account?.avatar ?? ''}`
   useEffect(() => {
-    void reloadEconomy()
-  }, [reloadEconomy, progressKey])
+    const economyApi = getEconomy()
+    if (!economyApi) return
+    const t = ++seq.current.next
+    economyApi.load().then(
+      (next) => applyEconomy(t, next),
+      (err: unknown) => setEconomyError(errorText(err)),
+    )
+  }, [getEconomy, applyEconomy, progressKey])
 
   useEffect(() => {
+    const economyApi = getEconomy()
     if (!economyApi) return
     const onVisible = () => document.visibilityState === 'visible' && void reloadEconomy()
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [economyApi, reloadEconomy])
+  }, [getEconomy, reloadEconomy])
 
   const nextReset = state.economy?.nextDailyReset
   useEffect(() => {
     const at = nextReset ? Date.parse(nextReset) : NaN
-    if (!economyApi || !Number.isFinite(at)) return
+    if (!getEconomy() || !Number.isFinite(at)) return
     // A second late, so the new day has started on the server too. Capped so timers stay sane.
     const wait = Math.min(Math.max(at - Date.now() + 1000, 1000), 24 * 3600_000)
     const timer = window.setTimeout(() => void reloadEconomy(), wait)
     return () => window.clearTimeout(timer)
-  }, [economyApi, nextReset, reloadEconomy])
+  }, [getEconomy, nextReset, reloadEconomy])
 
   /** Runs one economy write. The same key while it's in flight returns the same promise (double clicks). */
   const runEconomy = useCallback(
     (key: string, write: (economy: EconomyApi) => Promise<EconomyState>): Promise<void> => {
       const running = inFlight.current.get(key)
       if (running) return running
+      const economyApi = getEconomy()
       if (!economyApi) return Promise.reject(new Error(accountId ? 'Please log in again.' : 'Please create your profile first.'))
       setPending((p) => [...p, key])
       const t = ++seq.current.next
@@ -196,11 +206,12 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
       inFlight.current.set(key, job)
       return job
     },
-    [economyApi, accountId, applyEconomy],
+    [getEconomy, accountId, applyEconomy],
   )
 
   const recordVisit = useCallback(
     (page: EconomyPage) => {
+      const economyApi = getEconomy()
       if (!economyApi || !accountId || visitedToday(accountId, page)) return
       const key = `visit:${page}`
       if (inFlight.current.has(key)) return
@@ -219,7 +230,7 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
       })()
       inFlight.current.set(key, job)
     },
-    [economyApi, accountId, applyEconomy],
+    [getEconomy, accountId, applyEconomy],
   )
 
   const value = useMemo<StoreValue>(() => {
