@@ -16,7 +16,7 @@ if (!isFile(join(DIST, 'index.html'))) {
 }
 
 // Only these public, browser-safe values are exposed. Never add secret keys here.
-const PUBLIC_ENV = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY', 'VITE_GOOGLE_MAPS_API_KEY']
+const PUBLIC_ENV = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY', 'VITE_GOOGLE_MAPS_API_KEY', 'VITE_GOOGLE_MAPS_MAP_ID']
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
