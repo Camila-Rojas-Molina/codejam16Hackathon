@@ -1,16 +1,17 @@
-// A person's avatar: character art (lib/avatars.ts), or the emoji used by demo partners.
-// Anything else (an unknown id) shows the default avatar, so nothing breaks.
-import { AVATAR_LIST, avatarFor } from '../../lib/avatars'
+// A person's avatar: always one of the character illustrations in lib/avatars.ts, framed like a
+// stamp. Unknown or old values (e.g. emoji from early versions) show the default character, so
+// no emoji ever reaches the screen.
+import { avatarFor } from '../../lib/avatars'
 import { cn } from '../../lib/cn'
 
 type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
 
-const sizes: Record<AvatarSize, { box: string; emoji: string }> = {
-  xs: { box: 'size-8 border-2', emoji: 'text-base' },
-  sm: { box: 'size-11 border-[3px]', emoji: 'text-xl' },
-  md: { box: 'size-14 border-[3px]', emoji: 'text-3xl' },
-  lg: { box: 'size-20 border-4', emoji: 'text-4xl' },
-  xl: { box: 'size-28 border-4', emoji: 'text-6xl' },
+const sizes: Record<AvatarSize, string> = {
+  xs: 'size-8',
+  sm: 'size-11',
+  md: 'size-14',
+  lg: 'size-20',
+  xl: 'size-28',
 }
 
 type AvatarProps = {
@@ -22,23 +23,15 @@ type AvatarProps = {
 }
 
 export default function Avatar({ avatar, name, size = 'md', className }: AvatarProps) {
-  const known = AVATAR_LIST.find((a) => a.id === avatar)
-  // Emoji avatars are short pictographs; plain-text unknown ids fall back to the default art.
-  const isEmoji = !known && avatar.length <= 8 && /\p{Extended_Pictographic}/u.test(avatar)
-  const art = known ?? (isEmoji ? null : avatarFor(avatar))
-  const s = sizes[size]
+  const art = avatarFor(avatar)
   return (
     <span
-      className={cn('grid shrink-0 place-items-center overflow-hidden rounded-full border-navy bg-paper', s.box, className)}
+      className={cn('grid shrink-0 place-items-center overflow-hidden border-2 border-ink bg-saffron-soft', sizes[size], className)}
       role={name ? 'img' : undefined}
       aria-label={name ? `${name}’s avatar` : undefined}
       aria-hidden={name ? undefined : true}
     >
-      {art ? (
-        <img src={art.src} alt="" draggable={false} className="size-[88%] object-contain" />
-      ) : (
-        <span className={cn('leading-none', s.emoji)}>{avatar}</span>
-      )}
+      <img src={art.src} alt="" draggable={false} className="size-[86%] object-contain" />
     </span>
   )
 }

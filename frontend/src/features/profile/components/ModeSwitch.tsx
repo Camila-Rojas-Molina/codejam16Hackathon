@@ -1,5 +1,6 @@
 // The Tourist ⇄ Local switch shown on the main screens. Same account, same profile; just a different context.
 import { Link } from 'react-router'
+import Icon from '../../../components/icons/Icon'
 import { cn } from '../../../lib/cn'
 import { useStore } from '../../../store/useStore'
 import { MODE_OPTIONS } from '../../onboarding/options'
@@ -20,8 +21,8 @@ export default function ModeSwitch({ returnTo, className }: ModeSwitchProps) {
 
   return (
     <div className={className}>
-      <div role="group" aria-label="Exploring mode" className="flex gap-1.5 rounded-full border-[3px] border-navy bg-paper p-1.5">
-        {MODE_OPTIONS.map((m) => {
+      <div role="group" aria-label="Exploring mode" className="sheet-grain flex border-2 border-ink">
+        {MODE_OPTIONS.map((m, i) => {
           const active = activeMode === m.mode
           const ready = isModeReady(profile, m.mode)
           return (
@@ -32,16 +33,15 @@ export default function ModeSwitch({ returnTo, className }: ModeSwitchProps) {
               aria-busy={pending === m.mode || undefined}
               onClick={() => choose(m.mode, { returnTo })}
               className={cn(
-                'flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full border-[3px] px-3 font-type text-sm tracking-wider uppercase transition-[transform,background-color] duration-150 active:scale-95',
-                active ? cn('border-navy', m.activeClass, 'motion-safe:animate-pop') : 'border-transparent text-navy hover:bg-bubble-light',
+                'flex min-h-12 flex-1 items-center justify-center gap-2 px-3 text-sm font-bold tracking-[0.1em] uppercase transition-colors',
+                i > 0 && 'border-l-2 border-ink',
+                active ? m.activeClass : 'text-ink hover:bg-saffron-soft',
               )}
             >
-              <span aria-hidden className="text-lg">
-                {m.emoji}
-              </span>
+              <Icon name={m.icon} accent={m.accent} className="size-5" />
               <span>{m.title}</span>
               {!ready && (
-                <span className="rounded-full border-2 border-navy bg-bubble-light px-1.5 text-[0.6rem] text-navy">
+                <span className="border-2 border-ink bg-sheet px-1.5 text-[0.6rem]">
                   Set up
                 </span>
               )}
@@ -51,26 +51,26 @@ export default function ModeSwitch({ returnTo, className }: ModeSwitchProps) {
       </div>
 
       {/* What the current mode is pointed at, with a shortcut to change it. */}
-      <p className="mt-2 flex min-h-6 flex-wrap items-center justify-center gap-x-2 text-center text-sm">
+      <p className="mt-2 flex min-h-6 flex-wrap items-center justify-center gap-x-2 text-center text-sm font-semibold">
         {activeMode === 'tourist' && trip && (
           <>
-            <span>
-              <span aria-hidden>✈️ </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Icon name="plane" className="size-4" />
               Exploring <strong>{trip.destination}</strong>
               {formatTripDates(trip) && <> · {formatTripDates(trip)}</>}
             </span>
-            <Link to="/trips" className="font-semibold underline underline-offset-4">
+            <Link to="/trips" className="font-bold underline decoration-2 underline-offset-4">
               Change trip
             </Link>
           </>
         )}
         {activeMode === 'local' && local && (
           <>
-            <span>
-              <span aria-hidden>🏠 </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Icon name="house" accent="teal" className="size-4" />
               Hosting in <strong>{local.homeCity}</strong>
             </span>
-            <Link to="/mode/local" state={{ activate: false, returnTo }} className="font-semibold underline underline-offset-4">
+            <Link to="/mode/local" state={{ activate: false, returnTo }} className="font-bold underline decoration-2 underline-offset-4">
               Edit
             </Link>
           </>

@@ -4,12 +4,15 @@ import { Link, useNavigate } from 'react-router'
 import Button from '../components/ui/Button'
 import { buttonClasses } from '../components/ui/buttonStyles'
 import Card from '../components/ui/Card'
-import { Toggle } from '../components/ui/Fields'
+import { PrivacyNote, Toggle } from '../components/ui/Fields'
+import PageHeader from '../components/ui/PageHeader'
+import Icon from '../components/icons/Icon'
+import { Mascot } from '../components/illustrations/Mascot'
 import { ACCESSIBILITY_OPTIONS, labelsFor } from '../features/profile/options'
 import { profileStorage } from '../lib/api'
 import { useStore } from '../store/useStore'
 
-const sectionTitle = 'mb-3 text-3xl text-navy'
+const sectionTitle = 'mb-4 flex items-center gap-3 text-3xl'
 
 export default function SettingsPage() {
   const { account, profile, saveUniversal, saveTrip, deleteAccount, demoMode, setDemoMode } = useStore()
@@ -43,12 +46,13 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto w-full max-w-2xl space-y-10">
       <header>
-        <h1 className="text-4xl text-navy sm:text-5xl">Settings</h1>
+        <PageHeader eyebrow="Account & app" title="Settings" aside={<Mascot pose="read" className="h-28" />} />
         <p className="sr-only" aria-live="polite">
           {message}
         </p>
         {message && (
-          <p role="status" className="mt-3 rounded-2xl border-[3px] border-navy bg-sun px-4 py-2 text-ink">
+          <p role="status" className="mt-4 flex items-center gap-2 border-2 border-ink bg-teal-soft px-4 py-2 font-semibold">
+            <Icon name="check" accent="none" strokeWidth={2.6} className="size-5" />
             {message}
           </p>
         )}
@@ -56,6 +60,7 @@ export default function SettingsPage() {
 
       <section aria-labelledby="s-account">
         <h2 id="s-account" className={sectionTitle}>
+          <Icon name="user" className="size-8" />
           Account
         </h2>
         <Card className="space-y-4">
@@ -74,16 +79,18 @@ export default function SettingsPage() {
               Manage trips
             </Link>
           </div>
-          <p className="text-sm">
+          <p className="flex items-start gap-2 text-sm">
+            <Icon name={storage === 'supabase' ? 'cloud' : 'info'} accent="teal" className="size-5" />
             {storage === 'supabase'
-              ? '☁️ Your profile is saved to MIGO’s servers.'
-              : '📱 Your profile is saved on this device. Connecting the MIGO backend will sync it to your account.'}
+              ? 'Your profile is saved to MIGO’s servers.'
+              : 'Your profile is saved on this device. Connecting the MIGO backend will sync it to your account.'}
           </p>
         </Card>
       </section>
 
       <section aria-labelledby="s-privacy">
         <h2 id="s-privacy" className={sectionTitle}>
+          <Icon name="lock" className="size-8" />
           Privacy
         </h2>
         <Card className="space-y-5">
@@ -104,10 +111,11 @@ export default function SettingsPage() {
           />
           {hasAccessInfo &&
             (confirm === 'access' ? (
-              <div role="alertdialog" aria-label="Remove accessibility info?" className="rounded-2xl border-[3px] border-dashed border-navy p-3">
+              <div role="alertdialog" aria-label="Remove accessibility info?" className="border-2 border-dashed border-ink bg-sheet p-3">
                 <p className="font-semibold">Remove all accessibility info from your profile and trips?</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button
+                    variant="danger"
                     disabled={busy}
                     onClick={() =>
                       act(async () => {
@@ -131,14 +139,17 @@ export default function SettingsPage() {
               </Button>
             ))}
           <p className="text-sm">
-            🔒 Private answers (budget, food and dietary needs, transport, neighbourhood, hidden gems, notes) only help MIGO
-            choose places and people. They’re never shown to anyone. 👀 Public ones are marked on your profile.
+            <PrivacyNote kind="private">
+              Budget, food and dietary needs, transport, neighbourhood, hidden gems and notes only help MIGO choose places and
+              people. They’re never shown to anyone. Public answers are marked on your profile.
+            </PrivacyNote>
           </p>
         </Card>
       </section>
 
       <section aria-labelledby="s-app">
         <h2 id="s-app" className={sectionTitle}>
+          <Icon name="cog" className="size-8" />
           App
         </h2>
         <Card>
@@ -153,6 +164,7 @@ export default function SettingsPage() {
 
       <section aria-labelledby="s-danger" className="pb-4">
         <h2 id="s-danger" className={sectionTitle}>
+          <Icon name="trash" className="size-8" />
           Delete account
         </h2>
         {confirm === 'account' ? (
@@ -162,6 +174,7 @@ export default function SettingsPage() {
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Button
+                variant="danger"
                 disabled={busy}
                 onClick={async () => {
                   setBusy(true)
@@ -177,7 +190,7 @@ export default function SettingsPage() {
             </div>
           </Card>
         ) : (
-          <Button variant="secondary" onClick={() => setConfirm('account')}>
+          <Button variant="danger" icon="trash" onClick={() => setConfirm('account')}>
             Delete my account
           </Button>
         )}

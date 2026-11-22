@@ -1,17 +1,19 @@
 import { useEffect, useEffectEvent, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router'
 import Screen from '../components/layout/Screen'
-import { SpeechBubble, Star } from '../components/illustrations/Stickers'
+import Icon from '../components/icons/Icon'
+import { Mascot } from '../components/illustrations/Mascot'
+import { Sparkle, SpeechBubble } from '../components/illustrations/Stickers'
 import Avatar from '../components/ui/Avatar'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
-import { roleLabel } from '../features/onboarding/options'
+import { modeMeta, roleLabel } from '../features/onboarding/options'
 import { nextOnboardingStep } from '../features/profile/flow'
 import { compatibility, toMatchProfile } from '../features/profile/matching'
 import { activeTrip } from '../features/profile/model'
 import { INTEREST_OPTIONS, labelsFor } from '../features/profile/options'
-import { findPartner, matchDogs } from '../lib/api'
+import { asMatchProfile, findPartner } from '../lib/api'
 import type { User } from '../lib/types'
 import { useStore } from '../store/useStore'
 
@@ -61,22 +63,23 @@ export default function MatchPage() {
 
   if (phase.kind === 'searching') {
     return (
-      <Screen className="items-center justify-center gap-10 text-center">
-        <div className="relative grid size-56 place-items-center" role="status" aria-live="polite">
+      <Screen className="items-center justify-center gap-8 text-center">
+        <div className="relative grid size-64 place-items-center" role="status" aria-live="polite">
           {[0, 0.65, 1.3].map((delay) => (
             <span
               key={delay}
-              className="absolute inset-0 rounded-full border-4 border-navy bg-bubble/40 motion-safe:animate-ring"
+              className="absolute inset-6 border-2 border-ink bg-saffron-soft/50 motion-safe:animate-ring"
               style={{ animationDelay: `${delay}s` }}
               aria-hidden
             />
           ))}
-          <AvatarDisc emoji={user.avatar} className="relative" />
+          <Mascot pose="search" className="relative h-52" />
           <span className="sr-only">Finding your partner…</span>
         </div>
         <div>
-          <h1 className="text-4xl text-navy">Finding your partner…</h1>
-          <p className="mt-2">Looking for {lookingFor}.</p>
+          <p className="eyebrow mb-2">Matching</p>
+          <h1 className="text-4xl">Finding your partner…</h1>
+          <p className="mt-2 font-serif text-xl">Looking for {lookingFor}.</p>
         </div>
       </Screen>
     )
@@ -85,9 +88,12 @@ export default function MatchPage() {
   if (phase.kind === 'error') {
     return (
       <Screen className="justify-center gap-6">
+        <div className="flex justify-center">
+          <Mascot pose="ponder" className="h-40" label />
+        </div>
         <Card>
-          <h1 className="text-2xl">No partner yet</h1>
-          <p className="mt-2">We couldn't find anyone just now. Give it another go.</p>
+          <h1 className="text-3xl">No partner yet</h1>
+          <p className="mt-2">We couldn’t find anyone just now. Give it another go.</p>
         </Card>
         <Button
           size="lg"
@@ -104,13 +110,14 @@ export default function MatchPage() {
   }
 
   const { partner } = phase
-  const match = compatibility(me ?? {}, { interests: partner.interests, languages: partner.languages, dogs: matchDogs(partner) })
+  const match = compatibility(me ?? {}, asMatchProfile(partner))
   const common = labelsFor(INTEREST_OPTIONS, match.sharedInterests)
 
   return (
-    <Screen className="justify-between gap-8">
+    <Screen className="justify-between gap-8 md:max-w-xl">
       <header className="pt-4 text-center">
-        <h1 className="text-4xl text-navy motion-safe:animate-pop">It's a match!</h1>
+        <p className="eyebrow mb-2">Matched</p>
+        <h1 className="title-retro font-display text-5xl motion-safe:animate-pop">It’s a match!</h1>
       </header>
 
       {/* The two players greeting each other */}
@@ -119,47 +126,54 @@ export default function MatchPage() {
           <SpeechBubble tail="left">Hi!</SpeechBubble>
           <AvatarDisc emoji={user.avatar} />
         </div>
-        <Star className="mb-6 size-9 motion-safe:animate-wiggle" />
+        <Sparkle className="mb-8 size-9 motion-safe:animate-wiggle" />
         <div className="flex flex-col items-center gap-6">
-          <SpeechBubble tail="right" fill="sun">
+          <SpeechBubble tail="right" tone="saffron">
             Salut!
           </SpeechBubble>
-          <AvatarDisc emoji={partner.avatar} className="bg-bubble-light" />
+          <AvatarDisc emoji={partner.avatar} />
         </div>
       </div>
 
-      <Card tone="bubble-light" tilt="right" className="motion-safe:animate-pop">
-        <div className="flex items-center gap-4">
-          <Avatar avatar={partner.avatar} size="xl" className="bg-paper" />
-          <div className="min-w-0">
-            <p className="font-type text-xs tracking-wider uppercase">Your teammate</p>
+      <article className="sheet-grain border-2 border-ink shadow-block motion-safe:animate-pop">
+        <div className="flex items-stretch border-b-2 border-ink">
+          <div className="grid shrink-0 place-items-center border-r-2 border-ink bg-saffron-soft p-3">
+            <Avatar avatar={partner.avatar} size="xl" className="border-0 bg-transparent" />
+          </div>
+          <div className="min-w-0 flex-1 p-4">
+            <p className="eyebrow">Your teammate</p>
             <h2 className="truncate text-4xl">{partner.name}</h2>
-            <Badge tone="navy" className="mt-1">
-              {roleLabel(partner.role)}
-            </Badge>
-            {match.dogDuo && (
-              <Badge tone="sun" className="mt-1 ml-1.5">
-                🐾 Dog duo
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              <Badge tone={partner.role === 'local' ? 'teal' : 'saffron'} icon={modeMeta(partner.role).icon}>
+                {roleLabel(partner.role)}
               </Badge>
-            )}
+              {match.dogDuo && (
+                <Badge tone="sandy" icon="paw">
+                  Dog duo
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
         {(common.length > 0 || match.sharedLanguages.length > 0) && (
-          <p className="mt-4 border-t-[3px] border-dashed border-navy pt-3">
-            <span className="font-type text-xs tracking-wider uppercase">In common · </span>
-            {[common.length > 0 && `you both love ${common.join(', ')}`, match.sharedLanguages.length > 0 && `you both speak ${match.sharedLanguages.join(', ')}`]
-              .filter(Boolean)
-              .join('; ')}
-            .
+          <p className="flex items-start gap-2 border-b-2 border-ink px-4 py-3">
+            <Icon name="venn" className="size-5" />
+            <span>
+              <span className="eyebrow mr-1">In common</span>
+              {[common.length > 0 && `you both love ${common.join(', ')}`, match.sharedLanguages.length > 0 && `you both speak ${match.sharedLanguages.join(', ')}`]
+                .filter(Boolean)
+                .join('; ')}
+              .
+            </span>
           </p>
         )}
         {partner.funFact && (
-          <p className="mt-4 border-t-[3px] border-dashed border-navy pt-3">
-            <span className="font-type text-xs tracking-wider uppercase">Fun fact · </span>
+          <p className="px-4 py-3 font-serif text-lg leading-snug">
+            <span className="eyebrow mr-2 align-middle">Fun fact</span>
             {partner.funFact}
           </p>
         )}
-      </Card>
+      </article>
 
       <Button
         size="lg"
@@ -170,6 +184,7 @@ export default function MatchPage() {
         }}
       >
         Start hunting together
+        <Icon name="arrow-right" accent="none" strokeWidth={2.4} className="size-5" />
       </Button>
     </Screen>
   )

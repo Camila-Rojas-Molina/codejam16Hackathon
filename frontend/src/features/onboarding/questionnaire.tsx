@@ -1,12 +1,16 @@
 // The universal onboarding questionnaire: two sections, one question (or a small group) per screen.
 // Nothing here assumes the person is a tourist or a local; both modes use these answers.
 import type { ReactNode } from 'react'
+import type { IconName } from '../../components/icons/Icon'
 import Choices from '../../components/ui/Choices'
-import { TagInput, TextArea, TextField, Toggle } from '../../components/ui/Fields'
+import RankedChoices from '../../components/ui/RankedChoices'
+import { PrivacyNote, TextArea, TextField, Toggle } from '../../components/ui/Fields'
+import CityCollection from '../places/components/CityCollection'
 import BudgetFields from '../profile/components/BudgetFields'
 import DogPhotoField from '../profile/components/DogPhotoField'
 import LanguageFields from '../profile/components/LanguageFields'
-import { citiesFromNames, dogDetailsError, dogsOf, rangeError } from '../profile/model'
+import { QUALITY_RANK_WEIGHTS } from '../profile/matchingConfig'
+import { addCity, cityLabel, dogDetailsError, dogsOf, rangeError } from '../profile/model'
 import {
   ACCESSIBILITY_OPTIONS,
   ADVENTURE_OPTIONS,
@@ -24,7 +28,6 @@ import {
   FOOD_STYLE_OPTIONS,
   GROUP_OPTIONS,
   INTEREST_OPTIONS,
-  MAX_CITIES,
   MAX_QUALITIES,
   NEW_PEOPLE_OPTIONS,
   NOTE_MAX_LENGTH,
@@ -95,7 +98,7 @@ export const QUESTIONS: QuestionStep[] = [
         maxLength={CITY_MAX_LENGTH}
         placeholder="e.g. Montréal"
         autoComplete="address-level2"
-        hint="👀 Shown on your profile (city only). You can change it any time."
+        hint={<PrivacyNote kind="public">Shown on your profile (city only). You can change it any time.</PrivacyNote>}
       />
     ),
   },
@@ -188,17 +191,15 @@ export const QUESTIONS: QuestionStep[] = [
     id: 'qualities',
     section: 'you',
     title: 'What makes someone a great exploring buddy?',
-    subtitle: `Your top ${MAX_QUALITIES}.`,
+    subtitle: `Pick up to ${MAX_QUALITIES} and rank them. Your top choice carries the most weight when we match you.`,
     optional: true,
     isValid: () => true,
     isAnswered: (d) => d.companion.qualities.length > 0,
     render: (d, update) => (
-      <Choices
-        multiple
+      <RankedChoices
         legend="Qualities you value in a companion"
-        hideLegend
-        layout="chip"
         max={MAX_QUALITIES}
+        weights={QUALITY_RANK_WEIGHTS}
         options={QUALITY_OPTIONS}
         values={d.companion.qualities}
         onChange={(qualities) => companion(update, { qualities })}
@@ -495,19 +496,16 @@ export const QUESTIONS: QuestionStep[] = [
     id: 'cities',
     section: 'style',
     title: 'Where have you explored?',
-    subtitle: 'Add cities you’ve discovered. They become stamps on your profile, and great conversation starters.',
+    subtitle: 'Pin the cities you’ve discovered on your atlas. They show on your profile and make great conversation starters.',
     optional: true,
     isValid: () => true,
     isAnswered: (d) => d.citiesDiscovered.length > 0,
     render: (d, update) => (
-      <TagInput
-        label="Cities I’ve discovered"
-        values={d.citiesDiscovered.map((c) => c.name)}
-        onChange={(names) => update((x) => ({ ...x, citiesDiscovered: citiesFromNames(x.citiesDiscovered, names) }))}
-        placeholder="e.g. Lisbon"
-        maxLength={CITY_MAX_LENGTH}
-        max={MAX_CITIES}
-        hint="Type a city and press Enter. Add more from your profile later."
+      <CityCollection
+        label="Search for a city you’ve explored"
+        cities={d.citiesDiscovered}
+        onAdd={(place) => update((x) => ({ ...x, citiesDiscovered: addCity(x.citiesDiscovered, place) }))}
+        onRemove={(cityId) => update((x) => ({ ...x, citiesDiscovered: x.citiesDiscovered.filter((c) => c.id !== cityId) }))}
       />
     ),
   },
@@ -546,7 +544,7 @@ export const QUESTIONS: QuestionStep[] = [
             onChange={(notes) => setA({ notes })}
             hint="Private. Never shown on your profile."
           />
-          <div className="rounded-[1.3rem_1.1rem_1.4rem_1rem] border-[3px] border-navy bg-paper p-4">
+          <div className="sheet-grain border-2 border-ink p-4">
             <Toggle
               label="Share these needs with my matches"
               description="Off: only MIGO sees them, to pick suitable places. On: your teammate sees the list above (never your notes)."
@@ -569,15 +567,14 @@ export type SummaryRow = {
   section: SectionId
   label: string
   value: string
+  /** Category icon shown with the answer. */
+  icon: IconName
   /** Private rows are used for matching and suggestions, but never shown to other people. */
   visibility: 'public' | 'private'
 }
 
 const list = (items: string[], empty = 'Not answered') => (items.length > 0 ? items.join(', ') : empty)
-const withEmoji = <T extends string>(options: Option<T>[], value: T | null) => {
-  const o = optionFor(options, value)
-  return o ? `${o.emoji ?? ''} ${o.label}`.trim() : 'Not answered'
-}
+const answer = <T extends string>(options: Option<T>[], value: T | null) => optionFor(options, value)?.label ?? 'Not answered'
 
 export function formatRange(range: UniversalProfile['exploration']['budget']['range']) {
   if (!range || (range.min === null && range.max === null)) return ''
@@ -594,7 +591,7 @@ export function summaryRows(u: UniversalProfile): SummaryRow[] {
   const access = labelsFor(ACCESSIBILITY_OPTIONS, u.accessibility.needs)
   if (u.accessibility.notes.trim()) access.push('plus a private note')
   const adventure = [
-    u.companion.idealAdventure ? withEmoji(ADVENTURE_OPTIONS, u.companion.idealAdventure) : '',
+    u.companion.idealAdventure ? answer(ADVENTURE_OPTIONS, u.companion.idealAdventure) : '',
     u.companion.idealAdventureNote.trim() ? `“${u.companion.idealAdventureNote.trim()}”` : '',
   ].filter(Boolean)
   const langs = u.languages.preferred.length > 0 ? `${list(u.languages.spoken)} (prefers ${list(u.languages.preferred)})` : list(u.languages.spoken)
@@ -602,7 +599,7 @@ export function summaryRows(u: UniversalProfile): SummaryRow[] {
   const dogValue =
     dogs.stance === 'has-dog'
       ? [
-          `🐕 ${dogs.dog.name.trim() || 'My dog'}`,
+          dogs.dog.name.trim() || 'My dog',
           [labelFor(DOG_SIZE_OPTIONS, dogs.dog.size), labelFor(DOG_VIBE_OPTIONS, dogs.dog.vibe)].filter(Boolean).join(', ').toLowerCase(),
           dogs.dog.goodWithDogs && `good with dogs: ${labelFor(DOG_SOCIAL_OPTIONS, dogs.dog.goodWithDogs).toLowerCase()}`,
           dogs.dog.photo && 'with photo',
@@ -610,34 +607,35 @@ export function summaryRows(u: UniversalProfile): SummaryRow[] {
           .filter(Boolean)
           .join(' · ')
       : dogs.stance
-        ? withEmoji(DOG_STANCE_OPTIONS, dogs.stance)
+        ? answer(DOG_STANCE_OPTIONS, dogs.stance)
         : 'Skipped'
 
   return [
-    { stepId: 'home', section: 'you', label: 'Home city', value: u.homeCity.trim() || 'Not answered yet', visibility: 'public' },
-    { stepId: 'energy', section: 'you', label: 'Vibe', value: withEmoji(ENERGY_OPTIONS, u.personality.energy), visibility: 'public' },
-    { stepId: 'new-people', section: 'you', label: 'Meeting new people', value: withEmoji(NEW_PEOPLE_OPTIONS, u.personality.newPeople), visibility: 'private' },
-    { stepId: 'planning', section: 'you', label: 'Planning', value: withEmoji(PLANNING_OPTIONS, u.personality.planning), visibility: 'public' },
-    { stepId: 'decisions', section: 'you', label: 'Deciding', value: withEmoji(DECISION_OPTIONS, u.personality.decisions), visibility: 'public' },
-    { stepId: 'interests', section: 'you', label: 'Interests', value: list(labelsFor(INTEREST_OPTIONS, u.interests)), visibility: 'public' },
-    { stepId: 'qualities', section: 'you', label: 'Great buddies are', value: list(labelsFor(QUALITY_OPTIONS, u.companion.qualities), 'Skipped'), visibility: 'private' },
-    { stepId: 'adventure', section: 'you', label: 'Ideal adventure', value: list(adventure, 'Skipped'), visibility: 'public' },
-    { stepId: 'topics', section: 'you', label: 'Could chat for hours about', value: list(labelsFor(TOPIC_OPTIONS, u.companion.topics), 'Skipped'), visibility: 'public' },
-    { stepId: 'budget', section: 'style', label: 'Usual budget', value: range ? `${budget}, ${range}` : budget, visibility: 'private' },
-    { stepId: 'pace', section: 'style', label: 'Pace', value: withEmoji(PACE_OPTIONS, u.exploration.pace), visibility: 'public' },
-    { stepId: 'attractions', section: 'style', label: 'Must-see spots', value: list(labelsFor(ATTRACTION_OPTIONS, u.exploration.attractions)), visibility: 'public' },
-    { stepId: 'food', section: 'style', label: 'Food', value: list(food, 'Skipped'), visibility: 'private' },
-    { stepId: 'transport', section: 'style', label: 'Getting around', value: list(labelsFor(TRANSPORT_OPTIONS, u.exploration.transport)), visibility: 'private' },
-    { stepId: 'group', section: 'style', label: 'Group size', value: withEmoji(GROUP_OPTIONS, u.exploration.groupSize), visibility: 'public' },
+    { stepId: 'home', section: 'you', label: 'Home city', value: u.homeCity.trim() || 'Not answered yet', icon: 'house', visibility: 'public' },
+    { stepId: 'energy', section: 'you', label: 'Vibe', value: answer(ENERGY_OPTIONS, u.personality.energy), icon: 'smile', visibility: 'public' },
+    { stepId: 'new-people', section: 'you', label: 'Meeting new people', value: answer(NEW_PEOPLE_OPTIONS, u.personality.newPeople), icon: 'people2', visibility: 'private' },
+    { stepId: 'planning', section: 'you', label: 'Planning', value: answer(PLANNING_OPTIONS, u.personality.planning), icon: 'clipboard', visibility: 'public' },
+    { stepId: 'decisions', section: 'you', label: 'Deciding', value: answer(DECISION_OPTIONS, u.personality.decisions), icon: 'venn', visibility: 'public' },
+    { stepId: 'interests', section: 'you', label: 'Interests', value: list(labelsFor(INTEREST_OPTIONS, u.interests)), icon: 'heart', visibility: 'public' },
+    { stepId: 'qualities', section: 'you', label: 'Great buddies are (ranked)', value: u.companion.qualities.length ? labelsFor(QUALITY_OPTIONS, u.companion.qualities).map((q, i) => `${i + 1}. ${q}`).join('  ') : 'Skipped', icon: 'star', visibility: 'private' },
+    { stepId: 'adventure', section: 'you', label: 'Ideal adventure', value: list(adventure, 'Skipped'), icon: 'compass', visibility: 'public' },
+    { stepId: 'topics', section: 'you', label: 'Could chat for hours about', value: list(labelsFor(TOPIC_OPTIONS, u.companion.topics), 'Skipped'), icon: 'chats', visibility: 'public' },
+    { stepId: 'budget', section: 'style', label: 'Usual budget', value: range ? `${budget}, ${range}` : budget, icon: 'coins', visibility: 'private' },
+    { stepId: 'pace', section: 'style', label: 'Pace', value: answer(PACE_OPTIONS, u.exploration.pace), icon: 'stopwatch', visibility: 'public' },
+    { stepId: 'attractions', section: 'style', label: 'Must-see spots', value: list(labelsFor(ATTRACTION_OPTIONS, u.exploration.attractions)), icon: 'pin', visibility: 'public' },
+    { stepId: 'food', section: 'style', label: 'Food', value: list(food, 'Skipped'), icon: 'bowl', visibility: 'private' },
+    { stepId: 'transport', section: 'style', label: 'Getting around', value: list(labelsFor(TRANSPORT_OPTIONS, u.exploration.transport)), icon: 'shoe', visibility: 'private' },
+    { stepId: 'group', section: 'style', label: 'Group size', value: answer(GROUP_OPTIONS, u.exploration.groupSize), icon: 'people3', visibility: 'public' },
     // "Prefers no dogs" is a private filter; every other answer is public (see privacy.ts).
-    { stepId: 'dogs', section: 'style', label: 'Four-legged amigos', value: dogValue, visibility: dogs.stance === 'no-dogs' ? 'private' : 'public' },
-    { stepId: 'languages', section: 'style', label: 'Languages', value: langs, visibility: 'public' },
-    { stepId: 'cities', section: 'style', label: 'Cities discovered', value: list(u.citiesDiscovered.map((c) => c.name), 'None yet'), visibility: 'public' },
+    { stepId: 'dogs', section: 'style', label: 'Four-legged amigos', value: dogValue, icon: 'paw', visibility: dogs.stance === 'no-dogs' ? 'private' : 'public' },
+    { stepId: 'languages', section: 'style', label: 'Languages', value: langs, icon: 'chat', visibility: 'public' },
+    { stepId: 'cities', section: 'style', label: 'Cities discovered', value: list(u.citiesDiscovered.map(cityLabel), 'None yet'), icon: 'globe', visibility: 'public' },
     {
       stepId: 'accessibility',
       section: 'style',
       label: 'Access needs',
       value: list(access, 'None shared'),
+      icon: 'shield',
       visibility: u.accessibility.shareWithMatches && u.accessibility.needs.length > 0 ? 'public' : 'private',
     },
   ]

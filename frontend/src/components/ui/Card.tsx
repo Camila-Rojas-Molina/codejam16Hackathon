@@ -1,54 +1,33 @@
 import type { HTMLAttributes, ReactNode } from 'react'
 import { cn } from '../../lib/cn'
 
-type CardTone = 'paper' | 'bubble-light' | 'bubble' | 'sun' | 'navy'
-type CardTilt = 'none' | 'left' | 'right'
+type CardTone = 'sheet' | 'paper' | 'saffron' | 'saffron-soft' | 'teal-soft' | 'sandy-soft' | 'sienna-soft' | 'ink'
 
 type CardProps = HTMLAttributes<HTMLElement> & {
   title?: string
   tone?: CardTone
-  /** Slight hand-placed rotation (±1°). */
-  tilt?: CardTilt
-  /** Adds the squish-on-tap feel. Use when the whole card is a link or button. */
-  interactive?: boolean
+  /** Solid offset shadow, for the one card on a screen that should lift off the page. */
+  lifted?: boolean
+  /** Tighter padding for dense cells. */
+  compact?: boolean
   children: ReactNode
 }
 
+// A ruled cell: square corners, 2px ink border, paper fill. Every container uses this look.
 const tones: Record<CardTone, string> = {
-  paper: 'bg-paper text-navy',
-  'bubble-light': 'bg-bubble-light text-navy',
-  bubble: 'bg-bubble text-navy',
-  sun: 'bg-sun text-ink',
-  navy: 'bg-navy text-paper',
+  sheet: 'sheet-grain text-ink',
+  paper: 'paper-grain text-ink',
+  saffron: 'bg-saffron text-ink',
+  'saffron-soft': 'bg-saffron-soft text-ink',
+  'teal-soft': 'bg-teal-soft text-ink',
+  'sandy-soft': 'bg-sandy-soft text-ink',
+  'sienna-soft': 'bg-sienna-soft text-ink',
+  ink: 'bg-ink text-sheet',
 }
 
-const tilts: Record<CardTilt, string> = {
-  none: '',
-  left: '-rotate-1',
-  right: 'rotate-1',
-}
-
-export default function Card({
-  title,
-  tone = 'paper',
-  tilt = 'none',
-  interactive,
-  className,
-  children,
-  ...props
-}: CardProps) {
+export default function Card({ title, tone = 'sheet', lifted, compact, className, children, ...props }: CardProps) {
   return (
-    <section
-      className={cn(
-        // Uneven corner radii give a slightly hand-cut feel.
-        'rounded-[1.6rem_1.4rem_1.7rem_1.3rem] border-[3px] border-navy p-5',
-        tones[tone],
-        tilts[tilt],
-        interactive && 'cursor-pointer transition-transform duration-100 active:scale-[0.98]',
-        className,
-      )}
-      {...props}
-    >
+    <section className={cn('border-2 border-ink', compact ? 'p-4' : 'p-5 sm:p-6', tones[tone], lifted && 'shadow-block', className)} {...props}>
       {title && <h2 className="mb-3 text-2xl">{title}</h2>}
       {children}
     </section>

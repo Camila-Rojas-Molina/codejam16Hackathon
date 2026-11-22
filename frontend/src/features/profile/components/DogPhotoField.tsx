@@ -3,7 +3,7 @@
 // The image is shrunk to a small JPEG data URL so it fits comfortably in the stored profile.
 import { useId, useState, type ChangeEvent } from 'react'
 import { buttonClasses } from '../../../components/ui/buttonStyles'
-import { fieldLabel } from '../../../components/ui/Fields'
+import { ErrorText, fieldLabel } from '../../../components/ui/Fields'
 
 const MAX_SIDE = 320
 
@@ -52,14 +52,14 @@ export default function DogPhotoField({ dogName, value, onChange }: DogPhotoFiel
     <div>
       <p className={fieldLabel}>
         Photo of {who}
-        <span className="ml-2 normal-case opacity-80">(optional)</span>
+        <span className="ml-2 font-medium tracking-normal normal-case">(optional)</span>
       </p>
       <div className="flex items-center gap-4">
         {value && (
           <img
             src={value}
             alt={`Photo of ${who}`}
-            className="size-20 shrink-0 rounded-full border-[3px] border-navy object-cover"
+            className="size-20 shrink-0 border-2 border-ink object-cover"
           />
         )}
         <div className="flex flex-wrap gap-2">
@@ -70,7 +70,7 @@ export default function DogPhotoField({ dogName, value, onChange }: DogPhotoFiel
             className={buttonClasses({
               variant: 'secondary',
               className:
-                'cursor-pointer peer-focus-visible:outline-3 peer-focus-visible:outline-offset-3 peer-focus-visible:outline-navy',
+                'cursor-pointer peer-focus-visible:outline-3 peer-focus-visible:outline-offset-3 peer-focus-visible:outline-ink',
             })}
           >
             {busy ? 'Adding…' : value ? 'Change photo' : 'Add a photo'}
@@ -82,11 +82,7 @@ export default function DogPhotoField({ dogName, value, onChange }: DogPhotoFiel
           )}
         </div>
       </div>
-      {error && (
-        <p role="alert" className="mt-2 inline-block rounded-lg border-2 border-navy bg-sun px-2 py-0.5 text-sm text-ink">
-          {error}
-        </p>
-      )}
+      <ErrorText>{error}</ErrorText>
     </div>
   )
 }

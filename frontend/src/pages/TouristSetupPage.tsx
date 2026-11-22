@@ -7,7 +7,7 @@ import SetupFlow, { type SetupStep } from '../components/layout/SetupFlow'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import Choices from '../components/ui/Choices'
-import { Stepper, TextArea, TextField } from '../components/ui/Fields'
+import { PrivacyNote, Stepper, TextArea, TextField } from '../components/ui/Fields'
 import BudgetFields from '../features/profile/components/BudgetFields'
 import SummaryList from '../features/profile/components/SummaryList'
 import { stepIdOf, tripItems } from '../features/profile/contextSummary'
@@ -30,8 +30,8 @@ import type { TouristTrip, UniversalProfile } from '../features/profile/types'
 import { useStore } from '../store/useStore'
 
 const DATE_MODES: Option<TouristTrip['dates']['kind']>[] = [
-  { value: 'dates', emoji: '📅', label: 'I know my dates' },
-  { value: 'approx', emoji: '🤔', label: 'Not sure yet' },
+  { value: 'dates', icon: 'calendar', label: 'I know my dates' },
+  { value: 'approx', icon: 'tilde', label: 'Not sure yet' },
 ]
 
 const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x) => b.includes(x))
@@ -39,8 +39,8 @@ const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.l
 function UseMyUsual({ show, onClick }: { show: boolean; onClick: () => void }) {
   if (!show) return null
   return (
-    <Button variant="secondary" onClick={onClick} className="min-h-11 text-sm">
-      ↺ Use my usual
+    <Button variant="secondary" size="sm" icon="undo" onClick={onClick}>
+      Use my usual
     </Button>
   )
 }
@@ -135,7 +135,9 @@ function tripSteps(u: UniversalProfile): SetupStep<TouristTrip>[] {
               onChange={(companionCount) => update((x) => ({ ...x, companionCount }))}
             />
           )}
-          <p className="text-sm">🔒 Private. Helps us suggest group-friendly plans.</p>
+          <p className="text-sm">
+            <PrivacyNote kind="private">Helps us suggest group-friendly plans.</PrivacyNote>
+          </p>
         </>
       ),
     },
@@ -225,7 +227,7 @@ function tripSteps(u: UniversalProfile): SetupStep<TouristTrip>[] {
         return (
           <>
             {usual.length > 0 && (
-              <Card tone="bubble-light">
+              <Card tone="teal-soft">
                 <p>
                   <strong>Already in your profile:</strong> {usual.join(', ')}. Those still apply.
                 </p>
@@ -279,9 +281,9 @@ export default function TouristSetupPage() {
       initial={existing ? structuredClone(existing) : newTrip(universal)}
       startAtReview={!!existing}
       intro={
-        <MascotSays fill="var(--color-sun)" className="mb-6">
+        <MascotSays pose="glide" className="mb-6">
           <p>
-            Ooh, a trip! 🧳 Tell me where you’re headed. I’ve pre-filled the rest from your profile, so it only takes a
+            Ooh, a trip! Tell me where you’re headed. I’ve pre-filled the rest from your profile, so it only takes a
             minute.
           </p>
         </MascotSays>

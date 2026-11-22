@@ -85,7 +85,7 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'reset' })
       },
 
-      addCity: async (name) => commit(await api.addDiscoveredCity(requireId(), name)),
+      addCity: async (place) => commit(await api.addDiscoveredCity(requireId(), place)),
       removeCity: async (cityId) => commit(await api.removeDiscoveredCity(requireId(), cityId)),
 
       huntResults,

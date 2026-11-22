@@ -1,143 +1,122 @@
-// Migo, the MIGO mascot: a friendly map pin. Original hand-drawn style art, flat fills, wobbly navy strokes.
+// The MIGO mascot: a walking globe. Ten official poses live in public/assets/mascot/ (cut out
+// from the supplied character sheets, never redrawn). Pick the pose that fits the moment:
+//
+//   hello    strolling, fist up          welcomes, first steps, questionnaire part 1
+//   glide    hang-gliding in shades      travel, Tourist mode, exploration style (part 2)
+//   leap     jumping for joy             success, rewards claimed, setup finished
+//   read     reading with a backpack     reading, reviewing answers, settings
+//   goodies  thumbs up with a sack       the shop
+//   play     spinning a ball             quests and challenges
+//   curious  cap on, wide-eyed           Local mode, discovering people
+//   cheer    big grin, thumbs up         account created, profile; also the wardrobe pose
+//   search   shading eyes in the sun     loading, searching, waiting
+//   ponder   cloud overhead, side-eye    empty states, nothing here yet
 import type { ReactNode } from 'react'
 import type { AccessorySlot } from '../../features/profile/types'
 import { cn } from '../../lib/cn'
-import { AccessoryArt } from './Accessories'
+import { AccessoryArt, WARDROBE_POSE } from './Accessories'
 
-export type MascotMood = 'wave' | 'cheer' | 'think'
+export type MascotPose = 'hello' | 'glide' | 'leap' | 'read' | 'goodies' | 'play' | 'curious' | 'cheer' | 'search' | 'ponder'
 
-const stroke = {
-  stroke: 'var(--color-navy)',
-  strokeWidth: 4,
-  strokeLinecap: 'round' as const,
-  strokeLinejoin: 'round' as const,
+/** Intrinsic size of each cut-out (2x pixels), so the image never stretches or shifts layout. */
+const SIZES: Record<MascotPose, [number, number]> = {
+  hello: [344, 378],
+  glide: [450, 464],
+  leap: [420, 484],
+  read: [358, 388],
+  goodies: [348, 394],
+  play: [362, 420],
+  curious: [392, 496],
+  cheer: [498, 534],
+  search: [390, 588],
+  ponder: [522, 552],
+}
+
+const DESCRIPTIONS: Record<MascotPose, string> = {
+  hello: 'Migo the globe, strolling and waving hello',
+  glide: 'Migo the globe hang-gliding in sunglasses',
+  leap: 'Migo the globe leaping for joy',
+  read: 'Migo the globe reading a book',
+  goodies: 'Migo the globe giving a thumbs up beside a sack of goodies',
+  play: 'Migo the globe spinning a ball on one finger',
+  curious: 'Migo the globe in a cap, looking curious',
+  cheer: 'Migo the globe grinning with a thumbs up',
+  search: 'Migo the globe shading their eyes, searching the horizon',
+  ponder: 'Migo the globe deep in thought under a cloud',
 }
 
 type MascotProps = {
-  mood?: MascotMood
+  pose?: MascotPose
+  /** Size with a height class (h-32, h-48…). Width follows the image's own proportions. */
   className?: string
-  /** Pin fill. Sun for Tourist mode, bubble for Local, by convention. */
-  fill?: string
-  /** Shop items Migo is wearing, one per slot. */
+  /** Shop items to wear. Only drawn on the wardrobe pose (cheer). */
   accessories?: Partial<Record<AccessorySlot, string>>
-  /** Set to describe Migo for screen readers (e.g. on the wardrobe). Decorative otherwise. */
-  label?: string
+  /** Describe Migo for screen readers when the picture carries meaning. Decorative otherwise. */
+  label?: string | true
+  /** Gentle bobbing motion (respects reduced-motion). */
+  bob?: boolean
 }
 
-export function Mascot({ mood = 'wave', className, fill = 'var(--color-bubble)', accessories, label }: MascotProps) {
+export function Mascot({ pose = 'hello', className, accessories, label, bob = false }: MascotProps) {
+  const [w, h] = SIZES[pose]
+  const wearing = pose === WARDROBE_POSE && accessories && Object.values(accessories).some(Boolean)
+  const alt = label === true ? DESCRIPTIONS[pose] : (label ?? '')
+  const img = (
+    <img
+      src={`/assets/mascot/${pose}.webp`}
+      width={w / 2}
+      height={h / 2}
+      alt={wearing ? '' : alt}
+      draggable={false}
+      className={cn(
+        'w-auto max-w-none object-contain select-none',
+        // On its own the image takes the caller's size class; inside the wardrobe wrapper it fills it.
+        wearing ? 'size-full' : className,
+        !wearing && bob && 'motion-safe:animate-bob',
+      )}
+    />
+  )
+  if (!wearing) return img
   return (
-    <svg
-      viewBox="0 0 120 152"
-      className={cn('h-32 w-auto overflow-visible', className)}
-      role={label ? 'img' : undefined}
-      aria-label={label}
-      aria-hidden={label ? undefined : true}
+    <span
+      role={alt ? 'img' : undefined}
+      aria-label={alt || undefined}
+      aria-hidden={alt ? undefined : true}
+      className={cn('relative inline-block shrink-0', className, bob && 'motion-safe:animate-bob')}
+      style={{ aspectRatio: `${w} / ${h}` }}
     >
-      <ellipse cx="60" cy="146" rx="22" ry="4" fill="var(--color-navy)" opacity="0.2" />
-
-      {/* Arms behind the body */}
-      {mood === 'cheer' ? (
-        <g className="motion-safe:animate-wiggle" style={{ transformOrigin: '22px 74px' }}>
-          <path d="M22 74 C13 66 9 56 7 45" fill="none" {...stroke} />
-          <circle cx="7" cy="40" r="6" fill={fill} {...stroke} />
-        </g>
-      ) : mood === 'think' ? null : (
-        <g>
-          <path d="M21 80 C13 86 10 93 9 99" fill="none" {...stroke} />
-          <circle cx="9" cy="103" r="6" fill={fill} {...stroke} />
-        </g>
-      )}
-      {mood === 'think' ? (
-        <g>
-          <path d="M99 80 C106 88 108 96 108 104" fill="none" {...stroke} />
-          <circle cx="108" cy="108" r="6" fill={fill} {...stroke} />
-        </g>
-      ) : (
-        <g
-          className={mood === 'wave' ? 'motion-safe:animate-wave' : 'motion-safe:animate-wiggle'}
-          style={{ transformOrigin: '99px 74px' }}
-        >
-          <path d="M99 74 C108 67 112 58 114 47" fill="none" {...stroke} />
-          <circle cx="114" cy="42" r="6" fill={fill} {...stroke} />
-        </g>
-      )}
-
-      {/* Body: a slightly lopsided map pin */}
-      <path
-        d="M60 141 C52 124 22 102 19 66 C16 34 36 15 61 15 C88 16 104 36 101 64 C98 100 68 124 60 141 Z"
-        fill={fill}
-        {...stroke}
-      />
-      <path d="M33 46 C36 35 43 29 52 26" fill="none" stroke="var(--color-white)" strokeWidth="4" strokeLinecap="round" opacity="0.85" />
-
-      {/* Cheeks */}
-      <circle cx="37" cy="73" r="5.5" fill="var(--color-red)" opacity="0.3" />
-      <circle cx="83" cy="73" r="5.5" fill="var(--color-red)" opacity="0.3" />
-
-      {/* Eyes */}
-      {mood === 'cheer' ? (
-        <>
-          <path d="M40 61 Q47 52 54 61" fill="none" {...stroke} />
-          <path d="M66 61 Q73 52 80 61" fill="none" {...stroke} />
-        </>
-      ) : mood === 'think' ? (
-        <>
-          <ellipse cx="50" cy="56" rx="4" ry="5.5" fill="var(--color-navy)" />
-          <ellipse cx="76" cy="56" rx="4" ry="5.5" fill="var(--color-navy)" />
-          <path d="M44 45 Q50 42 55 45" fill="none" {...stroke} strokeWidth={3} />
-        </>
-      ) : (
-        <>
-          <ellipse cx="47" cy="59" rx="4.5" ry="6" fill="var(--color-navy)" />
-          <ellipse cx="73" cy="59" rx="4.5" ry="6" fill="var(--color-navy)" />
-          <circle cx="48.5" cy="56.5" r="1.6" fill="var(--color-white)" />
-          <circle cx="74.5" cy="56.5" r="1.6" fill="var(--color-white)" />
-        </>
-      )}
-
-      {/* Mouth */}
-      {mood === 'cheer' ? (
-        <path d="M47 73 Q60 92 73 73 Z" fill="var(--color-navy)" {...stroke} strokeWidth={3} />
-      ) : mood === 'think' ? (
-        <circle cx="63" cy="79" r="3.5" fill="none" {...stroke} strokeWidth={3} />
-      ) : (
-        <path d="M49 75 Q60 85 71 75" fill="none" {...stroke} />
-      )}
-
-      {/* Accessories: neckwear, then eyewear, then hats on top */}
-      {accessories?.neck && <AccessoryArt id={accessories.neck} />}
-      {accessories?.face && <AccessoryArt id={accessories.face} />}
-      {accessories?.head && <AccessoryArt id={accessories.head} />}
-
-      {/* Thinking hand on the chin, drawn over the body */}
-      {mood === 'think' && (
-        <g>
-          <path d="M23 86 C30 97 40 99 47 94" fill="none" {...stroke} />
-          <circle cx="51" cy="92" r="6" fill={fill} {...stroke} />
-        </g>
-      )}
-    </svg>
+      {img}
+      <svg viewBox={`0 0 ${w} ${h}`} className="pointer-events-none absolute inset-0 size-full overflow-visible" aria-hidden>
+        {accessories?.neck && <AccessoryArt id={accessories.neck} />}
+        {accessories?.face && <AccessoryArt id={accessories.face} />}
+        {accessories?.head && <AccessoryArt id={accessories.head} />}
+      </svg>
+    </span>
   )
 }
 
 type MascotSaysProps = {
   children: ReactNode
-  mood?: MascotMood
-  fill?: string
+  pose?: MascotPose
   className?: string
+  /** Mascot size class. */
+  size?: string
 }
 
-/** Migo with a speech bubble. The words are real text (read by screen readers); the art is decorative. */
-export function MascotSays({ children, mood = 'wave', fill, className }: MascotSaysProps) {
+/**
+ * Migo with an outlined speech bubble (the café-poster bubble: serif words, ink outline, a tail
+ * towards Migo). The words are real text; the picture is decorative.
+ */
+export function MascotSays({ children, pose = 'hello', className, size = 'h-32 sm:h-36' }: MascotSaysProps) {
   return (
-    <div className={cn('flex items-end gap-1', className)}>
-      <Mascot mood={mood} fill={fill} className="h-28 shrink-0 motion-safe:animate-bob" />
-      <div className="relative mb-10 min-w-0 flex-1">
-        <svg viewBox="0 0 24 30" className="absolute bottom-3 -left-[19px] h-7 w-6" aria-hidden>
-          <path d="M24 2 L2 24 L24 20 Z" fill="var(--color-paper)" />
-          <path d="M23 3 L2 24 L23 20" fill="none" {...stroke} />
+    <div className={cn('flex items-end gap-2', className)}>
+      <Mascot pose={pose} className={cn('shrink-0', size)} bob />
+      <div className="relative mb-6 min-w-0 flex-1">
+        <svg viewBox="0 0 28 24" className="absolute bottom-4 -left-[25px] h-6 w-7" aria-hidden>
+          <path d="M28 3 2 19l26-4z" fill="var(--color-sheet)" />
+          <path d="M27 3 2 19l25-4" fill="none" stroke="var(--color-ink)" strokeWidth="2" strokeLinejoin="round" />
         </svg>
-        <div className="rounded-[1.4rem_1.1rem_1.5rem_1.2rem] border-4 border-navy bg-paper px-4 py-3 text-navy">
+        <div className="sheet-grain rounded-[1.75rem] border-2 border-ink px-5 py-4 font-serif text-lg leading-snug text-ink sm:text-xl">
           {children}
         </div>
       </div>

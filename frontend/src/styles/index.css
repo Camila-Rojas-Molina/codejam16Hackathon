@@ -1,86 +1,55 @@
 @import 'tailwindcss';
 
 /*
- * Travel Quest design tokens (PRD section 7).
- * Hand-drawn scrapbook / zine: flat sky everywhere, red pill buttons, stamp + typewriter type.
- * Change colours here, not in components.
+ * MIGO design system: a retro printed-menu look.
+ *   Paper: warm cream sheets with a faint grain, ruled with ink lines into cells.
+ *   Ink: deep teal-charcoal (#264653) for all text and outlines.
+ *   Accents (the MIGO palette): saffron #E9C46A, teal #2A9D8F, sandy #F4A261, sienna #E76F51.
+ *   Type: Bowlby One for menu-style titles, Montserrat for big headlines and form text,
+ *         Montserrat Alternates for everything you read and tap, Fraunces for speech and quotes.
+ * Change tokens here, not in components.
  *
- * Contrast notes (WCAG):
- *   navy on sky 5.1:1 -> default text colour directly on the background
- *   navy on paper 14.7:1 · white on red 4.7:1 · ink on sun 13.9:1 · navy on bubble 9.4:1
- *   white on sky 3.2:1 -> large text only
- *   red on sky 1.5:1 -> ONLY for the big logo/display text, never body or labels
- *   red on paper 4.3:1 -> large text only
+ * Contrast (WCAG), text colour on background:
+ *   ink on paper 8.7 · ink on sheet 9.3 · ink on saffron 6.0 · ink on sandy 4.9
+ *   ink on any *-soft tint 7.3–8.2 · sheet on ink 9.3 · teal-deep on paper 5.0 · sienna-deep on paper 4.6
+ *   Teal (3.0) and sienna (3.3) are fills, borders and icons only, never behind small text.
  */
 @theme {
-  /* Palette: these replace Tailwind's default colours entirely. */
   --color-*: initial;
-  --color-sky: #6994c6;
-  --color-red: #e80c0c;
-  --color-red-rim: #ff2d2b;
-  --color-navy: #13175a;
-  --color-paper: #fff2e6;
-  --color-bubble: #7bcffb;
-  --color-bubble-light: #bdeaff;
-  --color-sun: #ffcc00;
-  --color-ink: #000000;
+  --color-ink: #264653;
+  --color-paper: #f3ebd5;
+  --color-sheet: #fbf6e8;
+  --color-saffron: #e9c46a;
+  --color-saffron-soft: #f7e7bc;
+  --color-teal: #2a9d8f;
+  --color-teal-deep: #1e7268;
+  --color-teal-soft: #cfe9e4;
+  --color-sandy: #f4a261;
+  --color-sandy-soft: #fbddc0;
+  --color-sienna: #e76f51;
+  --color-sienna-deep: #b8472d;
+  --color-sienna-soft: #f8d3c7;
   --color-white: #ffffff;
   --color-transparent: transparent;
   --color-current: currentColor;
 
-  /* Type: stamp display (logo, headings), typewriter caps (buttons, labels, timer), sans body */
-  --font-display: 'Rubik Dirt', 'Impact', ui-sans-serif, system-ui, sans-serif;
-  --font-type: 'Special Elite', 'Courier New', ui-monospace, monospace;
-  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Bowlby One', 'Arial Black', ui-sans-serif, sans-serif;
+  --font-heading: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Montserrat Alternates', 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Fraunces', Georgia, ui-serif, serif;
 
-  /* Motion: bouncy and sticker-like for game moments, slow for Phone Away */
+  /* No rounded corners by default: the look is ruled, square cells. */
+  --radius-none: 0;
+
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --animate-pop: pop 380ms var(--ease-spring) both;
-  --animate-breathe: breathe 6s ease-in-out infinite;
-  --animate-tick: tick 1s ease-in-out infinite;
   --animate-ring: ring 2s ease-out infinite;
   --animate-wiggle: wiggle 2.4s ease-in-out infinite;
+  --animate-tick: tick 1s ease-in-out infinite;
   --animate-step-in: step-in 320ms var(--ease-spring) both;
-  --animate-wave: wave 1.6s ease-in-out infinite;
   --animate-bob: bob 3.2s ease-in-out infinite;
-
-  /* One question per screen: each new step slides up gently. */
-  @keyframes step-in {
-    0% {
-      transform: translateY(14px);
-      opacity: 0;
-    }
-    100% {
-      transform: translateY(0);
-      opacity: 1;
-    }
-  }
-
-  /* Mascot waving hello. */
-  @keyframes wave {
-    0%,
-    60%,
-    100% {
-      transform: rotate(0deg);
-    }
-    15%,
-    45% {
-      transform: rotate(-22deg);
-    }
-    30% {
-      transform: rotate(8deg);
-    }
-  }
-
-  @keyframes bob {
-    0%,
-    100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-5px);
-    }
-  }
+  --animate-spin-slow: spin 24s linear infinite;
+  --animate-breathe: breathe 6s ease-in-out infinite;
 
   @keyframes ring {
     0% {
@@ -92,40 +61,25 @@
       opacity: 0;
     }
   }
-
   @keyframes wiggle {
     0%,
     100% {
-      transform: rotate(-6deg);
+      transform: rotate(-5deg);
     }
     50% {
-      transform: rotate(6deg);
+      transform: rotate(5deg);
     }
   }
-
   @keyframes pop {
     0% {
-      transform: scale(0.6) rotate(-6deg);
+      transform: scale(0.7);
       opacity: 0;
     }
     100% {
-      transform: scale(1) rotate(0);
-      opacity: 1;
-    }
-  }
-
-  @keyframes breathe {
-    0%,
-    100% {
       transform: scale(1);
-      opacity: 0.7;
-    }
-    50% {
-      transform: scale(1.08);
       opacity: 1;
     }
   }
-
   @keyframes tick {
     0%,
     100% {
@@ -135,17 +89,110 @@
       transform: scale(1.04);
     }
   }
+  @keyframes step-in {
+    0% {
+      transform: translateY(12px);
+      opacity: 0;
+    }
+    100% {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  @keyframes bob {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes breathe {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 0.75;
+    }
+    50% {
+      transform: scale(1.06);
+      opacity: 1;
+    }
+  }
 }
 
-/* Dashed navy divider: <hr className="trail-divider" /> */
-@utility trail-divider {
+/* ---- Paper, rules and print details ------------------------------------------------------- */
+
+/* The printed-paper grain: a faint fractal noise plus speckles, tinted to the ink. */
+@utility paper-grain {
+  background-color: var(--color-paper);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .15 0 0 0 0 .27 0 0 0 0 .33 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cg fill='%23264653' fill-opacity='.18'%3E%3Ccircle cx='12' cy='30' r='.9'/%3E%3Ccircle cx='88' cy='14' r='.6'/%3E%3Ccircle cx='140' cy='62' r='1.1'/%3E%3Ccircle cx='52' cy='118' r='.7'/%3E%3Ccircle cx='118' cy='136' r='.8'/%3E%3Ccircle cx='30' cy='84' r='.5'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Lighter sheet for panels and cells, same grain. */
+@utility sheet-grain {
+  background-color: var(--color-sheet);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .15 0 0 0 0 .27 0 0 0 0 .33 0 0 0 .06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Diagonal hatching, like the band under a printed menu's nav. */
+@utility hatch {
+  background-image: repeating-linear-gradient(-45deg, var(--color-ink) 0 1.5px, transparent 1.5px 6px);
+}
+
+/* Lighter hatching for empty progress tracks, so the count on top stays easy to read. */
+@utility hatch-soft {
+  background-image: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--color-ink) 28%, transparent) 0 1.5px, transparent 1.5px 7px);
+}
+
+/* A hatched divider band between two ink rules: <div className="hatch-band" aria-hidden /> */
+@utility hatch-band {
+  height: 14px;
+  border-top: 2px solid var(--color-ink);
+  border-bottom: 2px solid var(--color-ink);
+  background-image: repeating-linear-gradient(-45deg, var(--color-ink) 0 1.5px, transparent 1.5px 6px);
+}
+
+/* Solid offset shadow (the café-card block shadow). */
+@utility shadow-block {
+  box-shadow: 6px 6px 0 var(--color-ink);
+}
+@utility shadow-block-sm {
+  box-shadow: 3px 3px 0 var(--color-ink);
+}
+
+/* Masthead title: saffron letters, ink outline and a 3D ink extrude. */
+@utility title-retro {
+  color: var(--color-saffron);
+  -webkit-text-stroke: 2px var(--color-ink);
+  paint-order: stroke fill;
+  text-shadow:
+    2px 2px 0 var(--color-ink),
+    4px 4px 0 var(--color-ink);
+}
+
+/* Small caps label used for eyebrows, field labels and metadata. */
+@utility eyebrow {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* Dashed ink rule: <hr className="rule-dashed" /> */
+@utility rule-dashed {
   border: 0;
-  height: 3px;
-  background-image: repeating-linear-gradient(
-    to right,
-    var(--color-navy) 0 12px,
-    transparent 12px 20px
-  );
+  height: 2px;
+  background-image: repeating-linear-gradient(to right, var(--color-ink) 0 8px, transparent 8px 14px);
 }
 
 @layer base {
@@ -155,21 +202,57 @@
     height: 100%;
   }
 
-  /* Flat sky background: no grain, no gradient. Navy text (5.1:1) by default. */
   body {
-    @apply bg-sky font-sans text-navy antialiased;
+    @apply paper-grain font-sans text-ink antialiased;
+    font-weight: 500;
+    font-size: 1rem;
+    line-height: 1.6;
   }
 
-  /* Rubik Dirt ships one weight; never fake-bold it. */
-  h1,
+  /*
+   * Type scale
+   *   h1  page headline: Montserrat Black, wide caps ("PIZZA BY THE SLICE")
+   *   h2  section title: Bowlby One caps ("CHICKEN & WAFFLES")
+   *   h3  card title: Bowlby One caps, smaller
+   *   h4  subheading: Montserrat Alternates bold caps
+   */
+  h1 {
+    font-family: var(--font-heading);
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    line-height: 1.02;
+  }
   h2,
-  h3,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    line-height: 1.05;
+  }
   h4 {
-    @apply font-display font-normal tracking-wide uppercase;
+    font-family: var(--font-sans);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* Form controls use plain Montserrat: the most legible face for typed text. */
+  input,
+  textarea,
+  select {
+    font-family: var(--font-heading);
+    font-weight: 500;
+  }
+
+  ::selection {
+    background: var(--color-saffron);
+    color: var(--color-ink);
   }
 
   :focus-visible {
-    outline: 3px solid var(--color-navy);
+    outline: 3px solid var(--color-ink);
     outline-offset: 3px;
   }
 

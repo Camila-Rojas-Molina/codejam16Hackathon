@@ -14,11 +14,11 @@ export default function DashboardLayout() {
   if (!hasUniversalProfile(profile)) return <Navigate to="/onboarding/questions" replace />
 
   return (
-    <div className="min-h-dvh md:grid md:grid-cols-[6.5rem_minmax(0,1fr)] lg:grid-cols-[15rem_minmax(0,1fr)_20rem] xl:grid-cols-[16.5rem_minmax(0,1fr)_23rem]">
+    <div className="min-h-dvh md:grid md:grid-cols-[6.5rem_minmax(0,1fr)] lg:grid-cols-[15.5rem_minmax(0,1fr)_21rem] xl:grid-cols-[17rem_minmax(0,1fr)_24rem]">
       <SideNav />
       <div className="flex min-h-dvh min-w-0 flex-col">
         <TopBar />
-        <main id="main" className="flex flex-1 flex-col px-4 pt-5 pb-32 sm:px-6 md:pb-8 lg:px-8 lg:pt-8">
+        <main id="main" className="flex flex-1 flex-col px-4 pt-6 pb-28 sm:px-6 md:pb-10 lg:px-10 lg:pt-10">
           <Outlet />
         </main>
       </div>

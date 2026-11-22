@@ -1,11 +1,12 @@
 // A discoverable person: who they are, what you share, and actions (view, show interest, message).
 import { useId, useState } from 'react'
 import { Link } from 'react-router'
+import Icon from '../../../components/icons/Icon'
 import Avatar from '../../../components/ui/Avatar'
 import Badge from '../../../components/ui/Badge'
 import { buttonClasses } from '../../../components/ui/buttonStyles'
 import { cn } from '../../../lib/cn'
-import { roleLabel } from '../../onboarding/options'
+import { modeMeta, roleLabel } from '../../onboarding/options'
 import type { Compatibility, Dimension } from '../../profile/matching'
 import { INTEREST_OPTIONS, labelsFor } from '../../profile/options'
 import { matchLabel } from '../match'
@@ -14,6 +15,7 @@ import type { Person } from '../types'
 const DIMENSION_LABELS: Record<Dimension, string> = {
   interests: 'Interests',
   languages: 'Languages',
+  qualities: 'What you each value',
   energy: 'Social energy',
   planning: 'Planning style',
   pace: 'Pace',
@@ -36,95 +38,113 @@ export default function PersonCard({ person, match, liked, onToggleLike, canMess
   const label = matchLabel(match.total)
   const shared = labelsFor(INTEREST_OPTIONS, match.sharedInterests)
   const pct = match.total === null ? null : Math.round(match.total * 100)
+  const mode = modeMeta(person.mode)
 
   return (
-    <article aria-labelledby={`${detailsId}-name`} className="rounded-[1.5rem_1.3rem_1.6rem_1.2rem] border-[3px] border-navy bg-paper p-4 sm:p-5">
-      <div className="flex items-start gap-4">
-        <Avatar avatar={person.avatar} size="lg" className="bg-bubble-light" />
-        <div className="min-w-0 flex-1">
+    <article aria-labelledby={`${detailsId}-name`} className="sheet-grain border-2 border-ink">
+      <div className="flex items-stretch border-b-2 border-ink">
+        <div className="grid w-24 shrink-0 place-items-center border-r-2 border-ink bg-saffron-soft p-2 sm:w-28">
+          <Avatar avatar={person.avatar} size="lg" className="border-0 bg-transparent" />
+        </div>
+        <div className="min-w-0 flex-1 p-4">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 id={`${detailsId}-name`} className="text-3xl leading-none">
+            <h3 id={`${detailsId}-name`} className="text-3xl">
               {person.name}
             </h3>
-            <Badge tone="navy">{roleLabel(person.mode)}</Badge>
+            <Badge tone={person.mode === 'local' ? 'teal' : 'saffron'} icon={mode.icon}>
+              {roleLabel(person.mode)}
+            </Badge>
             {person.demo && <Badge tone="outline">Sample</Badge>}
           </div>
           {/* Compatibility: a label plus a meter, never colour alone */}
-          <div className="mt-2 flex items-center gap-2">
+          <div className="mt-2 flex flex-wrap items-center gap-3">
             <Badge tone={label.tone}>{label.text}</Badge>
             {pct !== null && (
-              <span className="flex items-center gap-2 text-sm">
-                <span className="h-3 w-20 overflow-hidden rounded-full border-2 border-navy bg-paper" aria-hidden>
-                  <span className="block h-full bg-red" style={{ width: `${pct}%` }} />
+              <span className="flex items-center gap-2 text-sm font-semibold">
+                <span className="hatch h-3.5 w-24 border-2 border-ink bg-sheet" aria-hidden>
+                  <span className="block h-full bg-sienna" style={{ width: `${pct}%` }} />
                 </span>
                 {pct}% in common
               </span>
             )}
           </div>
-          {shared.length > 0 && <p className="mt-2 text-sm">🤝 You both love {shared.join(', ')}</p>}
-          {match.sharedLanguages.length > 0 && <p className="text-sm">🗣️ You both speak {match.sharedLanguages.join(', ')}</p>}
         </div>
       </div>
 
-      {open && (
-        <div id={detailsId} className="mt-4 space-y-3 border-t-[3px] border-dashed border-navy pt-4">
-          {person.funFact && (
-            <p>
-              <span className="font-type text-xs tracking-wider uppercase">Fun fact · </span>
-              {person.funFact}
-            </p>
-          )}
-          <div>
-            <p className="font-type text-xs tracking-wider uppercase">Into</p>
-            <ul className="mt-1 flex flex-wrap gap-1.5">
-              {labelsFor(INTEREST_OPTIONS, person.interests).map((i) => (
-                <li key={i} className={cn('rounded-full border-2 border-navy px-2.5 py-0.5 text-sm', shared.includes(i) ? 'bg-sun text-ink' : 'bg-paper')}>
-                  {shared.includes(i) && <span aria-hidden>★ </span>}
-                  {i}
-                  {shared.includes(i) && <span className="sr-only"> (shared)</span>}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <p className="text-sm">
-            <span className="font-type text-xs tracking-wider uppercase">Speaks · </span>
-            {person.languages.join(', ') || 'Not shared'}
+      <div className="space-y-2 p-4">
+        {shared.length > 0 && (
+          <p className="flex items-start gap-2 text-sm">
+            <Icon name="venn" className="size-5" />
+            <span>You both love {shared.join(', ')}</span>
           </p>
-          {Object.keys(match.dimensions).length > 0 && (
-            <dl className="grid grid-cols-2 gap-2 text-sm">
-              {(Object.entries(match.dimensions) as [Dimension, number][]).map(([dim, score]) => (
-                <div key={dim} className="rounded-xl border-2 border-navy/40 px-2 py-1">
-                  <dt className="font-semibold">{DIMENSION_LABELS[dim]}</dt>
-                  <dd>{Math.round(score * 100)}% match</dd>
-                </div>
-              ))}
-            </dl>
-          )}
-        </div>
-      )}
+        )}
+        {match.sharedLanguages.length > 0 && (
+          <p className="flex items-start gap-2 text-sm">
+            <Icon name="chats" className="size-5" />
+            <span>You both speak {match.sharedLanguages.join(', ')}</span>
+          </p>
+        )}
 
-      <div className="mt-4 flex flex-wrap gap-2">
+        {open && (
+          <div id={detailsId} className="mt-3 space-y-3 border-t-2 border-dashed border-ink pt-4">
+            {person.funFact && (
+              <p className="font-serif text-lg leading-snug">
+                <span className="eyebrow mr-2 align-middle">Fun fact</span>
+                {person.funFact}
+              </p>
+            )}
+            <div>
+              <p className="eyebrow">Into</p>
+              <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                {labelsFor(INTEREST_OPTIONS, person.interests).map((i) => (
+                  <li key={i} className={cn('inline-flex items-center gap-1 border-2 border-ink px-2 py-0.5 text-sm font-semibold', shared.includes(i) ? 'bg-saffron' : 'bg-sheet')}>
+                    {shared.includes(i) && <Icon name="star" accent="sheet" className="size-4" />}
+                    {i}
+                    {shared.includes(i) && <span className="sr-only"> (shared)</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <p className="text-sm">
+              <span className="eyebrow mr-2">Speaks</span>
+              {person.languages.join(', ') || 'Not shared'}
+            </p>
+            {Object.keys(match.dimensions).length > 0 && (
+              <dl className="grid grid-cols-2 border-t-2 border-l-2 border-ink text-sm">
+                {(Object.entries(match.dimensions) as [Dimension, number][]).map(([dim, score]) => (
+                  <div key={dim} className="border-r-2 border-b-2 border-ink px-3 py-2">
+                    <dt className="font-bold">{DIMENSION_LABELS[dim]}</dt>
+                    <dd>{Math.round(score * 100)}% match</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-2 border-t-2 border-ink p-4">
         <button type="button" aria-expanded={open} aria-controls={detailsId} onClick={() => setOpen((o) => !o)} className={buttonClasses({ variant: 'secondary' })}>
+          <Icon name={open ? 'minus' : 'eye'} className="size-5" />
           {open ? 'Hide profile' : 'View profile'}
         </button>
-        <button
-          type="button"
-          aria-pressed={liked}
-          disabled={busy}
-          onClick={onToggleLike}
-          className={buttonClasses({ variant: liked ? 'primary' : 'secondary' })}
-        >
-          <span aria-hidden>{liked ? '♥' : '♡'}</span> {liked ? 'Interested' : 'Show interest'}
+        <button type="button" aria-pressed={liked} disabled={busy} onClick={onToggleLike} className={buttonClasses({ variant: liked ? 'primary' : 'secondary' })}>
+          <Icon name={liked ? 'heart' : 'heart-outline'} accent={liked ? 'sienna' : 'none'} className="size-5" />
+          {liked ? 'Interested' : 'Show interest'}
         </button>
         {canMessage && (
-          <Link to={`/chat/${encodeURIComponent(person.id)}`} className={buttonClasses({ variant: 'sun' })}>
+          <Link to={`/chat/${encodeURIComponent(person.id)}`} className={buttonClasses({ variant: 'dark' })}>
+            <Icon name="chat" className="size-5" />
             Message
           </Link>
         )}
+        {!canMessage && (
+          <p className="flex w-full items-start gap-2 text-sm">
+            <Icon name="info" accent="sheet" className="size-5" />
+            Messaging opens once you’re matched as teammates, or you both show interest.
+          </p>
+        )}
       </div>
-      {!canMessage && (
-        <p className="mt-2 text-sm">💬 Messaging opens once you’re matched as teammates, or you both show interest.</p>
-      )}
     </article>
   )
 }

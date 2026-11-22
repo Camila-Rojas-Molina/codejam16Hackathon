@@ -2,7 +2,9 @@
 // rewards and completion. Sections only appear when they have challenges in them.
 import { useEffect } from 'react'
 import { useLocation } from 'react-router'
-import { PointsIcon } from '../components/illustrations/Icons'
+import Icon from '../components/icons/Icon'
+import { Mascot } from '../components/illustrations/Mascot'
+import PageHeader from '../components/ui/PageHeader'
 import { pointsBalance, pointsEarned } from '../features/profile/model'
 import { CADENCE_LABELS, type Cadence } from '../features/quests/challenges'
 import QuestCard from '../features/quests/components/QuestCard'
@@ -30,24 +32,29 @@ export default function QuestsPage() {
   }, [target])
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-8">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-4xl text-navy sm:text-5xl">Quests</h1>
-          <p className="mt-1">Complete challenges, earn points, treat Migo in the shop.</p>
-        </div>
-        <div className="flex items-center gap-3 rounded-2xl border-[3px] border-navy bg-paper px-4 py-2">
-          <PointsIcon className="size-9" />
-          <div>
-            <p className="font-display text-2xl leading-none">{pointsBalance(profile?.rewards).toLocaleString()}</p>
-            <p className="text-xs">{pointsEarned(profile?.rewards).toLocaleString()} earned in total</p>
+    <div className="mx-auto w-full max-w-4xl space-y-10">
+      <PageHeader
+        eyebrow="Challenges & rewards"
+        title="Quests"
+        description="Complete challenges, earn points, treat Migo in the shop."
+        aside={
+          <div className="flex items-end gap-3">
+            <Mascot pose="play" className="hidden h-28 sm:block" />
+            <div className="flex items-center gap-3 border-2 border-ink bg-saffron px-4 py-3">
+              <Icon name="coin" accent="sheet" className="size-10" />
+              <div>
+                <p className="font-display text-3xl leading-none">{pointsBalance(profile?.rewards).toLocaleString()}</p>
+                <p className="text-xs font-semibold">{pointsEarned(profile?.rewards).toLocaleString()} earned in total</p>
+              </div>
+            </div>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       {readyCount > 0 && (
-        <p role="status" className="rounded-2xl border-[3px] border-navy bg-sun px-4 py-2 font-semibold text-ink">
-          🎉 {readyCount} reward{readyCount === 1 ? '' : 's'} ready to claim!
+        <p role="status" className="flex items-center gap-3 border-2 border-ink bg-teal-soft px-4 py-2 font-semibold">
+          <Icon name="trophy" className="size-7" />
+          {readyCount} reward{readyCount === 1 ? '' : 's'} ready to claim!
         </p>
       )}
 
@@ -57,12 +64,12 @@ export default function QuestsPage() {
         return (
           <section key={cadence} aria-labelledby={`cadence-${cadence}`} className="space-y-4">
             <div>
-              <h2 id={`cadence-${cadence}`} className="text-3xl text-navy">
+              <h2 id={`cadence-${cadence}`} className="text-3xl">
                 {cadence === 'daily' ? 'Daily challenge' : CADENCE_LABELS[cadence]}
               </h2>
               <p className="text-sm">{BLURB[cadence]}</p>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-5">
               {items.map((state) => (
                 <QuestCard key={state.challenge.id} state={state} highlight={target === `quest-${state.challenge.id}`} />
               ))}

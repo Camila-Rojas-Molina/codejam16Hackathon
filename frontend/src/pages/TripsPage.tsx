@@ -2,7 +2,10 @@
 // Trips are independent of each other and of the universal profile.
 import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
-import Badge from '../components/ui/Badge'
+import Icon from '../components/icons/Icon'
+import { Mascot } from '../components/illustrations/Mascot'
+import Badge, { type BadgeTone } from '../components/ui/Badge'
+import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 import { buttonClasses } from '../components/ui/buttonStyles'
 import Card from '../components/ui/Card'
@@ -12,11 +15,11 @@ import { formatTripDates, tripTiming, type TripTiming } from '../features/profil
 import type { TouristTrip } from '../features/profile/types'
 import { useStore } from '../store/useStore'
 
-const TIMING: Record<TripTiming, { label: string; tone: 'sun' | 'bubble' | 'outline' | 'bubble-light' }> = {
-  now: { label: 'Happening now', tone: 'sun' },
-  upcoming: { label: 'Upcoming', tone: 'bubble' },
+const TIMING: Record<TripTiming, { label: string; tone: BadgeTone }> = {
+  now: { label: 'Happening now', tone: 'saffron' },
+  upcoming: { label: 'Upcoming', tone: 'teal' },
   past: { label: 'Past', tone: 'outline' },
-  unknown: { label: 'Dates flexible', tone: 'bubble-light' },
+  unknown: { label: 'Dates flexible', tone: 'sandy' },
 }
 
 // Active trip first, then the soonest, then flexible ones, then past trips.
@@ -57,48 +60,58 @@ export default function TripsPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <Button variant="ghost" className="self-start px-0" onClick={() => navigate('/profile')}>
-        ← Profile
+      <Button variant="ghost" icon="arrow-left" className="self-start px-0" onClick={() => navigate('/profile')}>
+        Profile
       </Button>
-      <header>
-        <h1 className="text-4xl text-navy">My trips</h1>
-        <p className="mt-1">
-          Tourist mode uses your <strong>active trip</strong>. Each trip keeps its own details, so planning Tokyo never
-          overwrites Paris.
-        </p>
-      </header>
+      <PageHeader
+        eyebrow="Tourist mode"
+        title="My trips"
+        description={
+          <>
+            Tourist mode uses your <strong>active trip</strong>. Each trip keeps its own details, so planning Tokyo never overwrites Paris.
+          </>
+        }
+        aside={<Mascot pose="glide" className="h-28" />}
+      />
 
       <p className="sr-only" aria-live="polite">
         {message}
       </p>
 
       {sorted.length === 0 && (
-        <Card tone="bubble-light">
+        <Card tone="teal-soft">
           <p>No trips yet. Planning one takes about a minute, and your profile fills in most of it.</p>
         </Card>
       )}
 
-      <ul className="space-y-4">
-        {sorted.map((trip: TouristTrip, i) => {
+      <ul className="space-y-5">
+        {sorted.map((trip: TouristTrip) => {
           const active = trip.id === activeTripId
           const timing = TIMING[tripTiming(trip)]
           return (
             <li key={trip.id}>
-              <Card tone={active ? 'sun' : 'paper'} tilt={i % 2 === 0 ? 'left' : 'right'}>
+              <Card tone={active ? 'saffron-soft' : 'sheet'} lifted={active}>
                 <div className="flex flex-wrap items-center gap-2">
-                  {active && <Badge tone="navy">✓ Active trip</Badge>}
+                  {active && (
+                    <Badge tone="ink" icon="check">
+                      Active trip
+                    </Badge>
+                  )}
                   <Badge tone={timing.tone}>{timing.label}</Badge>
                 </div>
-                <h2 className="mt-2 text-3xl break-words">{trip.destination}</h2>
-                <p className="mt-1">
+                <h2 className="mt-3 flex items-center gap-2 text-3xl break-words">
+                  <Icon name="pin" accent="sienna" className="size-7" />
+                  {trip.destination}
+                </h2>
+                <p className="mt-1 font-semibold">
                   {formatTripDates(trip)} · {companionText(trip)}
                 </p>
 
                 {confirming === trip.id ? (
-                  <div className="mt-4 rounded-2xl border-[3px] border-dashed border-navy p-3" role="alertdialog" aria-label="Delete this trip?">
+                  <div className="mt-4 border-2 border-dashed border-ink bg-sheet p-3" role="alertdialog" aria-label="Delete this trip?">
                     <p className="font-semibold">Delete your {trip.destination} trip? This can’t be undone.</p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <Button size="md" onClick={() => run(trip.id, () => deleteTrip(trip.id), `Deleted ${trip.destination}.`)} disabled={busy === trip.id}>
+                      <Button size="md" variant="danger" onClick={() => run(trip.id, () => deleteTrip(trip.id), `Deleted ${trip.destination}.`)} disabled={busy === trip.id}>
                         Yes, delete
                       </Button>
                       <Button size="md" variant="secondary" onClick={() => setConfirming(null)} autoFocus>
@@ -111,7 +124,7 @@ export default function TripsPage() {
                     {!active && (
                       <Button
                         size="md"
-                        variant="sun"
+                        variant="primary"
                         disabled={busy === trip.id}
                         onClick={() => run(trip.id, () => activateTrip(trip.id), `${trip.destination} is now your active trip.`)}
                       >
@@ -133,6 +146,7 @@ export default function TripsPage() {
       </ul>
 
       <Link to="/mode/tourist" state={newTripState} className={buttonClasses({ size: 'lg', fullWidth: true })}>
+        <Icon name="plus" accent="none" strokeWidth={2.4} className="size-5" />
         Plan a new trip
       </Link>
 
