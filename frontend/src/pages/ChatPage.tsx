@@ -276,7 +276,15 @@ function Discover() {
             <Icon name="star" className="size-7" />
             Your top matches
           </h2>
-          {top.map((entry, i) => card(entry, i + 1))}
+          {top.map((entry, i) =>
+            i === 0 ? (
+              <div key={entry.person.id} data-tour="top-match">
+                {card(entry, 1)}
+              </div>
+            ) : (
+              card(entry, i + 1)
+            ),
+          )}
         </section>
       )}
       {more.length > 0 && (

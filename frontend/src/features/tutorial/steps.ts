@@ -75,23 +75,23 @@ export const TOUR_STEPS: TourStep[] = [
   {
     id: 'match',
     route: (mode) => (mode === 'tourist' ? '/chat?tab=discover' : '/chat'),
-    target: (mode) => (mode === 'tourist' ? ['top-matches'] : ['nav-chat']),
+    target: (mode) => (mode === 'tourist' ? ['top-match'] : ['nav-chat']),
     pose: 'read',
     title: 'Find your people',
     text: (mode) =>
       mode === 'local'
         ? 'Tourists see you among their top matches. When one picks you, you’ll get a “You’ve been matched!”. Say hi and plan something together in Chat.'
         : mode === 'tourist'
-          ? 'These are your top-matched locals, ranked by what you have in common. Pick one and it’s a match, straight away. They get a “You’ve been matched!”.'
+          ? 'Your top-matched locals, ranked by what you have in common. Pick one and it’s a match, straight away: they get a “You’ve been matched!”.'
           : 'Tourists pick from their top-matched locals, and locals get a “You’ve been matched!”. Pick a mode to start meeting people.',
   },
   {
     id: 'quests',
     route: '/quests',
-    target: ['quests-weekly', 'quests-daily'],
+    target: ['quests-weekly'],
     pose: 'play',
     title: 'Quests earn points',
-    text: () => 'A big weekly challenge and three fresh dailies, plus adventures picked for your interests. Finish one, then claim its points.',
+    text: () => 'A big weekly challenge, three fresh dailies and adventures picked for your interests. Finish one, then claim its points.',
   },
   {
     id: 'points',

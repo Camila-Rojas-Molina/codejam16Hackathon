@@ -27,6 +27,7 @@ type Rect = { x: number; y: number; w: number; h: number }
 const PAD = 6 // spotlight padding around the target
 const GAP = 18 // between the spotlight and the tour sheet
 const EDGE = 12 // keep the sheet this far from the screen edge
+const TOP_BAR = 76 // the hub's sticky top bar, so a scrolled-to target isn't hidden under it
 
 const isVisible = (el: Element) => {
   const r = el.getBoundingClientRect()
@@ -150,7 +151,11 @@ function TourOverlay({ mode, onClose }: { mode: 'tourist' | 'local' | null; onCl
       if (found.els[0] && scrolledFor.current !== step.id) {
         scrolledFor.current = step.id
         const r = found.els[0].getBoundingClientRect()
-        if (r.top < 0 || r.bottom > window.innerHeight) found.els[0].scrollIntoView({ block: r.height > window.innerHeight * 0.6 ? 'start' : 'center', behavior: 'smooth' })
+        if (r.top < TOP_BAR || r.bottom > window.innerHeight) {
+          // Tall targets: their top just under the sticky top bar. Others: centred.
+          const top = r.height > window.innerHeight * 0.6 ? r.top - TOP_BAR - PAD * 2 : r.top - (window.innerHeight - r.height) / 2
+          window.scrollTo({ top: window.scrollY + top, behavior: 'smooth' })
+        }
       }
       setTarget((prev) => (same(prev, found.rect) ? prev : found.rect))
       setViewport((v) => (v.w === window.innerWidth && v.h === window.innerHeight ? v : { w: window.innerWidth, h: window.innerHeight }))
@@ -263,17 +268,17 @@ function TourOverlay({ mode, onClose }: { mode: 'tourist' | 'local' | null; onCl
 
         {/* Migo talking: the bubble's tail points at Migo's mouth. */}
         <div key={step.id} className="flex items-start gap-1 px-3 pt-3 motion-safe:animate-step-in">
-          <Mascot pose={step.pose} bob className={cn('shrink-0', narrow ? 'h-24' : 'h-32')} />
+          <Mascot pose={step.pose} bob className={cn('shrink-0', narrow ? 'h-20' : 'h-32')} />
           <div className="relative mt-3 min-w-0 flex-1 pl-3">
             <svg viewBox="0 0 20 20" className="absolute top-6 -left-[5px] size-5" aria-hidden>
               <path d="M20 4 1 12l19 3z" fill="var(--color-sheet)" />
               <path d="M19 4 1 12l18 3" fill="none" stroke="var(--color-ink)" strokeWidth="2" strokeLinejoin="round" />
             </svg>
             <div className="rounded-[1.4rem] border-2 border-ink bg-sheet px-4 py-3" aria-live="polite">
-              <h2 id={`${ids}-title`} className="text-xl leading-tight sm:text-2xl">
+              <h2 id={`${ids}-title`} className="text-lg leading-tight sm:text-2xl">
                 {step.title}
               </h2>
-              <p id={`${ids}-text`} className="mt-1 font-serif text-base leading-snug sm:text-lg">
+              <p id={`${ids}-text`} className="mt-1 font-serif text-[0.95rem] leading-snug sm:text-lg">
                 {step.text(mode)}
               </p>
             </div>
