@@ -4,20 +4,17 @@
 import { DEFAULT_AVATAR } from './avatars'
 import type { PlacePick } from '../features/places/types'
 import { MESSAGE_MAX_LENGTH, type Message, type Person, type Thread } from '../features/chat/types'
-import { addCity, pointsBalance, tidyDogs } from '../features/profile/model'
+import { addCity, tidyDogs } from '../features/profile/model'
 import { compatibility, type Compatibility, type MatchDogs, type MatchProfile } from '../features/profile/matching'
 import type {
   Account,
   DiscoveredCity,
   ExploreMode,
-  PointsEntry,
   LocalContext,
   ProfileRecord,
   TouristTrip,
   UniversalProfile,
 } from '../features/profile/types'
-import { challenge, challengeState, rewardRef, type ChallengeContext } from '../features/quests/challenges'
-import { shopItem } from '../features/rewards/shop'
 import { scoreHunt } from '../features/scoring/score'
 import { distanceMeters } from './geo'
 import { HUNTS, TEAMS, USERS } from './mockData'
@@ -240,50 +237,11 @@ export async function deleteAccount(accountId: string): Promise<void> {
   db.deleteAccountData(accountId)
 }
 
-// ---- Points, challenges & shop ----------------------------------------------------------------
-// The balance is the sum of the ledger. Rewards are re-checked here before paying out, and each
-// reward/purchase has a unique refId so nothing pays (or charges) twice.
-// TODO(backend): move these checks into SQL functions so the server, not the browser, awards points.
-
-/** Pays a challenge reward if the challenge is complete and hasn't been claimed this period. */
-export async function claimChallengeReward(accountId: string, challengeId: string, ctx: Omit<ChallengeContext, 'profile'>): Promise<ProfileRecord> {
-  await delay(200)
-  return updateRecord(accountId, (r) => {
-    const c = challenge(challengeId)
-    if (!c) throw new Error('Unknown challenge.')
-    const state = challengeState(c, { ...ctx, profile: r })
-    if (state.status === 'claimed') return r
-    if (state.status !== 'ready') throw new Error('That challenge isn’t finished yet.')
-    const entry: PointsEntry = { id: newId('pts'), amount: c.reward, reason: 'challenge', refId: rewardRef(c, ctx.today), label: c.title, at: Date.now() }
-    return { ...r, rewards: { ...r.rewards, ledger: [...r.rewards.ledger, entry] } }
-  })
-}
-
-export async function purchaseItem(accountId: string, itemId: string): Promise<ProfileRecord> {
-  await delay(200)
-  return updateRecord(accountId, (r) => {
-    const item = shopItem(itemId)
-    if (!item) throw new Error('That item isn’t in the shop.')
-    if (r.rewards.owned.includes(item.id)) return r
-    const balance = pointsBalance(r.rewards)
-    if (balance < item.price) throw new Error(`You need ${item.price - balance} more points for that.`)
-    const entry: PointsEntry = { id: newId('pts'), amount: -item.price, reason: 'purchase', refId: `item:${item.id}`, label: item.name, at: Date.now() }
-    return { ...r, rewards: { ...r.rewards, ledger: [...r.rewards.ledger, entry], owned: [...r.rewards.owned, item.id] } }
-  })
-}
-
-/** Puts an owned item on Migo (replacing whatever is in that slot), or takes it off. */
-export async function setEquipped(accountId: string, itemId: string, on: boolean): Promise<ProfileRecord> {
-  await delay(100)
-  return updateRecord(accountId, (r) => {
-    const item = shopItem(itemId)
-    if (!item || !r.rewards.owned.includes(item.id)) throw new Error('You don’t own that yet.')
-    const equipped = { ...r.rewards.equipped }
-    if (on) equipped[item.slot] = item.id
-    else if (equipped[item.slot] === item.id) delete equipped[item.slot]
-    return { ...r, rewards: { ...r.rewards, equipped } }
-  })
-}
+// ---- Points, quests & shop -------------------------------------------------------------------
+// Moved to lib/economy (the server's rpc functions when signed in, the device economy otherwise),
+// used through the store: claimQuest, refreshDaily, purchase, setEquipped, recordVisit. Nothing
+// here writes points, purchases or the outfit into the profile record any more; `record.rewards`
+// is only read once, to carry an existing device ledger into the device economy.
 
 // ---- People & messages ------------------------------------------------------------------------
 // TODO(backend): live discovery and message delivery. Until then, discovery shows the sample

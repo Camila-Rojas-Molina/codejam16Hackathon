@@ -485,3 +485,35 @@ export async function deletePhoto(profileId: string, photoId: string): Promise<v
   const path = await rpc<string>('gallery_delete_photo', { p_profile_id: profileId, p_photo_id: photoId })
   if (path) await deleteGalleryFile(path).catch(() => undefined)
 }
+
+// ---- Points, quests & shop (011_economy.sql) ----------------------------------------
+// The server owns the economy: these send ids only (never an amount or a price) and each write
+// returns the fresh EconomyState (camelCase jsonb, features/economy/types.ts). Errors such as
+// 'Daily refresh already used' or 'Not enough points' come back as BackendError messages to show
+// as is. lib/economy/server.ts wraps these as an EconomyApi.
+
+export type EconomyPage = 'map' | 'shop' | 'gallery' | 'chat' | 'quests'
+
+/** Raw EconomyState from the server (lib/economy normalises it). */
+export const economyState = (profileId: string) => rpc<unknown>('economy_state', { p_profile_id: profileId })
+
+export const economyClaim = (profileId: string, assignmentId: string) =>
+  rpc<unknown>('economy_claim', { p_profile_id: profileId, p_assignment_id: assignmentId })
+
+export const economyRefreshDaily = (profileId: string, assignmentId: string) =>
+  rpc<unknown>('economy_refresh_daily', { p_profile_id: profileId, p_assignment_id: assignmentId })
+
+export const economyPurchase = (profileId: string, itemId: string) =>
+  rpc<unknown>('economy_purchase', { p_profile_id: profileId, p_item_id: itemId })
+
+/** itemId null = take off whatever is in that slot. */
+export const economyEquip = (profileId: string, slot: string, itemId: string | null) =>
+  rpc<unknown>('economy_equip', { p_profile_id: profileId, p_slot: slot, p_item_id: itemId })
+
+export async function economyRecordVisit(profileId: string, page: EconomyPage): Promise<void> {
+  await rpc<unknown>('economy_record_visit', { p_profile_id: profileId, p_page: page })
+}
+
+export async function economySetTimezone(profileId: string, tz: string): Promise<void> {
+  await rpc<unknown>('economy_set_timezone', { p_profile_id: profileId, p_tz: tz })
+}

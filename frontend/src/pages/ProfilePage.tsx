@@ -20,7 +20,10 @@ import SummaryList from '../features/profile/components/SummaryList'
 import UniversalSummary from '../features/profile/components/UniversalSummary'
 import { localItems, stepIdOf } from '../features/profile/contextSummary'
 import { hasUniversalProfile, type SetupNavState } from '../features/profile/flow'
-import { activeTrip, cityLabel, formatTripDates, homeCityFields, needsHomePick, pointsBalance, pointsEarned } from '../features/profile/model'
+import PointsHistory from '../features/economy/components/PointsHistory'
+import PointsSummary from '../features/economy/components/PointsSummary'
+import { useEconomy } from '../features/economy/useEconomy'
+import { activeTrip, cityLabel, formatTripDates, homeCityFields, needsHomePick, pointsBalance } from '../features/profile/model'
 import {
   ACCESSIBILITY_OPTIONS,
   ATTRACTION_OPTIONS,
@@ -91,7 +94,6 @@ function Overview() {
   const energy = optionFor(ENERGY_OPTIONS, view.energy)
   const pace = optionFor(PACE_OPTIONS, view.pace)
   const editLocal: SetupNavState = { activate: false, returnTo: '/profile' }
-  const ledger = [...profile.rewards.ledger].reverse().slice(0, 5)
   const mode = view.mode ? modeMeta(view.mode) : null
 
   const homeMissing = !universal.homeCityPlace
@@ -336,38 +338,20 @@ function Overview() {
         <SectionTitle id="points-title" icon="coin">
           Points
         </SectionTitle>
-        <div className="sheet-grain border-2 border-ink">
-          <div className="flex items-center gap-4 border-b-2 border-ink bg-saffron p-5">
-            <Icon name="coin" accent="sheet" className="size-14" />
-            <div>
-              <p className="font-display text-5xl leading-none">{pointsBalance(profile.rewards).toLocaleString()}</p>
-              <p className="text-sm font-semibold">to spend · {pointsEarned(profile.rewards).toLocaleString()} earned in total</p>
+        <div className="grid items-start gap-4 @2xl:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+          <PointsSummary />
+          <div className="min-w-0">
+            <PointsHistory limit={5} />
+            <div className="grid grid-cols-2 border-2 border-t-0 border-ink">
+              <Link to="/quests" className={cn(arrowRowClasses, 'border-0 border-r-2')}>
+                <span className={arrowLabel}>Quests</span>
+                <ArrowCell />
+              </Link>
+              <Link to="/shop" className={cn(arrowRowClasses, 'border-0')}>
+                <span className={arrowLabel}>Shop</span>
+                <ArrowCell />
+              </Link>
             </div>
-          </div>
-          {ledger.length > 0 ? (
-            <ul aria-label="Recent points activity">
-              {ledger.map((e, i) => (
-                <li key={e.id} className={cn('flex items-center justify-between gap-3 px-5 py-3', i > 0 && 'border-t-2 border-ink')}>
-                  <span className="flex items-center gap-2 font-semibold">
-                    <Icon name={e.reason === 'purchase' ? 'bag' : 'trophy'} className="size-5" />
-                    {e.reason === 'purchase' ? `Bought ${e.label}` : e.label}
-                  </span>
-                  <span className="font-display text-lg tabular-nums">{e.amount > 0 ? `+${e.amount}` : e.amount}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="px-5 py-4">Complete quests to earn your first points.</p>
-          )}
-          <div className="grid grid-cols-2 border-t-2 border-ink">
-            <Link to="/quests" className={cn(arrowRowClasses, 'border-0 border-r-2')}>
-              <span className={arrowLabel}>Quests</span>
-              <ArrowCell />
-            </Link>
-            <Link to="/shop" className={cn(arrowRowClasses, 'border-0')}>
-              <span className={arrowLabel}>Shop</span>
-              <ArrowCell />
-            </Link>
           </div>
         </div>
       </section>
@@ -378,7 +362,9 @@ function Overview() {
 // ---- Avatar & Migo ------------------------------------------------------------------------------
 
 function Style() {
-  const { account, profile, updateAccount, setEquipped } = useStore()
+  const { account, profile, updateAccount } = useStore()
+  const { setEquipped, busy: economyBusy } = useEconomy()
+  const [wardrobeMessage, setWardrobeMessage] = useState('')
   const [name, setName] = useState(account?.name ?? '')
   // Old emoji avatars show as the default picture, so one is always selected.
   const [avatar, setAvatar] = useState<string>(resolveAvatar(account?.avatar))
@@ -463,13 +449,27 @@ function Style() {
                         <span className="block font-bold">{item.name}</span>
                         <span className="text-xs font-semibold">{SLOT_LABELS[item.slot]}</span>
                       </span>
-                      <Button size="sm" variant={wearing ? 'secondary' : 'primary'} onClick={() => setEquipped(item.id, !wearing)} aria-label={`${wearing ? 'Take off' : 'Put on'} ${item.name}`}>
+                      <Button
+                        size="sm"
+                        variant={wearing ? 'secondary' : 'primary'}
+                        disabled={economyBusy.equip(item.id)}
+                        onClick={() => {
+                          setWardrobeMessage('')
+                          setEquipped(item.id, !wearing).catch((err: unknown) => setWardrobeMessage(err instanceof Error ? err.message : 'Couldn’t change that.'))
+                        }}
+                        aria-label={`${wearing ? 'Take off' : 'Put on'} ${item.name}`}
+                      >
                         {wearing ? 'Take off' : 'Put on'}
                       </Button>
                     </li>
                   )
                 })}
               </ul>
+            )}
+            {wardrobeMessage && (
+              <p role="alert" className="mt-3 border-2 border-ink bg-sienna-soft px-3 py-2 font-semibold">
+                {wardrobeMessage}
+              </p>
             )}
             <Link to="/shop" className={cn(arrowRowClasses, 'mt-4 w-full')}>
               <span className={arrowLabel}>Visit the shop</span>

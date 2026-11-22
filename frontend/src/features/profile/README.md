@@ -84,6 +84,6 @@ Everything goes through `src/lib/api.ts`, which saves accounts and profile recor
 | Message delivery | Messages you send are saved on the device; nothing arrives from others | `getThreads` / `sendMessage` / `markThreadRead` in `api.ts` |
 | Mutual interest | Likes are saved; matching likes isn't checked yet (messaging opens for teammates) | `setLiked` in `api.ts`, `canMessage` in `features/chat/useConversations.ts` |
 | Server-checked points | Rewards/purchases are validated in `api.ts` but stored in the client-sent record | "Points, challenges & shop" in `api.ts` |
-| More challenges | One daily + three starter challenges | `features/quests/challenges.ts` |
+| Quests | Weekly, daily (one refresh a day), travel adventures and getting-started quests; points checked on the server | `features/quests/catalog/`, `features/quests/engine.ts`, `backend/supabase/migrations/011_economy.sql` |
 | Online city search | Works where Open-Meteo is reachable; otherwise only the bundled 7,680 larger cities show (the search says so) | `searchRemote` in `features/places/citySearch.ts` |
 | Cities added automatically | `source: 'trip' / 'quest'` and `refId` are in the model, but nothing adds cities yet | `addCity(cities, place, source, refId)` in `model.ts` |
