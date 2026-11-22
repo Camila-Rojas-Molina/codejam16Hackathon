@@ -31,7 +31,8 @@
 --
 -- Timezones can't be used to farm quests:
 --   * A (profile, period, slot) is issued at most once, ever: once any row exists for it (active,
---     completed, expired or replaced), it is never issued again.
+--     completed, expired or replaced), it is never issued again. (One exception: when the first
+--     timezone is saved, quests nobody has touched yet are discarded and issued again in it.)
 --   * Periods only move forward: the current day (or week) is the later of "today in the saved
 --     timezone" and the latest one already issued. Moving west (back into "yesterday") keeps the
 --     day already issued instead of issuing yesterday; moving east can only start the next day a
@@ -434,6 +435,8 @@ begin
     end case;
 
   elsif v_type = 'visit' then
+    -- app_visits keeps the first and the latest visit per page, which is exact for the windows that
+    -- matter: all time (starters) and the active quest's period up to now (a visit since it began).
     return (exists (select 1 from app_visits v
                      where v.profile_id = p_profile_id and v.page = p_cond ->> 'page'
                        and v.last_at >= v_from and v.first_at < v_to))::int;
@@ -1171,6 +1174,15 @@ begin
     raise exception 'The timezone can only change once every 20 hours' using errcode = 'P0001', hint = 'timezone_rate_limited';
   end if;
   update profiles set timezone = p_tz, timezone_changed_at = v_now where id = p_profile_id;
+  -- The very first timezone: quests issued so far (in UTC, by an economy_state call that came
+  -- first) are discarded if nobody has touched them, so the first periods follow the real local day.
+  -- Only possible once per profile, and only before any quest was completed, refreshed or expired.
+  if p.timezone_changed_at is null
+     and not exists (select 1 from quest_assignments
+                      where profile_id = p_profile_id and category <> 'starter' and status <> 'active')
+     and not exists (select 1 from daily_refreshes where profile_id = p_profile_id) then
+    delete from quest_assignments where profile_id = p_profile_id and category <> 'starter';
+  end if;
   for a in select id, period_key from quest_assignments
             where profile_id = p_profile_id and status = 'active' and category <> 'starter' loop
     select * into v_b from economy_period_bounds(a.period_key, p_tz);

@@ -242,6 +242,15 @@ begin
   perform economy_record_visit(pid, 'shop');
   perform economy_record_visit(pid, 'quests');
   assert (select count(*) from app_visits where profile_id = pid) = 5, 'visits stored once per page';
+  -- Visits count inside the quest's period: today's visit for today's daily, any visit for starters.
+  assert economy_progress(pid, rec, '{"type":"visit","page":"map"}', '2026-11-24', '2026-11-25') = 1, 'visited today';
+  assert economy_progress(pid, rec, '{"type":"visit","page":"map"}', null, null) = 1, 'visited ever';
+  assert economy_progress(pid, rec, '{"type":"visit","page":"map"}', '2026-11-25', '2026-11-26') = 0, 'not yet tomorrow';
+  perform pg_temp.at('2026-11-24 18:00:00+00');
+  perform economy_record_visit(pid, 'map');
+  assert (select last_at from app_visits where profile_id = pid and page = 'map') = '2026-11-24 18:00:00+00'
+     and (select first_at from app_visits where profile_id = pid and page = 'map') = '2026-11-24 10:00:00+00', 'last_at moves, first_at stays';
+  perform pg_temp.at('2026-11-24 10:00:00+00');
   s := economy_state(pid);
   q := (select x from jsonb_array_elements(s -> 'quests') x where x ->> 'defId' = 't-s-map');
   s := economy_claim(pid, (q ->> 'id')::uuid);
@@ -442,19 +451,33 @@ begin
   update quest_defs set retired = false where id like 't-d-%';
 
   -- ---- Timezones: periods follow the saved zone, and switching can't re-issue a day ----
-  perform pg_temp.at('2026-11-24 02:00:00+00');
+  -- The app loads the state first, then saves the browser's zone: untouched quests are re-issued once.
+  perform pg_temp.at('2026-11-23 06:00:00+00');
   tzp := (migo_create_account('Zone', 'star') ->> 'id')::uuid;
   s := economy_state(tzp);
   ids := array(select x ->> 'id' from jsonb_array_elements(pg_temp.active(s, 'daily')) x order by 1);
-  assert (select bool_and(x ->> 'periodKey' like 'd:2026-11-24:%') from jsonb_array_elements(pg_temp.active(s, 'daily')) x), 'UTC day 24';
   r := pg_temp.fails(format('select economy_set_timezone(%L, %L)', tzp, 'Mars/Olympus_Mons'));
   assert r = '22023', 'unknown timezone refused: ' || r;
-  perform economy_set_timezone(tzp, 'America/Los_Angeles');      -- first change: allowed. Local: Nov 23, 18:00
+  perform economy_set_timezone(tzp, 'Europe/Lisbon');            -- first timezone
   s := economy_state(tzp);
-  assert s ->> 'timezone' = 'America/Los_Angeles', 'timezone saved';
+  assert s ->> 'timezone' = 'Europe/Lisbon', 'timezone saved';
+  assert not (array(select x ->> 'id' from jsonb_array_elements(pg_temp.active(s, 'daily')) x) && ids)
+     and (select count(*) from quest_assignments where profile_id = tzp and category = 'daily') = 3,
+    'first timezone: untouched quests issued again in it, nothing extra';
+  assert jsonb_array_length(pg_temp.active(s, 'starter')) = (select count(*) from quest_defs where category = 'starter' and not retired),
+    'starters kept';
+
+  perform pg_temp.at('2026-11-24 02:00:00+00');                   -- 20 hours later; Lisbon: Nov 24, 02:00
+  s := economy_state(tzp);
+  ids := array(select x ->> 'id' from jsonb_array_elements(pg_temp.active(s, 'daily')) x order by 1);
+  assert (select bool_and(x ->> 'periodKey' like 'd:2026-11-24:%') from jsonb_array_elements(pg_temp.active(s, 'daily')) x), 'day 24';
+  perform economy_set_timezone(tzp, 'America/Los_Angeles');      -- Local: Nov 23, 18:00
+  s := economy_state(tzp);
   assert array(select x ->> 'id' from jsonb_array_elements(pg_temp.active(s, 'daily')) x order by 1) = ids,
     'moving west keeps the same dailies';
-  assert not exists (select 1 from quest_assignments where profile_id = tzp and period_key = 'd:2026-11-23'), 'yesterday is never issued';
+  assert (select count(*) from quest_assignments where profile_id = tzp and period_key = 'd:2026-11-23') = 3
+     and not exists (select 1 from quest_assignments where profile_id = tzp and period_key = 'd:2026-11-23' and status = 'active'),
+    'yesterday is not issued again';
   assert (s ->> 'nextDailyReset')::timestamptz = '2026-11-25 08:00:00+00', 'day ends at midnight in Los Angeles';
   assert (pg_temp.active(s, 'daily') -> 0 ->> 'expiresAt')::timestamptz = '2026-11-25 08:00:00+00', 'quest windows moved too';
   r := pg_temp.fails(format('select economy_set_timezone(%L, %L)', tzp, 'Asia/Tokyo'));
@@ -475,8 +498,9 @@ begin
   s := economy_state(tzp);
   assert (select count(*) from quest_assignments where profile_id = tzp and category = 'daily' and period_key = 'd:2026-11-25') = 3,
     'switching back does not re-issue day 25';
-  assert (select count(distinct period_key) from quest_assignments where profile_id = tzp and category = 'daily') = 2,
-    'only two days ever issued (24 and 25)';
+  assert (select count(distinct period_key) from quest_assignments where profile_id = tzp and category = 'daily') = 3
+     and (select count(*) from quest_assignments where profile_id = tzp and category = 'daily') = 9,
+    'three days, three dailies each (23, 24, 25)';
   assert jsonb_array_length(pg_temp.active(s, 'daily')) = 3, 'day 25 still active';
   assert (s ->> 'nextDailyReset')::timestamptz = '2026-11-26 08:00:00+00', 'resets at Los Angeles midnight';
 
