@@ -16,18 +16,18 @@ import { BackdropArt } from './backdrops'
 export type Outfit = Partial<Record<ShopSlot, string>>
 
 /** Every slot something can be worn in. */
-export const WEAR_SLOTS: readonly WearSlot[] = ['back', 'neck', 'hand', 'face', 'ears', 'hair', 'head']
+const WEAR_SLOTS: readonly WearSlot[] = ['back', 'neck', 'hand', 'face', 'ears', 'hair', 'head']
 
 /** Default stacking per slot (a fit's `z` overrides it). Hats go over headphones, headphones over glasses… */
-export const SLOT_Z: Record<WearSlot, number> = { back: 0, neck: 10, hand: 20, face: 30, ears: 40, hair: 45, head: 50 }
+const SLOT_Z: Record<WearSlot, number> = { back: 0, neck: 10, hand: 20, face: 30, ears: 40, hair: 45, head: 50 }
 
 /** Outline width as a share of the avatar square (≈ the characters' own line, ~5px of 500). */
 const LINE_IN_SQUARE = 0.95
 
-export type PlacedWearable = { slot: WearSlot; id: string; art: string; fit: Fit; behind: boolean; z: number }
+type PlacedWearable = { slot: WearSlot; id: string; art: string; fit: Fit; behind: boolean; z: number }
 
 /** The worn items of an outfit that fit this avatar, in drawing order (behind ones first). */
-export function placeOutfit(avatarId: string, outfit: Outfit): PlacedWearable[] {
+function placeOutfit(avatarId: string, outfit: Outfit): PlacedWearable[] {
   const placed: PlacedWearable[] = []
   for (const slot of WEAR_SLOTS) {
     const item = accessoryById(outfit[slot])

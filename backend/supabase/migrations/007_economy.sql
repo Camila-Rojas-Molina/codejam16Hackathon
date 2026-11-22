@@ -327,6 +327,7 @@ language sql stable security definer set search_path = public as $$
       from team_members tm
       join submissions s on s.team_id = tm.team_id
      where tm.profile_id = p_profile_id
+       and not s.demo
        and (select count(*) from team_members x where x.team_id = tm.team_id) >= 2)
 $$;
 
@@ -359,6 +360,8 @@ begin
       join team_members tm on tm.team_id = s.team_id and tm.profile_id = p_profile_id
       join hunts h on h.id = s.hunt_id
      where s.created_at >= v_from and s.created_at < v_to
+       -- "Simulate arrival" (demo) hunts skip the location check, so they never earn quest progress.
+       and not s.demo
        and (not coalesce((p_cond ->> 'withPartner')::boolean, false)
             or (select count(*) from team_members x where x.team_id = s.team_id) >= 2)
        and (cardinality(v_kinds) = 0 or h.kind = any (v_kinds));
