@@ -179,7 +179,7 @@ function FittingRoom({ rewards, avatar, name, tryingId, onReset }: { rewards: Re
   const outfit: Outfit = trying ? { ...rewards.equipped, [trying.slot]: trying.id } : rewards.equipped
   const worn = SHOP_SLOTS.map((slot) => shopItem(rewards.equipped[slot])).filter((i): i is ShopItem => !!i)
   return (
-    <section aria-labelledby="fitting-title" className="sheet-grain border-2 border-ink lg:sticky lg:top-6">
+    <section aria-labelledby="fitting-title" className="sheet-grain border-2 border-ink shadow-block lg:sticky lg:top-6">
       <h2 id="fitting-title" className="border-b-2 border-ink bg-ink px-4 py-2 font-sans text-sm font-bold tracking-[0.12em] text-sheet uppercase">
         Fitting room
       </h2>

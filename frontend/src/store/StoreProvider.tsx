@@ -1,9 +1,10 @@
-import { startTransition, useEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
-import type { Thread } from '../features/chat/types'
+import { startTransition, useCallback, useEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
+import type { Connection, Thread } from '../features/chat/types'
 import type { ProfileRecord } from '../features/profile/types'
 import { todayKey } from '../features/quests/challenges'
 import * as api from '../lib/api'
 import * as auth from '../lib/auth'
+import { STORAGE_KEY as CONNECTIONS_KEY } from '../lib/connectionsDb'
 import { StoreContext, type StoreValue } from './context'
 import { currentUser, loadState, reducer, saveState } from './state'
 
@@ -15,6 +16,8 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
   const accountId = state.account?.id ?? null
   // Message threads live in api.ts (not in the persisted app state); this is the in-memory copy.
   const [threads, setThreads] = useState<{ owner: string | null; byPerson: Record<string, Thread> }>({ owner: null, byPerson: {} })
+  // Connection requests and connections (api.ts). Kept with the account they belong to.
+  const [connections, setConnections] = useState<{ owner: string | null; list: Connection[] | null }>({ owner: null, list: null })
   // The login (only when AUTH_ENABLED). Updated when a token refresh fails or another tab logs in/out.
   const [session, setSession] = useState<auth.Session | null>(() => (AUTH_ENABLED ? auth.getSession() : null))
   const sessionUserId = session?.user.id ?? null
@@ -83,6 +86,32 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [accountId])
 
+  // Load connections, then keep them fresh: when the app regains focus, every 30 s while it's open
+  // (a local's answer or a new request arrives from someone else), and when another tab changes them.
+  const loadConnections = useCallback(async () => {
+    if (!accountId) return
+    const list = await api.getConnections(accountId)
+    setConnections({ owner: accountId, list })
+  }, [accountId])
+
+  useEffect(() => {
+    if (!accountId) return
+    const refresh = () => void loadConnections().catch(() => {})
+    refresh()
+    const onVisible = () => document.visibilityState === 'visible' && refresh()
+    const onStorage = (e: StorageEvent) => (e.key === CONNECTIONS_KEY || e.key === null) && refresh()
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('storage', onStorage)
+    const timer = window.setInterval(() => document.visibilityState === 'visible' && refresh(), 30_000)
+    return () => {
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('storage', onStorage)
+      window.clearInterval(timer)
+    }
+  }, [accountId, loadConnections])
+
   const value = useMemo<StoreValue>(() => {
     const requireId = () => {
       if (!accountId) throw new Error('Please create your profile first.')
@@ -94,6 +123,7 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
     }
     const huntResults = [...Object.values(state.results), ...Object.values(state.parked).flatMap((s) => Object.values(s.results))]
     const myThreads = threads.owner === accountId ? threads.byPerson : {}
+    const myConnections = connections.owner === accountId ? connections.list : null
     const setThread = (thread: Thread) =>
       setThreads((t) => ({ owner: accountId, byPerson: { ...(t.owner === accountId ? t.byPerson : {}), [thread.person.id]: thread } }))
 
@@ -178,7 +208,33 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
       purchase: async (itemId) => commit(await api.purchaseItem(requireId(), itemId)),
       setEquipped: async (itemId, on) => commit(await api.setEquipped(requireId(), itemId, on)),
 
-      setLiked: async (personId, liked) => commit(await api.setLiked(requireId(), personId, liked)),
+      connections: myConnections,
+      refreshConnections: loadConnections,
+      requestConnection: async (person) => {
+        const c = await api.requestConnection(requireId(), person)
+        await loadConnections()
+        return c
+      },
+      respondToConnection: async (id, accept) => {
+        const c = await api.respondToConnection(requireId(), id, accept)
+        await loadConnections()
+        return c
+      },
+      cancelConnection: async (id) => {
+        const c = await api.cancelConnection(requireId(), id)
+        await loadConnections()
+        return c
+      },
+      markConnectionsSeen: async (ids) => {
+        await api.markConnectionsSeen(requireId(), ids)
+        await loadConnections()
+      },
+      removeFromMessages: async (personId) => {
+        const live = myConnections?.find((c) => c.person.id === personId && c.status === 'accepted')
+        commit(await api.removeFromMessages(requireId(), personId, live?.id))
+        await loadConnections()
+      },
+      setTutorial: async (status) => commit(await api.setTutorialStatus(requireId(), status)),
       threads: myThreads,
       sendMessage: async (person, text) => setThread(await api.sendMessage(requireId(), person, text)),
       markRead: async (personId) => {
@@ -187,7 +243,7 @@ export default function StoreProvider({ children }: { children: ReactNode }) {
         if (thread) setThread(thread)
       },
     }
-  }, [state, accountId, threads, session])
+  }, [state, accountId, threads, session, connections, loadConnections])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

@@ -6,6 +6,7 @@
 // Pages own their own max-width and columns; the frame just gives them the room.
 import { Navigate, Outlet } from 'react-router'
 import { hasUniversalProfile } from '../../features/profile/flow'
+import Tour from '../../features/tutorial/Tour'
 import { useStore } from '../../store/useStore'
 import { MobileTabBar, SideNav } from './DashboardNav'
 import RightSidebar from './RightSidebar'
@@ -27,6 +28,8 @@ export default function DashboardLayout() {
       </div>
       <RightSidebar />
       <MobileTabBar />
+      {/* Migo's guided tour: once for new accounts, or when replayed from Settings. */}
+      <Tour />
     </div>
   )
 }

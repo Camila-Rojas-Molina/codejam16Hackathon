@@ -38,6 +38,13 @@ export function putAccount(account: Account) {
   writeJSON(DB_KEY, db)
 }
 
+/** Every account saved on this device (device-mode Discover finds locals among them). */
+export function listAccounts(): Account[] {
+  return Object.keys(load().accounts)
+    .map(getAccount)
+    .filter((a): a is Account => a !== null)
+}
+
 export function getRecord(accountId: string): ProfileRecord {
   return normalizeRecord(load().profiles[accountId], accountId)
 }

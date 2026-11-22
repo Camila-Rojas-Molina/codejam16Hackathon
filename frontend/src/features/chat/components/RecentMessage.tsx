@@ -27,14 +27,14 @@ export default function RecentMessage({ className }: { className?: string }) {
       <Link to="/chat" className={cn('group flex items-end gap-3', className)} aria-label="Messages: none yet. Open Chat">
         <Bubble>
           <p className="eyebrow text-[0.65rem]">Messages</p>
-          <p className="font-serif leading-snug">No messages yet. Team up on a hunt to start chatting.</p>
+          <p className="font-serif leading-snug">No messages yet. Connect with someone in Chat to start talking.</p>
         </Bubble>
       </Link>
     )
   }
 
   const { person, last, unread } = latest
-  const preview = last ? (last.from === 'me' ? `You: ${last.text}` : last.text) : 'You’re teammates. Say hi!'
+  const preview = last ? (last.from === 'me' ? `You: ${last.text}` : last.text) : latest.connection ? 'You’re connected. Say hi!' : 'You’re teammates. Say hi!'
   return (
     <Link
       to={`/chat/${encodeURIComponent(person.id)}`}

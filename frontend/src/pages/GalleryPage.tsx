@@ -151,7 +151,7 @@ export default function GalleryPage() {
       )}
 
       {online && status === 'ready' && photos.length === 0 && (
-        <section aria-labelledby="gallery-empty" className="sheet-grain flex flex-col items-center gap-4 border-2 border-ink px-5 py-8 text-center">
+        <section aria-labelledby="gallery-empty" className="sheet-grain flex flex-col items-center gap-4 border-2 border-ink px-5 py-8 text-center shadow-block">
           <Mascot pose="ponder" className="h-40 sm:h-48" />
           <h2 id="gallery-empty" className="text-2xl sm:text-3xl">
             No photos yet

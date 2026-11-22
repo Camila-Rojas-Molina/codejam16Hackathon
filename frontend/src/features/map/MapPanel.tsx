@@ -48,7 +48,7 @@ export default function MapPanel({ className }: { className?: string }) {
 
   return (
     <aside aria-label="Map details" className={cn('flex-col gap-5', className)}>
-      <section className="sheet-grain border-2 border-ink">
+      <section className="sheet-grain border-2 border-ink shadow-block-sm">
         <p className="eyebrow border-b-2 border-ink px-4 py-2">Where you are</p>
         <div className="flex items-start gap-3 p-4">
           <span className="grid size-12 shrink-0 place-items-center border-2 border-ink bg-teal-soft" aria-hidden>

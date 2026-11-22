@@ -3,7 +3,7 @@
 // when it's configured, and to this device otherwise. Screens must not import mockData.
 import { DEFAULT_AVATAR } from './avatars'
 import type { PlacePick } from '../features/places/types'
-import { MESSAGE_MAX_LENGTH, type Message, type Person, type Thread } from '../features/chat/types'
+import { MESSAGE_MAX_LENGTH, type Connection, type DiscoverEntry, type Message, type Person, type Thread } from '../features/chat/types'
 import { addCity, pointsBalance, tidyDogs } from '../features/profile/model'
 import { compatibility, type Compatibility, type MatchDogs, type MatchProfile } from '../features/profile/matching'
 import type {
@@ -21,6 +21,8 @@ import { shopItem } from '../features/rewards/shop'
 import { scoreHunt } from '../features/scoring/score'
 import { distanceMeters } from './geo'
 import { HUNTS, TEAMS, USERS } from './mockData'
+import * as backend from './backend'
+import * as conn from './connectionsDb'
 import * as db from './profileDb'
 import { profileRepo } from './profileRepo'
 import type { Hunt, LatLng, Role, ScoreBreakdown, Team, User } from './types'
@@ -106,7 +108,8 @@ export async function createAccount(input: { name: string; avatar: string }): Pr
   if (!name) throw new Error('A name is required.')
   const repo = profileRepo()
   const account = await repo.createAccount({ name, avatar: input.avatar })
-  const profile = await repo.getRecord(account.id)
+  // A brand-new account gets the guided tour on its first visit to the hub.
+  const profile: ProfileRecord = { ...(await repo.getRecord(account.id)), tutorial: { status: 'pending', at: Date.now() } }
   await repo.saveRecord(profile)
   return { account: clone(account), profile: clone(profile) }
 }
@@ -238,6 +241,8 @@ export async function deleteAccount(accountId: string): Promise<void> {
   await delay(150)
   await profileRepo().deleteAccount(accountId)
   db.deleteAccountData(accountId)
+  // Device connections go too (on Supabase the database cascades its own).
+  conn.deleteAccountRows(accountId)
 }
 
 // ---- Points, challenges & shop ----------------------------------------------------------------
@@ -285,31 +290,212 @@ export async function setEquipped(accountId: string, itemId: string, on: boolean
   })
 }
 
-// ---- People & messages ------------------------------------------------------------------------
-// TODO(backend): live discovery and message delivery. Until then, discovery shows the sample
-// profiles from the match pool (flagged `demo`), and messages you send are kept on this device.
+// ---- People, connections & messages ----------------------------------------------------------
+// Discover lists locals for tourists; a tourist asks to connect; the local says Connect or Not now.
+// Real people: Supabase (007_connections.sql, the server enforces every rule) when configured, else
+// every account on this device (connectionsDb.ts, same rules). MIGO's sample locals (mockData) live
+// on the device in both cases, and say yes straight away so the flow can be tried alone.
+// Messages themselves are still kept on this device (TODO(backend): message delivery).
 
-/** People to discover, most compatible first, in the opposite mode to yours. */
-export async function getPeopleToDiscover(me: MatchProfile | null): Promise<{ person: Person; match: Compatibility }[]> {
-  await delay(200)
-  const wanted: Role | null = me ? (me.mode === 'tourist' ? 'local' : 'tourist') : null
-  return USERS.filter((u) => !wanted || u.role === wanted)
-    .map((u) => {
-      const person: Person = { id: u.id, name: u.name, avatar: u.avatar, mode: u.role, interests: u.interests ?? [], languages: u.languages ?? [], funFact: u.funFact, demo: true }
-      return { person, match: compatibility(me ?? {}, asMatchProfile(u)) }
+const SAMPLE_IDS = new Set(USERS.map((u) => u.id))
+/** True for MIGO's built-in sample profiles (they can't answer requests or reply). */
+export const isSamplePerson = (id: string) => SAMPLE_IDS.has(id)
+
+const samplePerson = (u: User): Person => ({
+  id: u.id,
+  name: u.name,
+  avatar: u.avatar,
+  mode: u.role,
+  interests: u.interests ?? [],
+  languages: u.languages ?? [],
+  funFact: u.funFact,
+  demo: true,
+  traits: {
+    energy: u.traits?.energy ?? undefined,
+    planning: u.traits?.planning ?? undefined,
+    decisions: u.traits?.decisions ?? undefined,
+    pace: u.traits?.pace ?? undefined,
+    groupSize: u.traits?.groupSize ?? undefined,
+    dogStance: u.dogs?.stance && u.dogs.stance !== 'no-dogs' ? u.dogs.stance : undefined,
+  },
+})
+
+/** Someone's public card from their account and record (device accounts; same fields as migo_public_person). */
+function personFromRecord(account: Account, record: ProfileRecord): Person {
+  const u = record.universal
+  const stance = u?.dogs?.stance
+  return {
+    id: account.id,
+    name: account.name,
+    avatar: account.avatar,
+    mode: record.activeMode ?? 'tourist',
+    interests: u?.interests ?? [],
+    languages: u?.languages.spoken ?? [],
+    traits: u
+      ? {
+          energy: u.personality.energy ?? undefined,
+          planning: u.personality.planning ?? undefined,
+          decisions: u.personality.decisions ?? undefined,
+          pace: u.exploration.pace ?? undefined,
+          groupSize: u.exploration.groupSize ?? undefined,
+          dogStance: stance && stance !== 'no-dogs' ? stance : undefined,
+        }
+      : undefined,
+  }
+}
+
+/** The fresh public card of a device account, or null for anyone else. */
+function deviceCard(id: string): Person | null {
+  const account = db.getAccount(id)
+  return account ? personFromRecord(account, db.getRecord(id)) : null
+}
+
+/** A person's public answers in the shape compatibility() expects. */
+export const personMatchProfile = (p: Person): Partial<MatchProfile> => ({
+  mode: p.mode,
+  interests: p.interests,
+  languages: p.languages,
+  energy: p.traits?.energy,
+  planning: p.traits?.planning,
+  decisions: p.traits?.decisions,
+  pace: p.traits?.pace,
+  groupSize: p.traits?.groupSize,
+  dogs: p.traits?.dogStance ? { stance: p.traits.dogStance } : undefined,
+})
+
+const onSupabase = () => profileRepo().kind === 'supabase'
+// Device rows have "conn-…" ids; server rows are uuids.
+const isDeviceConnection = (id: string) => id.startsWith('conn-')
+
+async function myCard(accountId: string): Promise<{ person: Person; record: ProfileRecord }> {
+  const repo = profileRepo()
+  const account = await repo.getAccount(accountId)
+  if (!account) throw new Error('Account not found. Please log in again.')
+  const record = await repo.getRecord(accountId)
+  return { person: personFromRecord(account, record), record }
+}
+
+/** Every connection you're part of (requests both ways, connections, and closed ones), newest first. */
+export async function getConnections(accountId: string): Promise<Connection[]> {
+  const device = conn.forAccount(accountId).map((r) => conn.asConnection(r, accountId, deviceCard))
+  const server = onSupabase() ? await backend.myConnections() : []
+  return [...server, ...device].sort((a, b) => b.updatedAt - a.updatedAt)
+}
+
+/**
+ * Locals a tourist can ask to connect with, most compatible first. Empty unless you're in Tourist mode.
+ * Leaves out people you're connected with or who've asked you (they're in Messages), anyone who said
+ * "not now" to you recently, `exclude` (people already in your Messages, e.g. hunt teammates), and
+ * dog mismatches. People you've already asked are kept, marked pending.
+ */
+export async function discoverLocals(
+  accountId: string,
+  me: MatchProfile | null,
+  exclude: ReadonlySet<string> = new Set(),
+): Promise<(DiscoverEntry & { match: Compatibility })[]> {
+  await delay(150)
+  if (me?.mode !== 'tourist') return []
+
+  const people: DiscoverEntry[] = []
+  if (onSupabase()) {
+    for (const p of await backend.discoverLocals()) people.push({ person: { ...p, demo: false }, pending: p.pending })
+  } else {
+    for (const account of db.listAccounts()) {
+      if (account.id === accountId) continue
+      const record = db.getRecord(account.id)
+      if (record.activeMode !== 'local' || !record.universalCompletedAt) continue
+      // The private half of the dog filter (a "no dogs" local never sees dog owners and vice versa).
+      const theirs = record.universal?.dogs?.stance
+      const mine = me.dogs?.stance
+      if ((mine === 'no-dogs' && theirs === 'has-dog') || (mine === 'has-dog' && theirs === 'no-dogs')) continue
+      people.push({ person: personFromRecord(account, record), pending: false })
+    }
+  }
+  for (const u of USERS) if (u.role === 'local') people.push({ person: samplePerson(u), pending: false })
+
+  // Device-side rules (the server already applied them to its own people).
+  const rows = conn.forAccount(accountId)
+  return people
+    .filter(({ person }) => !exclude.has(person.id))
+    .filter(({ person }) => {
+      const pair = rows.filter((r) => r.requesterId === person.id || r.recipientId === person.id)
+      if (pair.some((r) => r.status === 'accepted' || (r.status === 'pending' && r.requesterId === person.id))) return false
+      return !conn.declinedRecently(accountId, person.id)
     })
-    // Same hard filter as matching: "prefers no dogs" never sees dog owners (and vice versa).
+    .map(({ person, pending }) => ({
+      person,
+      pending: pending || rows.some((r) => r.status === 'pending' && r.requesterId === accountId && r.recipientId === person.id),
+      // Samples rank on their full mock answers (as hunt matching does); real people on public answers only.
+      match: compatibility(me, isSamplePerson(person.id) ? asMatchProfile(USERS.find((u) => u.id === person.id)!) : personMatchProfile(person)),
+    }))
     .filter(({ match }) => !match.blocked)
     .sort((a, b) => (b.match.total ?? 0) - (a.match.total ?? 0))
 }
 
-/** Shows (or withdraws) interest in someone's profile. */
-export async function setLiked(accountId: string, personId: string, liked: boolean): Promise<ProfileRecord> {
+/** Asks a local to connect. Returns the request (or the existing connection: never a duplicate). */
+export async function requestConnection(accountId: string, person: Person): Promise<Connection> {
+  await delay(150)
+  if (isSamplePerson(person.id)) {
+    const { person: me, record } = await myCard(accountId)
+    if (record.activeMode !== 'tourist') throw new Error('Switch to Tourist mode to connect with locals.')
+    return conn.asConnection(conn.request(me, person, { autoAccept: true }), accountId)
+  }
+  if (onSupabase()) return backend.requestConnection(person.id)
+
+  const { person: me, record } = await myCard(accountId)
+  const existing = conn.livePair(accountId, person.id)
+  if (!existing) {
+    if (record.activeMode !== 'tourist') throw new Error('Switch to Tourist mode to connect with locals.')
+    const theirs = db.getAccount(person.id) ? db.getRecord(person.id) : null
+    if (!theirs) throw new Error('That person isn’t on MIGO any more.')
+    if (theirs.activeMode !== 'local') throw new Error('They’re not in Local mode right now.')
+    if (conn.declinedRecently(accountId, person.id)) throw new Error('They’re not taking new requests from you right now.')
+  }
+  return conn.asConnection(conn.request(me, deviceCard(person.id) ?? person), accountId, deviceCard)
+}
+
+/** The local's answer: true = Connect, false = Not now. An already-answered request comes back unchanged. */
+export async function respondToConnection(accountId: string, connectionId: string, accept: boolean): Promise<Connection> {
   await delay(120)
-  return updateRecord(accountId, (r) => {
-    const likes = r.likes.filter((id) => id !== personId)
-    return { ...r, likes: liked ? [...likes, personId] : likes }
-  })
+  if (!isDeviceConnection(connectionId)) return backend.respondConnection(connectionId, accept)
+  const row = conn.respond(accountId, connectionId, accept)
+  if (!row) throw new Error('That request isn’t there any more.')
+  return conn.asConnection(row, accountId, deviceCard)
+}
+
+/** The tourist withdraws a request that hasn't been answered. */
+export async function cancelConnection(accountId: string, connectionId: string): Promise<Connection> {
+  await delay(120)
+  if (!isDeviceConnection(connectionId)) return backend.cancelConnection(connectionId)
+  const row = conn.cancel(accountId, connectionId)
+  if (!row) throw new Error('That request isn’t there any more.')
+  return conn.asConnection(row, accountId, deviceCard)
+}
+
+export async function markConnectionsSeen(accountId: string, ids: string[]): Promise<void> {
+  if (ids.length === 0) return
+  const device = ids.filter(isDeviceConnection)
+  const server = ids.filter((id) => !isDeviceConnection(id))
+  if (device.length) conn.markSeen(accountId, device)
+  if (server.length && onSupabase()) await backend.markConnectionsSeen(server)
+}
+
+/**
+ * Removes someone from your Messages: ends the connection (if there is one) and hides the
+ * conversation. Messages are kept, so connecting again later reopens the same conversation.
+ */
+export async function removeFromMessages(accountId: string, personId: string, connectionId?: string | null): Promise<ProfileRecord> {
+  await delay(120)
+  if (connectionId) {
+    if (isDeviceConnection(connectionId)) conn.remove(accountId, connectionId)
+    else await backend.removeConnection(connectionId)
+  }
+  return updateRecord(accountId, (r) => ({ ...r, removedChats: { ...r.removedChats, [personId]: Date.now() } }))
+}
+
+/** Records the guided tour as completed or skipped, or queues it to show again. */
+export async function setTutorialStatus(accountId: string, status: 'pending' | 'completed' | 'skipped'): Promise<ProfileRecord> {
+  return updateRecord(accountId, (r) => ({ ...r, tutorial: { status, at: Date.now() } }))
 }
 
 function normMessage(v: unknown): Message | null {

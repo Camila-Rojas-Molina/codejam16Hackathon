@@ -12,12 +12,14 @@ backend/
 │   ├── 003_storage.sql  'selfies' storage bucket
 │   ├── 004_migo_profiles.sql  one account, two modes: questionnaire, trips, local profile
 │   ├── 005_auth.sql     login (Supabase Auth): links profiles to logins, owner checks
-│   └── 006_gallery.sql  photo gallery: private `photos` table + 'gallery' storage bucket
+│   ├── 006_gallery.sql  photo gallery: private `photos` table + 'gallery' storage bucket
+│   └── 007_connections.sql  CHAT connection requests: tourist asks, local says Connect or Not now
 └── tests/
     ├── smoke_test.sql          checks the hunt flow, then rolls back
     ├── migo_profiles_test.sql  checks accounts/profiles and mode switching, then rolls back
     ├── auth_test.sql           checks the login/owner rules, then rolls back
     ├── gallery_test.sql        checks the gallery owner rules, ordering and delete, then rolls back
+    ├── connections_test.sql    checks requests, answers, no duplicates, Discover exclusions, removal
     └── local_supabase_stub.sql fake `auth` schema for testing on plain Postgres (never run on Supabase)
 ```
 
@@ -34,7 +36,7 @@ backend/
    ```
    Never commit `.env.local`. Add the same two variables in Vercel for the deployed app.
 
-To test on a local Postgres instead, run `tests/local_supabase_stub.sql` first (it fakes Supabase's `auth` schema and `auth.uid()`), then 001, 002, 004, 005 and the three tests. Skip 003 (it needs Supabase storage).
+To test on a local Postgres instead, run `tests/local_supabase_stub.sql` first (it fakes Supabase's `auth` schema and `auth.uid()`), then 001, 002, 004, 005 (006, 007) and the tests. Skip 003 (it needs Supabase storage).
 
 All migration files can be run again safely after changes. Running `002_seed.sql` again also puts the demo partners back in the match queue.
 
@@ -97,6 +99,33 @@ Photos people take while exploring, shown on the app's `/gallery` page. Needs a 
 Errors: `42501` not signed in / `Not your account` / not your folder, `22023` bad details, `23505` path already saved, `P0002` unknown profile or photo.
 
 **Rules:** the `photos` table has RLS on and no grants, so it's only reachable through these functions (owner rule as in 005). Storage policies let a signed-in user upload, replace, list and delete files only under their own `<auth uid>/` folder. The bucket is public-read (8 MB per file, JPEG/PNG/WebP), like `selfies`: file names are random, but anyone who has a photo's URL can open it. Gap: deleting the whole account removes the photo rows but not the files; clean those up from **Storage** in the dashboard (or delete them from the app first).
+
+## Connections (`007_connections.sql`)
+
+How people meet in CHAT. A tourist browses locals in Discover and taps **Connect**; the local gets the
+request at the top of Messages and picks **Connect** or **Not now**. Accepted connections show up in
+Messages for both people and leave both people's Discover. Signed-in only.
+
+**Set up:** after 005 (and 006), paste and run `007_connections.sql` (safe to run again), then
+optionally `tests/connections_test.sql`, which should say `All connection checks passed`. Existing
+data is untouched: hunt teammates keep messaging as before, and the old `likes` list stays in each
+profile record (unused).
+
+| Function | Does |
+|---|---|
+| `migo_discover()` | Locals the caller (in Tourist mode) can ask, with public answers only. Leaves out connected people, people who've asked you, anyone who said "not now" to you in the last 14 days, and dog mismatches. People you've asked come with `pending: true`. Locals get `[]`. |
+| `migo_request_connection(recipient)` | Tourist → local. Idempotent: an open request or connection is returned as is; if they already asked you, this accepts theirs. |
+| `migo_respond_connection(id, accept)` | The recipient's answer. A request that's already answered or withdrawn comes back unchanged. |
+| `migo_cancel_connection(id)` | The requester withdraws an unanswered request. |
+| `migo_remove_connection(id)` | Either person ends an accepted connection (row kept as `removed`; they can be discovered again). |
+| `migo_my_connections()` | Every connection the caller is part of, as `{id, status, direction, person, seen, …}`. |
+| `migo_mark_connections_seen(ids)` | Marks news as seen (an incoming request stays new until answered). |
+
+Rules: one live (pending/accepted) row per pair, enforced by a unique index on the unordered pair,
+plus a per-pair advisory lock, so double taps and two people connecting at once can't duplicate.
+The `connections` table has RLS on and no grants. Errors: `42501` not signed in, `P0002` unknown
+person/request or not yours, `22023` wrong mode / declined recently. Messages themselves still live
+on each device (not on the server yet).
 
 ## Security
 

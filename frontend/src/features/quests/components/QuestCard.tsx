@@ -74,7 +74,7 @@ export default function QuestCard({ state, highlight = false }: { state: Challen
       className={cn(
         'relative scroll-mt-24 border-2 border-ink',
         status === 'claimed' ? 'bg-teal-soft' : 'sheet-grain',
-        highlight && 'shadow-block outline-4 outline-offset-4 outline-saffron',
+        highlight ? 'shadow-block outline-4 outline-offset-4 outline-saffron' : 'shadow-block-sm',
       )}
     >
       <div className="flex items-stretch border-b-2 border-ink">

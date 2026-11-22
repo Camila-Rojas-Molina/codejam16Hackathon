@@ -16,7 +16,7 @@ import { cn } from '../../lib/cn'
 export default function MapWorkspace({ className }: { className?: string }) {
   const mapRootRef = useRef<HTMLDivElement>(null)
   return (
-    <section aria-label="Map" className={cn('relative flex min-h-[22rem] flex-1 overflow-hidden border-2 border-ink bg-teal-soft', className)}>
+    <section aria-label="Map" className={cn('relative flex min-h-[22rem] flex-1 overflow-hidden border-2 border-ink bg-teal-soft shadow-block', className)}>
       {/* Pending: shown until the map is built. */}
       <div className="hatch-soft absolute inset-0 grid place-items-center p-6">
         <div className="sheet-grain flex max-w-sm flex-col items-center gap-3 border-2 border-ink p-5 text-center shadow-block-sm">

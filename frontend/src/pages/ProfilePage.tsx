@@ -237,7 +237,7 @@ function Overview() {
         <SectionTitle id="modes-title" icon="shuffle">
           Your two modes
         </SectionTitle>
-        <div className="grid border-2 border-ink @xl:grid-cols-2">
+        <div className="grid border-2 border-ink shadow-block-sm @xl:grid-cols-2">
           <div className="bg-saffron-soft p-5">
             <p className="eyebrow flex items-center gap-2">
               <Icon name="suitcase" className="size-5" />
@@ -336,7 +336,7 @@ function Overview() {
         <SectionTitle id="points-title" icon="coin">
           Points
         </SectionTitle>
-        <div className="sheet-grain border-2 border-ink">
+        <div className="sheet-grain border-2 border-ink shadow-block-sm">
           <div className="flex items-center gap-4 border-b-2 border-ink bg-saffron p-5">
             <Icon name="coin" accent="sheet" className="size-14" />
             <div>
@@ -446,7 +446,7 @@ function Style() {
         <SectionTitle id="wardrobe-title" icon="shop">
           Migo’s wardrobe
         </SectionTitle>
-        <div className="sheet-grain grid border-2 border-ink sm:grid-cols-[auto_1fr]">
+        <div className="sheet-grain grid border-2 border-ink shadow-block-sm sm:grid-cols-[auto_1fr]">
           <div className="grid place-items-center border-b-2 border-ink bg-teal-soft p-6 sm:border-r-2 sm:border-b-0">
             <Mascot pose="cheer" accessories={profile.rewards.equipped} className="h-52" label="Migo wearing your accessories" />
           </div>
@@ -503,7 +503,7 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-8">
-      <header className="sheet-grain flex items-stretch border-2 border-ink">
+      <header className="sheet-grain flex items-stretch border-2 border-ink shadow-block">
         <div className="grid shrink-0 place-items-center border-r-2 border-ink bg-saffron-soft p-3">
           <Avatar avatar={account.avatar} size="xl" className="border-0 bg-transparent" />
         </div>

@@ -13,6 +13,7 @@ import type {
   ProfileRecord,
   SpendRange,
   TouristTrip,
+  TutorialState,
   UniversalProfile,
 } from './types'
 
@@ -72,6 +73,8 @@ export function emptyRecord(accountId: string): ProfileRecord {
     local: null,
     rewards: { ledger: [], owned: [], equipped: {} },
     likes: [],
+    removedChats: {},
+    tutorial: null,
     updatedAt: Date.now(),
   }
 }
@@ -399,6 +402,17 @@ function normLocal(v: unknown): LocalContext | null {
   }
 }
 
+function normRemovedChats(v: unknown): Record<string, number> {
+  if (!isObj(v)) return {}
+  return Object.fromEntries(Object.entries(v).filter((e): e is [string, number] => typeof e[1] === 'number' && Number.isFinite(e[1])))
+}
+
+function normTutorial(v: unknown): TutorialState | null {
+  if (!isObj(v)) return null
+  const status = v.status === 'pending' || v.status === 'completed' || v.status === 'skipped' ? v.status : null
+  return status ? { status, at: numOrNull(v.at) ?? Date.now() } : null
+}
+
 export function normalizeRecord(v: unknown, accountId: string): ProfileRecord {
   if (!isObj(v)) return emptyRecord(accountId)
   const t = isObj(v.tourist) ? v.tourist : {}
@@ -414,6 +428,8 @@ export function normalizeRecord(v: unknown, accountId: string): ProfileRecord {
     local: normLocal(v.local),
     rewards: normRewards(v.rewards),
     likes: strArr(v.likes),
+    removedChats: normRemovedChats(v.removedChats),
+    tutorial: normTutorial(v.tutorial),
     updatedAt: numOrNull(v.updatedAt) ?? Date.now(),
   }
 }

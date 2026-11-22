@@ -1,17 +1,16 @@
 // MIGO's main navigation: a ruled left column on desktop, an icon rail on tablets, a tab bar on
 // phones. Each item is a cell divided by ink rules; the current one is filled saffron.
-// Same five destinations, in the same order, everywhere: Map, Quests, Chat, Profile, Gallery.
+// Same five destinations, in the same order, everywhere: Map, Quests, Chat, Gallery, Profile.
 // (The shop is reached from the points balance, and from the sidebar on desktop.)
 import { NavLink } from 'react-router'
 import { cn } from '../../lib/cn'
 import Icon, { type IconAccent } from '../icons/Icon'
-import MascotIcon from '../icons/MascotIcon'
 import Logo from '../ui/Logo'
 import { useNavItems, type NavItem } from './navItems'
 
-/** A nav item's icon: Migo for the map, a line icon for the rest. */
+/** A nav item's icon (Migo the walking globe for the map). */
 export function NavIcon({ icon, accent, className }: { icon: NavItem['icon']; accent: IconAccent; className?: string }) {
-  return icon === 'mascot' ? <MascotIcon accent={accent} className={className} /> : <Icon name={icon} accent={accent} className={className} />
+  return <Icon name={icon} accent={accent} className={className} />
 }
 
 /** Count badge: ink square, paper digits (9.3:1), with a sienna corner. */
@@ -42,6 +41,7 @@ export function SideNav() {
           <li key={item.to} className="border-b-2 border-ink">
             <NavLink
               to={item.to}
+              data-tour={`nav-${item.to.slice(1)}`}
               className={({ isActive }) =>
                 cn(
                   'group relative flex min-h-[4.5rem] flex-col items-center justify-center gap-1.5 px-2 font-bold tracking-[0.12em] uppercase transition-colors',
@@ -76,6 +76,7 @@ export function MobileTabBar({ className }: { className?: string }) {
           <li key={item.to} className={cn('min-w-0 flex-1', i > 0 && 'border-l-2 border-ink')}>
             <NavLink
               to={item.to}
+              data-tour={`nav-${item.to.slice(1)}`}
               className={({ isActive }) =>
                 cn(
                   'relative flex min-h-16 flex-col items-center justify-center gap-1 text-[0.6rem] font-bold tracking-[0.08em] uppercase transition-colors',

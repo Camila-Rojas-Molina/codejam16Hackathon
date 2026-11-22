@@ -7,7 +7,7 @@ import type {
   TouristTrip,
   UniversalProfile,
 } from '../features/profile/types'
-import type { Person, Thread } from '../features/chat/types'
+import type { Connection, Person, Thread } from '../features/chat/types'
 import type { PlacePick } from '../features/places/types'
 import type { HuntResult, ScoreBreakdown, User } from '../lib/types'
 import type { AppState } from './state'
@@ -61,8 +61,20 @@ export type StoreValue = AppState & {
   purchase: (itemId: string) => Promise<ProfileRecord>
   setEquipped: (itemId: string, on: boolean) => Promise<ProfileRecord>
 
-  // People & messages
-  setLiked: (personId: string, liked: boolean) => Promise<ProfileRecord>
+  // People, connections & messages
+  /** Every connection you're part of (null until first loaded). Refreshed on focus and every 30 s. */
+  connections: Connection[] | null
+  refreshConnections: () => Promise<void>
+  /** Tourist → local: "Connect". */
+  requestConnection: (person: Person) => Promise<Connection>
+  /** Local: Connect (true) or Not now (false). */
+  respondToConnection: (connectionId: string, accept: boolean) => Promise<Connection>
+  cancelConnection: (connectionId: string) => Promise<Connection>
+  markConnectionsSeen: (ids: string[]) => Promise<void>
+  /** Ends the connection (if any) and hides the conversation; messages are kept. */
+  removeFromMessages: (personId: string) => Promise<void>
+  /** Marks the guided tour completed or skipped, or queues it again (replay). */
+  setTutorial: (status: 'pending' | 'completed' | 'skipped') => Promise<ProfileRecord>
   /** Message threads by person id (loaded from api.ts). */
   threads: Record<string, Thread>
   sendMessage: (person: Person, text: string) => Promise<void>

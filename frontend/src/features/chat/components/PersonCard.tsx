@@ -1,6 +1,5 @@
-// A discoverable person: who they are, what you share, and actions (view, show interest, message).
+// A local in Discover: who they are, what you share, and Connect (or "Request sent" once you've asked).
 import { useId, useState } from 'react'
-import { Link } from 'react-router'
 import Icon from '../../../components/icons/Icon'
 import Avatar from '../../../components/ui/Avatar'
 import Badge from '../../../components/ui/Badge'
@@ -26,13 +25,56 @@ const DIMENSION_LABELS: Record<Dimension, string> = {
 type PersonCardProps = {
   person: Person
   match: Compatibility
-  liked: boolean
-  onToggleLike: () => void
-  canMessage: boolean
+  /** You've asked and they haven't answered yet. */
+  pending: boolean
+  onConnect: () => void
+  onWithdraw: () => void
   busy?: boolean
 }
 
-export default function PersonCard({ person, match, liked, onToggleLike, canMessage, busy }: PersonCardProps) {
+/** Someone's public profile: fun fact, interests (shared ones starred), languages, and optionally how you match. */
+export function PersonDetails({ person, match, id }: { person: Person; match?: Compatibility; id?: string }) {
+  const shared = match ? labelsFor(INTEREST_OPTIONS, match.sharedInterests) : []
+  return (
+    <div id={id} className="space-y-3">
+      {person.funFact && (
+        <p className="font-serif text-lg leading-snug">
+          <span className="eyebrow mr-2 align-middle">Fun fact</span>
+          {person.funFact}
+        </p>
+      )}
+      <div>
+        <p className="eyebrow">Into</p>
+        <ul className="mt-1.5 flex flex-wrap gap-1.5">
+          {labelsFor(INTEREST_OPTIONS, person.interests).map((i) => (
+            <li key={i} className={cn('inline-flex items-center gap-1 border-2 border-ink px-2 py-0.5 text-sm font-semibold', shared.includes(i) ? 'bg-saffron' : 'bg-sheet')}>
+              {shared.includes(i) && <Icon name="star" accent="sheet" className="size-4" />}
+              {i}
+              {shared.includes(i) && <span className="sr-only"> (shared)</span>}
+            </li>
+          ))}
+          {person.interests.length === 0 && <li className="text-sm">Not shared yet</li>}
+        </ul>
+      </div>
+      <p className="text-sm">
+        <span className="eyebrow mr-2">Speaks</span>
+        {person.languages.join(', ') || 'Not shared'}
+      </p>
+      {match && Object.keys(match.dimensions).length > 0 && (
+        <dl className="grid grid-cols-2 border-t-2 border-l-2 border-ink text-sm">
+          {(Object.entries(match.dimensions) as [Dimension, number][]).map(([dim, score]) => (
+            <div key={dim} className="border-r-2 border-b-2 border-ink px-3 py-2">
+              <dt className="font-bold">{DIMENSION_LABELS[dim]}</dt>
+              <dd>{Math.round(score * 100)}% match</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  )
+}
+
+export default function PersonCard({ person, match, pending, onConnect, onWithdraw, busy }: PersonCardProps) {
   const [open, setOpen] = useState(false)
   const detailsId = useId()
   const label = matchLabel(match.total)
@@ -41,7 +83,7 @@ export default function PersonCard({ person, match, liked, onToggleLike, canMess
   const mode = modeMeta(person.mode)
 
   return (
-    <article aria-labelledby={`${detailsId}-name`} className="sheet-grain border-2 border-ink">
+    <article aria-labelledby={`${detailsId}-name`} className="sheet-grain border-2 border-ink shadow-block">
       <div className="flex items-stretch border-b-2 border-ink">
         <div className="grid w-24 shrink-0 place-items-center border-r-2 border-ink bg-saffron-soft p-2 sm:w-28">
           <Avatar avatar={person.avatar} size="lg" className="border-0 bg-transparent" />
@@ -86,39 +128,8 @@ export default function PersonCard({ person, match, liked, onToggleLike, canMess
         )}
 
         {open && (
-          <div id={detailsId} className="mt-3 space-y-3 border-t-2 border-dashed border-ink pt-4">
-            {person.funFact && (
-              <p className="font-serif text-lg leading-snug">
-                <span className="eyebrow mr-2 align-middle">Fun fact</span>
-                {person.funFact}
-              </p>
-            )}
-            <div>
-              <p className="eyebrow">Into</p>
-              <ul className="mt-1.5 flex flex-wrap gap-1.5">
-                {labelsFor(INTEREST_OPTIONS, person.interests).map((i) => (
-                  <li key={i} className={cn('inline-flex items-center gap-1 border-2 border-ink px-2 py-0.5 text-sm font-semibold', shared.includes(i) ? 'bg-saffron' : 'bg-sheet')}>
-                    {shared.includes(i) && <Icon name="star" accent="sheet" className="size-4" />}
-                    {i}
-                    {shared.includes(i) && <span className="sr-only"> (shared)</span>}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <p className="text-sm">
-              <span className="eyebrow mr-2">Speaks</span>
-              {person.languages.join(', ') || 'Not shared'}
-            </p>
-            {Object.keys(match.dimensions).length > 0 && (
-              <dl className="grid grid-cols-2 border-t-2 border-l-2 border-ink text-sm">
-                {(Object.entries(match.dimensions) as [Dimension, number][]).map(([dim, score]) => (
-                  <div key={dim} className="border-r-2 border-b-2 border-ink px-3 py-2">
-                    <dt className="font-bold">{DIMENSION_LABELS[dim]}</dt>
-                    <dd>{Math.round(score * 100)}% match</dd>
-                  </div>
-                ))}
-              </dl>
-            )}
+          <div className="mt-3 border-t-2 border-dashed border-ink pt-4">
+            <PersonDetails id={detailsId} person={person} match={match} />
           </div>
         )}
       </div>
@@ -128,21 +139,25 @@ export default function PersonCard({ person, match, liked, onToggleLike, canMess
           <Icon name={open ? 'minus' : 'eye'} className="size-5" />
           {open ? 'Hide profile' : 'View profile'}
         </button>
-        <button type="button" aria-pressed={liked} disabled={busy} onClick={onToggleLike} className={buttonClasses({ variant: liked ? 'primary' : 'secondary' })}>
-          <Icon name={liked ? 'heart' : 'heart-outline'} accent={liked ? 'sienna' : 'none'} className="size-5" />
-          {liked ? 'Interested' : 'Show interest'}
-        </button>
-        {canMessage && (
-          <Link to={`/chat/${encodeURIComponent(person.id)}`} className={buttonClasses({ variant: 'dark' })}>
-            <Icon name="chat" className="size-5" />
-            Message
-          </Link>
-        )}
-        {!canMessage && (
-          <p className="flex w-full items-start gap-2 text-sm">
-            <Icon name="info" accent="sheet" className="size-5" />
-            Messaging opens once you’re matched as teammates, or you both show interest.
-          </p>
+        {pending ? (
+          <>
+            <span role="status" className={cn(buttonClasses({ variant: 'dark' }), 'cursor-default hover:bg-ink active:translate-0')}>
+              <Icon name="check" accent="none" strokeWidth={2.4} className="size-5" />
+              Request sent
+            </span>
+            <button type="button" disabled={busy} onClick={onWithdraw} className={buttonClasses({ variant: 'ghost', size: 'sm' })}>
+              Withdraw
+            </button>
+            <p className="flex w-full items-start gap-2 text-sm">
+              <Icon name="info" accent="sheet" className="size-5" />
+              We’ll let you know when {person.name} answers.
+            </p>
+          </>
+        ) : (
+          <button type="button" disabled={busy} onClick={onConnect} className={buttonClasses()}>
+            <Icon name="people2" accent="sheet" className="size-5" />
+            {busy ? 'Connecting…' : 'Connect'}
+          </button>
         )}
       </div>
     </article>
