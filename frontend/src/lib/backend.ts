@@ -59,11 +59,14 @@ export class TooFarError extends Error {}
 export class BackendError extends Error {
   readonly code: string | null
   readonly status: number
-  constructor(message: string, code: string | null, status: number) {
+  /** The server's hint, e.g. the retry reason from explore_register_capture ('capture_gap'…). */
+  readonly hint: string | null
+  constructor(message: string, code: string | null, status: number, hint: string | null = null) {
     super(message)
     this.name = 'BackendError'
     this.code = code
     this.status = status
+    this.hint = hint
   }
 }
 
@@ -71,7 +74,7 @@ export class BackendError extends Error {
 
 // apikey is always the anon key; Authorization carries the signed-in login's token when there is
 // one (so the database knows who is calling), else the anon key.
-async function headers(extra?: Record<string, string>): Promise<Record<string, string>> {
+export async function headers(extra?: Record<string, string>): Promise<Record<string, string>> {
   const token = (await getAccessToken()) ?? config.supabaseAnonKey
   return {
     apikey: config.supabaseAnonKey,
@@ -96,12 +99,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     if (body?.hint === 'too_far') throw new TooFarError(body.message ?? 'Not at the spot yet')
     // 42501 "Not your account", 23505 "This login already has a profile", etc.: show the server's message.
-    throw new BackendError(body?.message ?? `Request failed (${res.status})`, body?.code ?? null, res.status)
+    throw new BackendError(body?.message ?? `Request failed (${res.status})`, body?.code ?? null, res.status, body?.hint ?? null)
   }
   return body as T
 }
 
-const rpc = <T>(fn: string, args: Record<string, unknown>) =>
+export const rpc = <T>(fn: string, args: Record<string, unknown>) =>
   request<T>(`/rest/v1/rpc/${fn}`, { method: 'POST', body: JSON.stringify(args) })
 
 // ---- Mapping -------------------------------------------------------------------
@@ -276,13 +279,19 @@ export async function saveMigoRecord(record: ProfileRecord): Promise<void> {
   await rpc('migo_save_record', { p_profile_id: record.accountId, p_record: record })
 }
 
+/**
+ * Deletes the account. First removes the login's files from the private 'gallery' bucket (best
+ * effort: the database can't delete storage objects itself), then the profile and its rows.
+ */
 export async function deleteMigoAccount(id: string): Promise<void> {
+  await deleteMyGalleryFiles().catch(() => undefined)
   await rpc('migo_delete_account', { p_profile_id: id })
 }
 
-// ---- Gallery (006_gallery.sql) ----------------------------------------------------
-// Photos live in the 'gallery' bucket under the login's own folder (<auth uid>/<random id>.jpg);
-// a private `photos` row holds the city, caption and date. Needs a signed-in login.
+// ---- Gallery (006_gallery.sql, 007_landmarks_geofencing.sql) -------------------------
+// Photos live in the private 'gallery' bucket under the login's own folder (<auth uid>/<random>.jpg)
+// and are shown through short-lived signed URLs. A private `photos` row holds the city, caption,
+// date and, for camera captures, the landmark the server matched. Needs a signed-in login.
 
 type PhotoRow = {
   id: string
@@ -300,17 +309,50 @@ type PhotoRow = {
   width: number | null
   height: number | null
   created_at: string
+  landmark_id?: string | null
+  landmark_name?: string | null
+  landmark_slug?: string | null
+  association_status?: Photo['associationStatus']
+  gps_accuracy_m?: number | null
+  file_size_bytes?: number | null
 }
 
-/** Public URL of a file in the 'gallery' bucket. */
-export function photoUrl(path: string) {
-  return `${config.supabaseUrl}/storage/v1/object/public/gallery/${path.split('/').map(encodeURIComponent).join('/')}`
+/** How long a signed gallery URL stays valid. The gallery re-signs well before it runs out. */
+export const SIGNED_URL_TTL_S = 3600
+const SIGN_BATCH = 200
+
+export type SignedUrls = { urls: Map<string, string>; expiresAt: number }
+
+/** Signed URLs for files in the private 'gallery' bucket, in batches. Paths that fail are left out. */
+export async function signGalleryPaths(paths: string[], expiresIn = SIGNED_URL_TTL_S): Promise<SignedUrls> {
+  const urls = new Map<string, string>()
+  // Count the lifetime from before the request, so it never looks longer than it is.
+  const expiresAt = Date.now() + expiresIn * 1000
+  const unique = [...new Set(paths)]
+  for (let i = 0; i < unique.length; i += SIGN_BATCH) {
+    const rows = await request<{ path: string | null; signedURL: string | null; error: string | null }[]>('/storage/v1/object/sign/gallery', {
+      method: 'POST',
+      body: JSON.stringify({ expiresIn, paths: unique.slice(i, i + SIGN_BATCH) }),
+    })
+    for (const r of rows ?? []) {
+      if (r.path && r.signedURL && !r.error) urls.set(r.path, `${config.supabaseUrl}/storage/v1${r.signedURL}`)
+    }
+  }
+  return { urls, expiresAt }
 }
 
-const toPhoto = (row: PhotoRow): Photo => ({
+/** The same photos with fresh signed URLs (e.g. before the old ones expire). */
+export async function resignPhotos(photos: Photo[]): Promise<Photo[]> {
+  if (photos.length === 0) return photos
+  const { urls, expiresAt } = await signGalleryPaths(photos.map((p) => p.storagePath))
+  return photos.map((p) => ({ ...p, url: urls.get(p.storagePath) ?? null, urlExpiresAt: expiresAt }))
+}
+
+const toPhoto = (row: PhotoRow, signed: SignedUrls): Photo => ({
   id: row.id,
   storagePath: row.storage_path,
-  url: photoUrl(row.storage_path),
+  url: signed.urls.get(row.storage_path) ?? null,
+  urlExpiresAt: signed.expiresAt,
   city: row.city_name
     ? { name: row.city_name, country: row.country, countryCode: row.country_code, placeId: row.place_id }
     : null,
@@ -323,6 +365,10 @@ const toPhoto = (row: PhotoRow): Photo => ({
   width: row.width,
   height: row.height,
   createdAt: Date.parse(row.created_at) || 0,
+  landmark: row.landmark_id ? { id: row.landmark_id, name: row.landmark_name ?? 'A MIGO place', slug: row.landmark_slug ?? null } : null,
+  associationStatus: row.association_status ?? null,
+  gpsAccuracyM: row.gps_accuracy_m ?? null,
+  fileSizeBytes: row.file_size_bytes ?? null,
 })
 
 const randomName = () =>
@@ -330,30 +376,21 @@ const randomName = () =>
     ? crypto.randomUUID()
     : Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('')
 
-async function deleteGalleryFile(path: string): Promise<void> {
-  await fetch(`${config.supabaseUrl}/storage/v1/object/gallery/${path}`, { method: 'DELETE', headers: await headers() })
-}
-
-/** The profile's photos, newest first. */
-export async function listPhotos(profileId: string): Promise<Photo[]> {
-  const rows = await rpc<PhotoRow[] | null>('gallery_list', { p_profile_id: profileId })
-  return (rows ?? []).map(toPhoto)
-}
+const objectPath = (path: string) => path.split('/').map(encodeURIComponent).join('/')
 
 /**
- * Shrinks the picture in the browser (≤ 1600 px JPEG), uploads it to the login's folder and saves
- * its details. Throws BackendError 42501 when nobody is signed in, ImageReadError for unreadable files.
+ * Uploads a ready-to-store JPEG to the login's folder in the 'gallery' bucket and returns its path.
+ * Nothing references it yet: the caller registers it, and deletes it (deleteGalleryFile) if that fails.
  */
-export async function uploadPhoto(profileId: string, file: Blob, meta: PhotoMeta = {}): Promise<Photo> {
+export async function uploadGalleryImage(image: Blob): Promise<string> {
   if (!isBackendConfigured()) throw new Error('Backend not configured: set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY')
   const uid = getSession()?.user.id
   if (!uid) throw new BackendError('Sign in to save photos', '42501', 401)
-  const image = await prepareImage(file)
   const path = `${uid}/${randomName()}.jpg`
-  const res = await fetch(`${config.supabaseUrl}/storage/v1/object/gallery/${path}`, {
+  const res = await fetch(`${config.supabaseUrl}/storage/v1/object/gallery/${objectPath(path)}`, {
     method: 'POST',
     headers: await headers({ 'Content-Type': 'image/jpeg', 'Cache-Control': 'max-age=31536000' }),
-    body: image.blob,
+    body: image,
   })
   if (!res.ok) {
     let message = `Photo upload failed (${res.status})`
@@ -365,9 +402,55 @@ export async function uploadPhoto(profileId: string, file: Blob, meta: PhotoMeta
     }
     throw new BackendError(message, null, res.status)
   }
+  return path
+}
+
+/** Removes one file from the login's 'gallery' folder. Throws when the server refuses. */
+export async function deleteGalleryFile(path: string): Promise<void> {
+  const res = await fetch(`${config.supabaseUrl}/storage/v1/object/gallery/${objectPath(path)}`, { method: 'DELETE', headers: await headers() })
+  if (!res.ok && res.status !== 404) throw new BackendError(`Couldn’t delete the file (${res.status})`, null, res.status)
+}
+
+/** Every file in the signed-in login's gallery folder, removed in batches (account deletion). */
+async function deleteMyGalleryFiles(): Promise<void> {
+  const uid = getSession()?.user.id
+  if (!uid || !isBackendConfigured()) return
+  const limit = 1000
+  const paths: string[] = []
+  // List everything first: deleting while paging would shift the offsets.
+  for (let offset = 0; ; offset += limit) {
+    const items = await request<{ name: string; id: string | null }[]>('/storage/v1/object/list/gallery', {
+      method: 'POST',
+      body: JSON.stringify({ prefix: uid, limit, offset }),
+    })
+    for (const it of items ?? []) if (it.id && it.name) paths.push(`${uid}/${it.name}`)
+    if (!items || items.length < limit) break
+  }
+  for (let i = 0; i < paths.length; i += limit) {
+    await request('/storage/v1/object/gallery', { method: 'DELETE', body: JSON.stringify({ prefixes: paths.slice(i, i + limit) }) })
+  }
+}
+
+/** The profile's photos, newest first, with signed URLs. */
+export async function listPhotos(profileId: string): Promise<Photo[]> {
+  const rows = (await rpc<PhotoRow[] | null>('gallery_list', { p_profile_id: profileId })) ?? []
+  // A signing hiccup shouldn't hide the list: tiles then show "Image unavailable" until the next re-sign.
+  const signed = await signGalleryPaths(rows.map((r) => r.storage_path)).catch((): SignedUrls => ({ urls: new Map(), expiresAt: 0 }))
+  return rows.map((r) => toPhoto(r, signed))
+}
+
+/**
+ * Manual upload: shrinks the picture in the browser (≤ 1600 px JPEG), uploads it to the login's
+ * folder and saves its details. No location check (camera captures go through features/camera).
+ * Throws BackendError 42501 when nobody is signed in, ImageReadError for unreadable files.
+ */
+export async function uploadPhoto(profileId: string, file: Blob, meta: PhotoMeta = {}): Promise<Photo> {
+  const image = await prepareImage(file)
+  const path = await uploadGalleryImage(image.blob)
   const city = meta.city ?? null
+  let row: PhotoRow
   try {
-    const row = await rpc<PhotoRow>('gallery_add_photo', {
+    row = await rpc<PhotoRow>('gallery_add_photo', {
       p_profile_id: profileId,
       p_storage_path: path,
       p_meta: {
@@ -385,15 +468,19 @@ export async function uploadPhoto(profileId: string, file: Blob, meta: PhotoMeta
         height: image.height,
       },
     })
-    return toPhoto(row)
   } catch (e) {
     // Don't leave an orphan file behind when the details couldn't be saved.
     await deleteGalleryFile(path).catch(() => undefined)
     throw e
   }
+  const signed = await signGalleryPaths([path]).catch((): SignedUrls => ({ urls: new Map(), expiresAt: 0 }))
+  return toPhoto(row, signed)
 }
 
-/** Deletes the photo's record, then its file. The file delete is best effort. */
+/**
+ * Deletes the photo's record, then its file (best effort). For a landmark photo the visit itself
+ * stays: discoveries are kept apart from photos.
+ */
 export async function deletePhoto(profileId: string, photoId: string): Promise<void> {
   const path = await rpc<string>('gallery_delete_photo', { p_profile_id: profileId, p_photo_id: photoId })
   if (path) await deleteGalleryFile(path).catch(() => undefined)
